@@ -60,7 +60,15 @@ export function QuoteActions({ id, status, pricingComplete, hasOrder, number }: 
         </>
       )}
       {status === "ACCEPTED" && !hasOrder && (
-        <Button onClick={() => run(() => convertQuoteAction(id), (r) => r.ok && "data" in r && router.push(`/orders/${(r as { data: { orderId: string } }).data.orderId}`))} loading={busy}>
+        <Button
+          onClick={() =>
+            run(
+              () => convertQuoteAction(id),
+              (r) => r.ok && "data" in r && router.push(`/orders/${(r as { data: { orderId: string } }).data.orderId}`),
+            )
+          }
+          loading={busy}
+        >
           <ArrowRightLeft /> Create order
         </Button>
       )}
@@ -72,7 +80,14 @@ export function QuoteActions({ id, status, pricingComplete, hasOrder, number }: 
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           {["SENT", "REJECTED", "EXPIRED"].includes(status) && (
-            <DropdownMenuItem onSelect={() => run(() => reviseQuoteAction(id), (r) => "data" in r && router.push(`/quotes/${(r as { data: { id: string } }).data.id}/edit`))}>
+            <DropdownMenuItem
+              onSelect={() =>
+                run(
+                  () => reviseQuoteAction(id),
+                  (r) => "data" in r && router.push(`/quotes/${(r as { data: { id: string } }).data.id}/edit`),
+                )
+              }
+            >
               <GitBranch /> Create revision
             </DropdownMenuItem>
           )}
@@ -93,7 +108,12 @@ export function QuoteActions({ id, status, pricingComplete, hasOrder, number }: 
           title={`Delete draft ${number}?`}
           description="The draft and its items are permanently removed. Sent quotes are never deleted."
           confirmLabel="Delete draft"
-          onConfirm={() => run(() => deleteQuoteAction(id), () => router.push("/quotes"))}
+          onConfirm={() =>
+            run(
+              () => deleteQuoteAction(id),
+              () => router.push("/quotes"),
+            )
+          }
         />
       )}
 
@@ -103,7 +123,12 @@ export function QuoteActions({ id, status, pricingComplete, hasOrder, number }: 
             <Field label="Approval note">
               <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Approved by phone" autoFocus />
             </Field>
-            <Checkbox checked={createOrder} onChange={(e) => setCreateOrder(e.target.checked)} label="Create and confirm the order now" hint="Copies all items with the quoted prices, reserves material and starts modeling projects." />
+            <Checkbox
+              checked={createOrder}
+              onChange={(e) => setCreateOrder(e.target.checked)}
+              label="Create and confirm the order now"
+              hint="Copies all items with the quoted prices, reserves material and starts modeling projects."
+            />
           </div>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setDialog(null)}>
@@ -136,7 +161,16 @@ export function QuoteActions({ id, status, pricingComplete, hasOrder, number }: 
             <Button variant="secondary" onClick={() => setDialog(null)}>
               Cancel
             </Button>
-            <Button variant="danger" loading={busy} onClick={() => run(() => rejectQuoteAction(id, note), () => setDialog(null))}>
+            <Button
+              variant="danger"
+              loading={busy}
+              onClick={() =>
+                run(
+                  () => rejectQuoteAction(id, note),
+                  () => setDialog(null),
+                )
+              }
+            >
               Mark rejected
             </Button>
           </DialogFooter>

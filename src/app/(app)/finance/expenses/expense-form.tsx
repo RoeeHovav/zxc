@@ -26,7 +26,19 @@ export interface ExpenseValues {
   notes?: string | null;
 }
 
-export function ExpenseForm({ id, initial, suppliers, printers, vatRate }: { id: string | null; initial?: ExpenseValues; suppliers: { id: string; name: string }[]; printers: { id: string; name: string }[]; vatRate: string | null }) {
+export function ExpenseForm({
+  id,
+  initial,
+  suppliers,
+  printers,
+  vatRate,
+}: {
+  id: string | null;
+  initial?: ExpenseValues;
+  suppliers: { id: string; name: string }[];
+  printers: { id: string; name: string }[];
+  vatRate: string | null;
+}) {
   const router = useRouter();
   const v = initial ?? {};
   const [amount, setAmount] = React.useState(v.amount ?? "");
@@ -83,7 +95,13 @@ export function ExpenseForm({ id, initial, suppliers, printers, vatRate }: { id:
               }
             />
             <SelectField name="supplierId" label="Supplier" defaultValue={v.supplierId ?? ""} placeholder="None" options={suppliers.map((s) => ({ value: s.id, label: s.name }))} />
-            <SelectField name="paymentMethod" label="Paid with" defaultValue={v.paymentMethod ?? ""} placeholder="—" options={["CASH", "BANK_TRANSFER", "CREDIT_CARD", "BIT", "PAYBOX", "PAYPAL", "CHECK", "OTHER"].map((m) => ({ value: m, label: enumLabel("paymentMethod", m) }))} />
+            <SelectField
+              name="paymentMethod"
+              label="Paid with"
+              defaultValue={v.paymentMethod ?? ""}
+              placeholder="—"
+              options={["CASH", "BANK_TRANSFER", "CREDIT_CARD", "BIT", "PAYBOX", "PAYPAL", "CHECK", "OTHER"].map((m) => ({ value: m, label: enumLabel("paymentMethod", m) }))}
+            />
             <TextField name="reference" label="Invoice / receipt number" defaultValue={v.reference ?? ""} />
             <SelectField name="printerId" label="Related printer" defaultValue={v.printerId ?? ""} placeholder="None" options={printers.map((p) => ({ value: p.id, label: p.name }))} />
             <TextareaField name="notes" label="Notes" defaultValue={v.notes ?? ""} rows={2} className="sm:col-span-2" />

@@ -100,7 +100,14 @@ describe("customer → quote → order → production → payment → completion
     // Printer is busy — a second job cannot start on it.
     await expect(startJob(base.user.id, all[1].id)).rejects.toThrow(/already printing/);
 
-    await finishPrint(base.user.id, all[0].id, { outcome: "DONE", actualMinutes: "240", consumption: [{ spoolId: spool.id, materialId: null, grams: "100" }], good: {}, failureReason: null, notes: null });
+    await finishPrint(base.user.id, all[0].id, {
+      outcome: "DONE",
+      actualMinutes: "240",
+      consumption: [{ spoolId: spool.id, materialId: null, grams: "100" }],
+      good: {},
+      failureReason: null,
+      notes: null,
+    });
     const afterFirst = await prisma.spool.findUniqueOrThrow({ where: { id: spool.id } });
     expect(afterFirst.remainingG.toString()).toBe("900");
     // One job done out of several: the order must still be printing, not ready.
@@ -108,14 +115,35 @@ describe("customer → quote → order → production → payment → completion
 
     // Second bracket job fails; reprint is queued; reservation is not reduced by waste.
     await startJob(base.user.id, all[1].id);
-    await finishPrint(base.user.id, all[1].id, { outcome: "FAILED", actualMinutes: "30", consumption: [{ spoolId: spool.id, materialId: null, grams: "20" }], good: {}, failureReason: "Spaghetti — bed adhesion", notes: null });
+    await finishPrint(base.user.id, all[1].id, {
+      outcome: "FAILED",
+      actualMinutes: "30",
+      consumption: [{ spoolId: spool.id, materialId: null, grams: "20" }],
+      good: {},
+      failureReason: "Spaghetti — bed adhesion",
+      notes: null,
+    });
     const re = await reprintJob(base.user.id, all[1].id);
     await startJob(base.user.id, re.id);
-    await finishPrint(base.user.id, re.id, { outcome: "QUALITY_CHECK", actualMinutes: "240", consumption: [{ spoolId: spool.id, materialId: null, grams: "100" }], good: {}, failureReason: null, notes: null });
+    await finishPrint(base.user.id, re.id, {
+      outcome: "QUALITY_CHECK",
+      actualMinutes: "240",
+      consumption: [{ spoolId: spool.id, materialId: null, grams: "100" }],
+      good: {},
+      failureReason: null,
+      notes: null,
+    });
     await advanceJob(base.user.id, re.id, "DONE", { good: {} });
 
     await startJob(base.user.id, all[2].id);
-    await finishPrint(base.user.id, all[2].id, { outcome: "DONE", actualMinutes: "240", consumption: [{ spoolId: spool.id, materialId: null, grams: "100" }], good: {}, failureReason: null, notes: null });
+    await finishPrint(base.user.id, all[2].id, {
+      outcome: "DONE",
+      actualMinutes: "240",
+      consumption: [{ spoolId: spool.id, materialId: null, grams: "100" }],
+      good: {},
+      failureReason: null,
+      notes: null,
+    });
 
     const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId }, include: { items: { include: { reservations: true } } } });
     expect(order.status).toBe("READY");
@@ -129,15 +157,49 @@ describe("customer → quote → order → production → payment → completion
   });
 
   it("handles deposits, partial payments, overpayment and refunds", async () => {
-    await expect(recordPayment(base.user.id, orderId, { kind: "PAYMENT", method: "BIT", amount: "900", isDeposit: false, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: null })).rejects.toThrow(/exceeds the balance/);
-    await recordPayment(base.user.id, orderId, { kind: "PAYMENT", method: "BIT", amount: "300", isDeposit: true, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: "k1" });
+    await expect(
+      recordPayment(base.user.id, orderId, { kind: "PAYMENT", method: "BIT", amount: "900", isDeposit: false, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: null }),
+    ).rejects.toThrow(/exceeds the balance/);
+    await recordPayment(base.user.id, orderId, {
+      kind: "PAYMENT",
+      method: "BIT",
+      amount: "300",
+      isDeposit: true,
+      receivedAt: null,
+      reference: null,
+      feeAmount: null,
+      notes: null,
+      idempotencyKey: "k1",
+    });
     // Duplicate submission with the same key is ignored.
-    await recordPayment(base.user.id, orderId, { kind: "PAYMENT", method: "BIT", amount: "300", isDeposit: true, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: "k1" });
+    await recordPayment(base.user.id, orderId, {
+      kind: "PAYMENT",
+      method: "BIT",
+      amount: "300",
+      isDeposit: true,
+      receivedAt: null,
+      reference: null,
+      feeAmount: null,
+      notes: null,
+      idempotencyKey: "k1",
+    });
     expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).amountPaid.toString()).toBe("300");
-    await expect(recordPayment(base.user.id, orderId, { kind: "REFUND", method: "BIT", amount: "301", isDeposit: false, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: null })).rejects.toThrow(/cannot exceed/);
+    await expect(
+      recordPayment(base.user.id, orderId, { kind: "REFUND", method: "BIT", amount: "301", isDeposit: false, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: null }),
+    ).rejects.toThrow(/cannot exceed/);
     await transitionOrder(base.user.id, orderId, "DELIVERED");
     await expect(transitionOrder(base.user.id, orderId, "COMPLETED")).rejects.toThrow(/Outstanding balance of 573.20/);
-    await recordPayment(base.user.id, orderId, { kind: "PAYMENT", method: "CASH", amount: "573.20", isDeposit: false, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: null });
+    await recordPayment(base.user.id, orderId, {
+      kind: "PAYMENT",
+      method: "CASH",
+      amount: "573.20",
+      isDeposit: false,
+      receivedAt: null,
+      reference: null,
+      feeAmount: null,
+      notes: null,
+      idempotencyKey: null,
+    });
     await transitionOrder(base.user.id, orderId, "COMPLETED");
     const done = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
     expect(done.status).toBe("COMPLETED");
@@ -166,7 +228,9 @@ describe("cancellation, revisions and edits", () => {
     expect(after.items[0].reservations.every((r) => r.status === "RELEASED")).toBe(true);
     expect(after.jobs.every((j) => j.status === "CANCELED")).toBe(true);
     // Payment on a canceled order is refused; a partial refund is allowed.
-    await expect(recordPayment(user.id, o.id, { kind: "PAYMENT", method: "CASH", amount: "1", isDeposit: false, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: null })).rejects.toThrow(/canceled/);
+    await expect(
+      recordPayment(user.id, o.id, { kind: "PAYMENT", method: "CASH", amount: "1", isDeposit: false, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: null }),
+    ).rejects.toThrow(/canceled/);
     await recordPayment(user.id, o.id, { kind: "REFUND", method: "CASH", amount: "15", isDeposit: false, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: null });
     expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).amountPaid.toString()).toBe("5");
   });
@@ -191,7 +255,17 @@ describe("cancellation, revisions and edits", () => {
   it("voids a payment and keeps the ledger consistent", async () => {
     const { user, customer, material, printer } = base;
     const o = await saveOrder(user.id, null, orderForm(customer.id, [printLine(material.id, printer.id, { quantity: 1 })], { confirm: true }));
-    const p = await recordPayment(user.id, o.id, { kind: "PAYMENT", method: "CASH", amount: "10", isDeposit: false, receivedAt: null, reference: null, feeAmount: null, notes: null, idempotencyKey: null });
+    const p = await recordPayment(user.id, o.id, {
+      kind: "PAYMENT",
+      method: "CASH",
+      amount: "10",
+      isDeposit: false,
+      receivedAt: null,
+      reference: null,
+      feeAmount: null,
+      notes: null,
+      idempotencyKey: null,
+    });
     await voidPayment(user.id, p.id, "Entered twice");
     expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).amountPaid.toString()).toBe("0");
     expect(await verifyPaymentCaches()).toEqual([]);

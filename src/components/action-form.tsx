@@ -97,7 +97,16 @@ export function NumberField({ name, label, hint, required, className, suffix, ..
   );
 }
 
-export function SelectField({ name, label, hint, required, className, options, placeholder, ...rest }: Common & { options: { value: string; label: string }[]; placeholder?: string } & React.SelectHTMLAttributes<HTMLSelectElement>) {
+export function SelectField({
+  name,
+  label,
+  hint,
+  required,
+  className,
+  options,
+  placeholder,
+  ...rest
+}: Common & { options: { value: string; label: string }[]; placeholder?: string } & React.SelectHTMLAttributes<HTMLSelectElement>) {
   const error = useFieldError(name);
   return (
     <Field label={label} hint={hint} error={error} required={required} className={className}>

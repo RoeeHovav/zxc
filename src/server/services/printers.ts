@@ -48,7 +48,12 @@ export async function printerHours(ids?: string[]): Promise<Map<string, string>>
   const map = new Map<string, string>();
   for (const p of printers) {
     const minutes = jobs.find((j) => j.printerId === p.id)?._sum.actualMinutes;
-    map.set(p.id, dec(p.initialPrintHours.toString()).plus(minutes ? dec(minutes.toString()).div(60) : ZERO).toFixed(1));
+    map.set(
+      p.id,
+      dec(p.initialPrintHours.toString())
+        .plus(minutes ? dec(minutes.toString()).div(60) : ZERO)
+        .toFixed(1),
+    );
   }
   return map;
 }
@@ -187,13 +192,27 @@ export async function savePrinter(userId: string, id: string | null, i: PrinterI
   });
 }
 
-export async function saveMaintenanceTask(userId: string, printerId: string, input: { id?: string | null; title: string; intervalPrintHours: number | null; intervalDays: number | null; notes: string | null }) {
+export async function saveMaintenanceTask(
+  userId: string,
+  printerId: string,
+  input: { id?: string | null; title: string; intervalPrintHours: number | null; intervalDays: number | null; notes: string | null },
+) {
   if (!input.intervalPrintHours && !input.intervalDays) throw new ServiceError("Set an interval in print hours, days, or both.");
   const hours = (await printerHours([printerId])).get(printerId) ?? "0";
   return prisma.$transaction(async (tx) => {
     const t = input.id
       ? await tx.maintenanceTask.update({ where: { id: input.id }, data: { title: input.title, intervalPrintHours: input.intervalPrintHours, intervalDays: input.intervalDays, notes: input.notes } })
-      : await tx.maintenanceTask.create({ data: { printerId, title: input.title, intervalPrintHours: input.intervalPrintHours, intervalDays: input.intervalDays, notes: input.notes, lastDoneAt: new Date(), lastDonePrintHours: hours } });
+      : await tx.maintenanceTask.create({
+          data: {
+            printerId,
+            title: input.title,
+            intervalPrintHours: input.intervalPrintHours,
+            intervalDays: input.intervalDays,
+            notes: input.notes,
+            lastDoneAt: new Date(),
+            lastDonePrintHours: hours,
+          },
+        });
     await audit(tx, { userId, entityType: "PRINTER", entityId: printerId, action: "MAINTENANCE_TASK", summary: `${input.id ? "Updated" : "Scheduled"} maintenance "${t.title}"` });
     return t;
   });

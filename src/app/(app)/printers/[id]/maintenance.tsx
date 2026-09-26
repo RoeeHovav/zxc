@@ -42,10 +42,29 @@ export function MaintenanceControls({ printerId, tasks }: { printerId: string; t
   );
 }
 
-function MaintenanceLogForm({ printerId, tasks, taskId, onDone, defaultDescription }: { printerId: string; tasks: { id: string; title: string }[]; taskId?: string; onDone: () => void; defaultDescription?: string }) {
+function MaintenanceLogForm({
+  printerId,
+  tasks,
+  taskId,
+  onDone,
+  defaultDescription,
+}: {
+  printerId: string;
+  tasks: { id: string; title: string }[];
+  taskId?: string;
+  onDone: () => void;
+  defaultDescription?: string;
+}) {
   return (
     <ActionForm action={logMaintenanceAction.bind(null, printerId)} submitLabel="Record" onSuccess={onDone}>
-      <SelectField name="taskId" label="Scheduled task" defaultValue={taskId ?? ""} placeholder="Unscheduled work" options={tasks.map((t) => ({ value: t.id, label: t.title }))} hint="Completing a scheduled task resets its interval." />
+      <SelectField
+        name="taskId"
+        label="Scheduled task"
+        defaultValue={taskId ?? ""}
+        placeholder="Unscheduled work"
+        options={tasks.map((t) => ({ value: t.id, label: t.title }))}
+        hint="Completing a scheduled task resets its interval."
+      />
       <TextField name="description" label="What was done" required defaultValue={defaultDescription ?? ""} autoFocus />
       <div className="grid gap-4 sm:grid-cols-2">
         <NumberField name="cost" label="Cost" suffix="₪" />

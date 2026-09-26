@@ -23,7 +23,9 @@ import type { EditorHeader, EditorInitial, EditorLine } from "./types";
 const newKey = () => Math.random().toString(36).slice(2, 10);
 
 export function blankLine(options: EditorOptions, previous?: EditorLine): EditorLine {
-  const printer = previous?.printerId ? options.printers.find((p) => p.id === previous.printerId) : options.printers.find((p) => p.status !== "OFFLINE" && p.status !== "MAINTENANCE") ?? options.printers[0];
+  const printer = previous?.printerId
+    ? options.printers.find((p) => p.id === previous.printerId)
+    : (options.printers.find((p) => p.status !== "OFFLINE" && p.status !== "MAINTENANCE") ?? options.printers[0]);
   const material = previous?.materialId ? options.materials.find((m) => m.id === previous.materialId) : undefined;
   return {
     key: newKey(),
@@ -328,7 +330,10 @@ export function DocumentEditor({
                 searchPlaceholder="Name, phone, number…"
                 invalid={!!serverErrors.customerId}
                 footer={
-                  <Link href={`/customers/new?returnTo=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : `/${mode}s/new`)}`} className="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium text-primary hover:bg-accent">
+                  <Link
+                    href={`/customers/new?returnTo=${encodeURIComponent(typeof window !== "undefined" ? window.location.pathname : `/${mode}s/new`)}`}
+                    className="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium text-primary hover:bg-accent"
+                  >
                     <UserPlus className="size-3.5" /> New customer
                   </Link>
                 }
@@ -452,7 +457,13 @@ export function DocumentEditor({
             )}
             <div className="grid gap-1">
               <Label htmlFor="doc-dep">Deposit (%)</Label>
-              <Input id="doc-dep" inputMode="decimal" value={header.depositPercent} onChange={(e) => setH({ depositPercent: e.target.value })} placeholder={new D(ctx.defaultDepositPercent).times(100).toString()} />
+              <Input
+                id="doc-dep"
+                inputMode="decimal"
+                value={header.depositPercent}
+                onChange={(e) => setH({ depositPercent: e.target.value })}
+                placeholder={new D(ctx.defaultDepositPercent).times(100).toString()}
+              />
             </div>
             {mode === "order" && (
               <div className="grid gap-1">
@@ -529,11 +540,13 @@ export function DocumentEditor({
                 Totals appear once every item has the information needed to price it. Nothing is guessed.
               </Alert>
             )}
-            {priced.issues.filter((i) => i.line === undefined && i.severity !== "info").map((i, k) => (
-              <p key={k} className={i.severity === "error" ? "text-xs text-destructive" : "text-xs text-warning"}>
-                {i.message}
-              </p>
-            ))}
+            {priced.issues
+              .filter((i) => i.line === undefined && i.severity !== "info")
+              .map((i, k) => (
+                <p key={k} className={i.severity === "error" ? "text-xs text-destructive" : "text-xs text-warning"}>
+                  {i.message}
+                </p>
+              ))}
           </CardContent>
           <div className="grid gap-2 border-t border-border p-4">
             {mode === "order" && !isConfirmed ? (

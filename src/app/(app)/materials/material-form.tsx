@@ -25,15 +25,38 @@ export interface MaterialValues {
   isActive?: boolean;
 }
 
-export function MaterialForm({ id, initial, types, suppliers }: { id: string | null; initial?: MaterialValues; types: { id: string; code: string; name: string }[]; suppliers: { id: string; name: string }[] }) {
+export function MaterialForm({
+  id,
+  initial,
+  types,
+  suppliers,
+}: {
+  id: string | null;
+  initial?: MaterialValues;
+  types: { id: string; code: string; name: string }[];
+  suppliers: { id: string; name: string }[];
+}) {
   const v = initial ?? {};
   const pct = (f: string | null | undefined) => (f ? new D(f).times(100).toString() : "");
   return (
     <Card>
       <CardContent className="py-6">
-        <ActionForm action={saveMaterialAction.bind(null, id)} submitLabel={id ? "Save changes" : "Create material"} successMessage={id ? "Material saved." : "Material created."} redirectTo={(d: { id: string }) => `/materials/${d.id}`} className="gap-6">
+        <ActionForm
+          action={saveMaterialAction.bind(null, id)}
+          submitLabel={id ? "Save changes" : "Create material"}
+          successMessage={id ? "Material saved." : "Material created."}
+          redirectTo={(d: { id: string }) => `/materials/${d.id}`}
+          className="gap-6"
+        >
           <FormSection title="Product" description="What the filament is. Brand + line + color identify it on quotes.">
-            <SelectField name="materialTypeId" label="Type" required defaultValue={v.materialTypeId ?? ""} placeholder="Select type…" options={types.map((t) => ({ value: t.id, label: `${t.code} — ${t.name}` }))} />
+            <SelectField
+              name="materialTypeId"
+              label="Type"
+              required
+              defaultValue={v.materialTypeId ?? ""}
+              placeholder="Select type…"
+              options={types.map((t) => ({ value: t.id, label: `${t.code} — ${t.name}` }))}
+            />
             <TextField name="brand" label="Brand" required defaultValue={v.brand ?? ""} placeholder="Bambu Lab" />
             <TextField name="productLine" label="Product line" defaultValue={v.productLine ?? ""} placeholder="PLA Basic, Matte, Silk…" />
             <TextField name="colorName" label="Color" required defaultValue={v.colorName ?? ""} placeholder="Jade White" />

@@ -64,7 +64,10 @@ export async function createJobsForOrder(userId: string, orderId: string) {
 }
 
 /** Custom job, e.g. a mixed plate with several items or a partial batch. */
-export async function createCustomJob(userId: string, input: { orderId: string; printerId: string | null; items: { orderItemId: string; quantity: number }[]; estimatedMinutes: string | null; notes: string | null }) {
+export async function createCustomJob(
+  userId: string,
+  input: { orderId: string; printerId: string | null; items: { orderItemId: string; quantity: number }[]; estimatedMinutes: string | null; notes: string | null },
+) {
   const items = input.items.filter((i) => i.quantity > 0);
   if (items.length === 0) throw new ServiceError("Choose at least one item and quantity.");
   return prisma.$transaction(async (tx) => {
@@ -256,7 +259,13 @@ export async function finishPrint(userId: string, jobId: string, input: FinishIn
         notes: input.notes ?? job.notes,
       },
     });
-    await audit(tx, { userId, entityType: "ORDER", entityId: job.orderId, action: "JOB_FINISH", summary: `${job.number} → ${input.outcome.toLowerCase().replace("_", " ")} (${grams.toFixed(0)} g${minutes ? `, ${minutes.toFixed(0)} min` : ""})${input.failureReason ? `: ${input.failureReason}` : ""}` });
+    await audit(tx, {
+      userId,
+      entityType: "ORDER",
+      entityId: job.orderId,
+      action: "JOB_FINISH",
+      summary: `${job.number} → ${input.outcome.toLowerCase().replace("_", " ")} (${grams.toFixed(0)} g${minutes ? `, ${minutes.toFixed(0)} min` : ""})${input.failureReason ? `: ${input.failureReason}` : ""}`,
+    });
     await afterJobChange(tx, userId, job);
   });
 }
@@ -270,7 +279,12 @@ async function setGood(tx: Tx, job: Awaited<ReturnType<typeof lockJob>>, good: R
 }
 
 /** Post-processing / QC steps after printing. */
-export async function advanceJob(userId: string, jobId: string, to: "QUALITY_CHECK" | "POST_PROCESSING" | "DONE" | "FAILED", opts: { good?: Record<string, number>; qcNotes?: string | null; failureReason?: string | null } = {}) {
+export async function advanceJob(
+  userId: string,
+  jobId: string,
+  to: "QUALITY_CHECK" | "POST_PROCESSING" | "DONE" | "FAILED",
+  opts: { good?: Record<string, number>; qcNotes?: string | null; failureReason?: string | null } = {},
+) {
   return prisma.$transaction(async (tx) => {
     const job = await lockJob(tx, jobId);
     if (job.status === "PRINTING") throw new ServiceError("Finish the print first (record time and material).");
@@ -280,9 +294,20 @@ export async function advanceJob(userId: string, jobId: string, to: "QUALITY_CHE
     if (to === "FAILED") for (const ji of job.items) await tx.printJobItem.update({ where: { id: ji.id }, data: { quantityGood: 0 } });
     await tx.printJob.update({
       where: { id: jobId },
-      data: { status: to, completedAt: to === "DONE" || to === "FAILED" ? new Date() : null, qcNotes: opts.qcNotes ?? job.qcNotes, failureReason: to === "FAILED" ? opts.failureReason : job.failureReason },
+      data: {
+        status: to,
+        completedAt: to === "DONE" || to === "FAILED" ? new Date() : null,
+        qcNotes: opts.qcNotes ?? job.qcNotes,
+        failureReason: to === "FAILED" ? opts.failureReason : job.failureReason,
+      },
     });
-    await audit(tx, { userId, entityType: "ORDER", entityId: job.orderId, action: "JOB_STEP", summary: `${job.number} → ${to.toLowerCase().replace("_", " ")}${opts.failureReason ? `: ${opts.failureReason}` : ""}` });
+    await audit(tx, {
+      userId,
+      entityType: "ORDER",
+      entityId: job.orderId,
+      action: "JOB_STEP",
+      summary: `${job.number} → ${to.toLowerCase().replace("_", " ")}${opts.failureReason ? `: ${opts.failureReason}` : ""}`,
+    });
     await afterJobChange(tx, userId, job);
   });
 }
@@ -302,7 +327,9 @@ export async function reprintJob(userId: string, jobId: string) {
   return prisma.$transaction(async (tx) => {
     const job = await lockJob(tx, jobId);
     if (!["FAILED", "DONE"].includes(job.status)) throw new ServiceError("Only failed or completed jobs can be reprinted.");
-    const lines = job.items.map((ji) => ({ orderItemId: ji.orderItemId, quantity: job.status === "FAILED" ? ji.quantity : ji.quantity - (ji.quantityGood ?? ji.quantity) })).filter((l) => l.quantity > 0);
+    const lines = job.items
+      .map((ji) => ({ orderItemId: ji.orderItemId, quantity: job.status === "FAILED" ? ji.quantity : ji.quantity - (ji.quantityGood ?? ji.quantity) }))
+      .filter((l) => l.quantity > 0);
     if (!lines.length) throw new ServiceError("Nothing to reprint — all units passed.");
     const order = await tx.order.findUniqueOrThrow({ where: { id: job.orderId } });
     if (!PRODUCTION_ORDER_STATUSES.includes(order.status)) throw new ServiceError(`Order ${order.number} is not in production.`);
@@ -377,6 +404,14 @@ export async function spoolOptions(materialIds: string[]) {
   return prisma.spool.findMany({
     where: { materialId: { in: materialIds }, status: { in: ["SEALED", "OPEN"] } },
     orderBy: [{ status: "desc" }, { remainingG: "asc" }],
-    select: { id: true, code: true, remainingG: true, remainingIsMeasured: true, status: true, materialId: true, material: { select: { brand: true, colorName: true, materialType: { select: { code: true } } } } },
+    select: {
+      id: true,
+      code: true,
+      remainingG: true,
+      remainingIsMeasured: true,
+      status: true,
+      materialId: true,
+      material: { select: { brand: true, colorName: true, materialType: { select: { code: true } } } },
+    },
   });
 }

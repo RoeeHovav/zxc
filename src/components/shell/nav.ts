@@ -1,16 +1,4 @@
-import {
-  BarChart3,
-  Boxes,
-  ClipboardList,
-  FileText,
-  Home,
-  Layers,
-  PenTool,
-  Printer,
-  Settings,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { BarChart3, Boxes, ClipboardList, FileText, Home, Layers, PenTool, Printer, Settings, Users, Wallet } from "lucide-react";
 import { dictionary } from "@/lib/i18n";
 
 const t = dictionary.nav;

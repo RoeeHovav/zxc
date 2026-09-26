@@ -70,7 +70,11 @@ export function DocumentLines({ items }: { items: ViewLine[] }) {
                     {fees.scanning && <>Scanning {money(fees.scanning.price)} (one-time)</>}
                   </p>
                 )}
-                {r?.production?.priceSource === "MANUAL" && <Badge tone="warning" className="mt-1">manual price</Badge>}
+                {r?.production?.priceSource === "MANUAL" && (
+                  <Badge tone="warning" className="mt-1">
+                    manual price
+                  </Badge>
+                )}
                 {it.progress}
               </TD>
               <TD className="tabular text-end">{it.quantity}</TD>
@@ -137,7 +141,13 @@ export function TotalsBlock({ doc, extra }: { doc: DocTotals; extra?: React.Reac
   );
 }
 
-export function InternalSummary({ doc, actual }: { doc: { estimatedCost: Money; estimatedProfit: Money; taxableAmount: Money; pricingComplete: boolean; pricingSummary: unknown }; actual?: { total: string; complete: boolean; profit: string; variance: string } | null }) {
+export function InternalSummary({
+  doc,
+  actual,
+}: {
+  doc: { estimatedCost: Money; estimatedProfit: Money; taxableAmount: Money; pricingComplete: boolean; pricingSummary: unknown };
+  actual?: { total: string; complete: boolean; profit: string; variance: string } | null;
+}) {
   const s = doc.pricingSummary as { costs?: Record<string, string>; marginPercent?: string | null; markupPercent?: string | null } | null;
   if (!doc.pricingComplete || !s?.costs) return null;
   return (

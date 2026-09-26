@@ -114,7 +114,9 @@ export default async function MaterialsPage({ searchParams }: { searchParams: Pr
                   <TD className="tabular hidden text-end md:table-cell">{spoolWeight(m.stock.onHandG, !m.stock.hasEstimates)}</TD>
                   <TD className="tabular hidden text-end text-muted-foreground md:table-cell">{Number(m.stock.reservedG) > 0 ? grams(m.stock.reservedG) : "—"}</TD>
                   <TD className="tabular text-end">
-                    <span className={m.stock.lowStock ? "font-semibold text-destructive" : m.stock.nearThreshold ? "font-medium text-warning" : undefined}>{spoolWeight(m.stock.availableG, !m.stock.hasEstimates)}</span>
+                    <span className={m.stock.lowStock ? "font-semibold text-destructive" : m.stock.nearThreshold ? "font-medium text-warning" : undefined}>
+                      {spoolWeight(m.stock.availableG, !m.stock.hasEstimates)}
+                    </span>
                     {m.stock.lowStock && <div className="text-[11px] text-destructive">below {grams(m.minStockG)}</div>}
                     {m.stock.nearThreshold && <div className="text-[11px] text-warning">weigh to confirm</div>}
                   </TD>

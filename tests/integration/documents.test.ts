@@ -17,14 +17,21 @@ beforeAll(async () => {
 
 function assertNoInternals(doc: unknown) {
   const json = JSON.stringify(doc);
-  for (const forbidden of ["\"cost\"", "lineCost", "estimatedCost", "estimatedProfit", "margin", "markup", "profit", "machineRatePerHour", "pricingContext", SECRET_NOTE]) {
+  for (const forbidden of ['"cost"', "lineCost", "estimatedCost", "estimatedProfit", "margin", "markup", "profit", "machineRatePerHour", "pricingContext", SECRET_NOTE]) {
     expect(json, `document leaks ${forbidden}`).not.toContain(forbidden);
   }
 }
 
 describe("customer documents", () => {
   it("renders a quotation PDF with Hebrew text and no internal financials", async () => {
-    const q = await saveQuote(base.user.id, null, quoteForm(base.customer.id, [printLine(base.material.id, base.printer.id, { modelingHours: "2", serviceType: "MODELING_AND_PRINTING" })], { internalNotes: SECRET_NOTE, customerNotes: "Thank you!" }));
+    const q = await saveQuote(
+      base.user.id,
+      null,
+      quoteForm(base.customer.id, [printLine(base.material.id, base.printer.id, { modelingHours: "2", serviceType: "MODELING_AND_PRINTING" })], {
+        internalNotes: SECRET_NOTE,
+        customerNotes: "Thank you!",
+      }),
+    );
     const doc = await quoteDocument(q.id);
     assertNoInternals(doc);
     expect(doc.totals.find(([k]) => k === "Total")?.[1]).toBe(q.total.toString());
@@ -37,7 +44,17 @@ describe("customer documents", () => {
 
   it("renders order confirmation, delivery note and payment acknowledgement", async () => {
     const o = await saveOrder(base.user.id, null, orderForm(base.customer.id, [printLine(base.material.id, base.printer.id)], { confirm: true, internalNotes: SECRET_NOTE }));
-    const p = await recordPayment(base.user.id, o.id, { kind: "PAYMENT", method: "BIT", amount: "50", isDeposit: true, receivedAt: null, reference: "BIT-123", feeAmount: "1.20", notes: null, idempotencyKey: null });
+    const p = await recordPayment(base.user.id, o.id, {
+      kind: "PAYMENT",
+      method: "BIT",
+      amount: "50",
+      isDeposit: true,
+      receivedAt: null,
+      reference: "BIT-123",
+      feeAmount: "1.20",
+      notes: null,
+      idempotencyKey: null,
+    });
     for (const doc of [await orderConfirmationDocument(o.id), await deliveryNoteDocument(o.id), await paymentAckDocument(p.id)]) {
       assertNoInternals(doc);
       const pdf = await renderCustomerPdf(doc);

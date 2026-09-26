@@ -27,14 +27,20 @@ export async function seedBasics() {
       defaultDepositPercent: "0",
     },
   });
-  const policy = await prisma.pricingPolicy.create({ data: { name: "Standard", method: "MARKUP", markupPercent: "1", minimumOrderCharge: "0", minimumMarginPercent: "0.25", priceRoundingStep: "1", isDefault: true } });
+  const policy = await prisma.pricingPolicy.create({
+    data: { name: "Standard", method: "MARKUP", markupPercent: "1", minimumOrderCharge: "0", minimumMarginPercent: "0.25", priceRoundingStep: "1", isDefault: true },
+  });
   await prisma.$transaction((tx) => seedReferenceData(tx));
   const pla = await prisma.materialType.findUniqueOrThrow({ where: { code: "PLA" } });
-  const material = await prisma.material.create({ data: { materialTypeId: pla.id, brand: "Bambu", productLine: "PLA Basic", colorName: "Black", pricePerKg: "100", minStockG: 500, emptySpoolWeightG: 250 } });
+  const material = await prisma.material.create({
+    data: { materialTypeId: pla.id, brand: "Bambu", productLine: "PLA Basic", colorName: "Black", pricePerKg: "100", minStockG: 500, emptySpoolWeightG: 250 },
+  });
   const printer = await prisma.printer.create({ data: { name: "X1C", model: "X1 Carbon", hourlyRateOverride: "5" } });
   // The customer below takes C-0001 directly, so advance the sequence past it.
   await prisma.numberSequence.create({ data: { key: "CUSTOMER", prefix: "C", nextValue: 2, padding: 4, includeYear: false } });
-  const customer = await prisma.customer.create({ data: { number: "C-0001", name: "Dana Levi", phone: "050-123-4567", phoneNormalized: "0501234567", email: "dana@example.com", emailNormalized: "dana@example.com" } });
+  const customer = await prisma.customer.create({
+    data: { number: "C-0001", name: "Dana Levi", phone: "050-123-4567", phoneNormalized: "0501234567", email: "dana@example.com", emailNormalized: "dana@example.com" },
+  });
   return { user, policy, material, printer, customer };
 }
 

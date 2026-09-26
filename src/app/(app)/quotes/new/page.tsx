@@ -26,7 +26,11 @@ export default async function NewQuotePage({ searchParams }: { searchParams: Pro
       <PageHeader title={from ? `New quotation (copy of ${from.number})` : "New quotation"} back={{ href: "/quotes", label: "Quotations" }} />
       {options.materials.length === 0 && (
         <Alert tone="info" className="mb-5" title="No materials yet">
-          Add at least one material with a price per kg in <Link href="/materials/new" className="underline">Materials</Link> to price print jobs.
+          Add at least one material with a price per kg in{" "}
+          <Link href="/materials/new" className="underline">
+            Materials
+          </Link>{" "}
+          to price print jobs.
         </Alert>
       )}
       <DocumentEditor mode="quote" id={null} options={options} initial={initial} save={save} />

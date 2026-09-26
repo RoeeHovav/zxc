@@ -58,7 +58,8 @@ export default async function DataPage() {
             </Link>
           </Button>
           <p className="text-xs text-muted-foreground">
-            Per-customer personal data exports and erasure are on each customer page. Accounting records are retained after erasure (Israeli bookkeeping rules generally require 7 years — confirm with your accountant).
+            Per-customer personal data exports and erasure are on each customer page. Accounting records are retained after erasure (Israeli bookkeeping rules generally require 7 years — confirm with
+            your accountant).
           </p>
           <KeyValue
             items={[
@@ -80,14 +81,20 @@ export default async function DataPage() {
             </Alert>
           ) : (
             <Alert tone="warning" icon={DatabaseBackup} title="No backup status available">
-              Set <code>BACKUP_DIR</code> for the app to show the latest backup, and make sure the backup service (Docker Compose <code>backup</code> service or cron running <code>scripts/backup.sh</code>) is enabled.
+              Set <code>BACKUP_DIR</code> for the app to show the latest backup, and make sure the backup service (Docker Compose <code>backup</code> service or cron running{" "}
+              <code>scripts/backup.sh</code>) is enabled.
             </Alert>
           )}
-          <p className="text-sm text-muted-foreground">Restore with <code className="rounded bg-muted px-1">scripts/restore.sh</code> — tested by <code className="rounded bg-muted px-1">npm run test:backup</code> against a throwaway database.</p>
+          <p className="text-sm text-muted-foreground">
+            Restore with <code className="rounded bg-muted px-1">scripts/restore.sh</code> — tested by <code className="rounded bg-muted px-1">npm run test:backup</code> against a throwaway database.
+          </p>
         </CardContent>
       </Card>
       <Card className="lg:col-span-2">
-        <CardHeader title="Data integrity check" description="Cross-checks cached values (amount paid, spool weights, completed units, production status, stored files) against their source records." />
+        <CardHeader
+          title="Data integrity check"
+          description="Cross-checks cached values (amount paid, spool weights, completed units, production status, stored files) against their source records."
+        />
         <CardContent>
           <IntegrityCheck />
         </CardContent>

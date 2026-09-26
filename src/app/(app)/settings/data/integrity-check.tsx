@@ -23,15 +23,37 @@ export function IntegrityCheck() {
         <ShieldCheck /> Run integrity check
       </Button>
       {r && !r.ok && <Alert tone="danger" title={r.error} />}
-      {data && issues === 0 && <Alert tone="success" title="No inconsistencies found." >{data.orphanFiles.length ? `${data.orphanFiles.length} stored file(s) are not linked to any record (safe to review).` : "Stored files match their records."}</Alert>}
+      {data && issues === 0 && (
+        <Alert tone="success" title="No inconsistencies found.">
+          {data.orphanFiles.length ? `${data.orphanFiles.length} stored file(s) are not linked to any record (safe to review).` : "Stored files match their records."}
+        </Alert>
+      )}
       {data && issues > 0 && (
         <Alert tone="warning" title={`${issues} inconsistency(ies) found`}>
           <ul className="list-disc ps-4">
-            {data.payments.map((p) => <li key={p.number}>{p.number}: cached paid {p.cached}, ledger {p.ledger}</li>)}
-            {data.spoolMismatches.map((s) => <li key={s.code}>Spool {s.code}: remaining {s.cached} g, ledger {s.ledger} g</li>)}
-            {data.itemMismatches.map((i, k) => <li key={k}>{i.order} “{i.part}”: completed {i.cached}, jobs say {i.jobs}</li>)}
-            {data.statusMismatches.map((s) => <li key={s.number}>{s.number}: status {s.status}, production data implies {s.expected}</li>)}
-            {data.missingFiles.map((f) => <li key={f}>Missing stored file: {f}</li>)}
+            {data.payments.map((p) => (
+              <li key={p.number}>
+                {p.number}: cached paid {p.cached}, ledger {p.ledger}
+              </li>
+            ))}
+            {data.spoolMismatches.map((s) => (
+              <li key={s.code}>
+                Spool {s.code}: remaining {s.cached} g, ledger {s.ledger} g
+              </li>
+            ))}
+            {data.itemMismatches.map((i, k) => (
+              <li key={k}>
+                {i.order} “{i.part}”: completed {i.cached}, jobs say {i.jobs}
+              </li>
+            ))}
+            {data.statusMismatches.map((s) => (
+              <li key={s.number}>
+                {s.number}: status {s.status}, production data implies {s.expected}
+              </li>
+            ))}
+            {data.missingFiles.map((f) => (
+              <li key={f}>Missing stored file: {f}</li>
+            ))}
           </ul>
         </Alert>
       )}

@@ -72,7 +72,12 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       )}
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Balance due" value={Number(balance) < 0 ? `${money(balance)}` : money(balance)} hint={Number(balance) < 0 ? "Customer has credit" : Number(balance) > 0 ? "Outstanding" : "Settled"} tone={Number(balance) > 0 ? "warning" : undefined} />
+        <Stat
+          label="Balance due"
+          value={Number(balance) < 0 ? `${money(balance)}` : money(balance)}
+          hint={Number(balance) < 0 ? "Customer has credit" : Number(balance) > 0 ? "Outstanding" : "Settled"}
+          tone={Number(balance) > 0 ? "warning" : undefined}
+        />
         <Stat label="Paid to date" value={money(totalPaid)} />
         <Stat label="Lifetime orders" value={money(lifetimeValue)} hint={`${c.orders.length} order(s)`} />
         <Stat label="Quotations" value={c.quotes.length} hint={`${c.quotes.filter((q) => q.status === "ACCEPTED").length} accepted`} />
@@ -81,7 +86,18 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div className="grid min-w-0 content-start gap-6">
           <Card>
-            <CardHeader title="Orders" actions={!c.archivedAt && <Button size="sm" variant="secondary" asChild><Link href={`/orders/new?customerId=${c.id}`}><Plus /> Order</Link></Button>} />
+            <CardHeader
+              title="Orders"
+              actions={
+                !c.archivedAt && (
+                  <Button size="sm" variant="secondary" asChild>
+                    <Link href={`/orders/new?customerId=${c.id}`}>
+                      <Plus /> Order
+                    </Link>
+                  </Button>
+                )
+              }
+            />
             {c.orders.length === 0 ? (
               <EmptyState icon={ClipboardList} title="No orders yet" />
             ) : (
@@ -176,8 +192,16 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                     <TR key={p.id} className={p.voidedAt ? "opacity-50" : undefined}>
                       <TD>
                         {p.number}
-                        {p.kind === "REFUND" && <Badge tone="warning" className="ms-2">Refund</Badge>}
-                        {p.voidedAt && <Badge tone="muted" className="ms-2">Void</Badge>}
+                        {p.kind === "REFUND" && (
+                          <Badge tone="warning" className="ms-2">
+                            Refund
+                          </Badge>
+                        )}
+                        {p.voidedAt && (
+                          <Badge tone="muted" className="ms-2">
+                            Void
+                          </Badge>
+                        )}
                       </TD>
                       <TD>
                         <Link href={`/orders/${p.order.id}`} className="hover:text-primary">
@@ -213,7 +237,16 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
         <div className="grid content-start gap-6">
           <Card>
-            <CardHeader title="Contact details" actions={!c.anonymizedAt && <Button size="sm" variant="ghost" asChild><Link href={`/customers/${c.id}/edit`}>Edit</Link></Button>} />
+            <CardHeader
+              title="Contact details"
+              actions={
+                !c.anonymizedAt && (
+                  <Button size="sm" variant="ghost" asChild>
+                    <Link href={`/customers/${c.id}/edit`}>Edit</Link>
+                  </Button>
+                )
+              }
+            />
             <CardContent className="grid gap-4 text-sm">
               <div className="grid gap-2.5">
                 {c.phone && (

@@ -10,7 +10,15 @@ export function materialLabel(m: { brand: string; productLine: string | null; co
   return `${m.materialType.code} · ${m.brand}${m.productLine ? ` ${m.productLine}` : ""} · ${m.colorName}`;
 }
 
-export function toResolvedMaterial(m: { id: string; brand: string; productLine: string | null; colorName: string; pricePerKg: { toString(): string } | null; wastePercent: { toString(): string } | null; materialType: { code: string } }): ResolvedMaterial {
+export function toResolvedMaterial(m: {
+  id: string;
+  brand: string;
+  productLine: string | null;
+  colorName: string;
+  pricePerKg: { toString(): string } | null;
+  wastePercent: { toString(): string } | null;
+  materialType: { code: string };
+}): ResolvedMaterial {
   return { id: m.id, label: materialLabel(m), pricePerKg: m.pricePerKg?.toString() ?? null, wastePercent: m.wastePercent?.toString() ?? null };
 }
 
@@ -93,7 +101,11 @@ export async function getMaterial(id: string) {
       materialType: true,
       supplier: true,
       spools: { orderBy: [{ status: "asc" }, { createdAt: "desc" }], include: { supplier: { select: { name: true } } } },
-      movements: { orderBy: { createdAt: "desc" }, take: 100, include: { spool: { select: { code: true } }, printJob: { select: { id: true, number: true } }, orderItem: { select: { order: { select: { id: true, number: true } } } } } },
+      movements: {
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: { spool: { select: { code: true } }, printJob: { select: { id: true, number: true } }, orderItem: { select: { order: { select: { id: true, number: true } } } } },
+      },
       reservations: { where: { status: "ACTIVE" }, include: { orderItem: { select: { partName: true, order: { select: { id: true, number: true, status: true } } } } } },
     },
   });
@@ -241,7 +253,15 @@ export async function receiveSpools(userId: string, input: ReceiveInput) {
         },
       });
       await tx.stockMovement.create({
-        data: { materialId: material.id, spoolId: spool.id, type: "RECEIVED", quantityG: net.toFixed(2), costPerKg: pricePerKg.toFixed(4), reason: input.reference ? `Purchase ${input.reference}` : "Purchase", createdById: userId },
+        data: {
+          materialId: material.id,
+          spoolId: spool.id,
+          type: "RECEIVED",
+          quantityG: net.toFixed(2),
+          costPerKg: pricePerKg.toFixed(4),
+          reason: input.reference ? `Purchase ${input.reference}` : "Purchase",
+          createdById: userId,
+        },
       });
     }
     if (input.updateMaterialPrice) await tx.material.update({ where: { id: material.id }, data: { pricePerKg: pricePerKg.toFixed(2) } });
@@ -274,13 +294,24 @@ export async function reconcileSpool(userId: string, spoolId: string, input: { g
     const delta = remaining.minus(dec(spool.remainingG.toString()));
     await tx.spool.update({
       where: { id: spoolId },
-      data: { remainingG: remaining.toFixed(2), remainingIsMeasured: true, lastWeighedAt: new Date(), status: remaining.lte(0) ? "EMPTY" : remaining.lt(dec(spool.netWeightG.toString())) ? "OPEN" : spool.status },
+      data: {
+        remainingG: remaining.toFixed(2),
+        remainingIsMeasured: true,
+        lastWeighedAt: new Date(),
+        status: remaining.lte(0) ? "EMPTY" : remaining.lt(dec(spool.netWeightG.toString())) ? "OPEN" : spool.status,
+      },
     });
     if (!delta.eq(0))
       await tx.stockMovement.create({
         data: { materialId: spool.materialId, spoolId, type: "RECONCILIATION", quantityG: delta.toFixed(2), reason: input.note ?? "Weigh-in", createdById: userId, costPerKg: spoolCostPerKg(spool) },
       });
-    await audit(tx, { userId, entityType: "SPOOL", entityId: spoolId, action: "RECONCILE", summary: `Weighed ${spool.code}: ${remaining.toFixed(0)} g (${delta.gte(0) ? "+" : ""}${delta.toFixed(0)} g vs estimate)` });
+    await audit(tx, {
+      userId,
+      entityType: "SPOOL",
+      entityId: spoolId,
+      action: "RECONCILE",
+      summary: `Weighed ${spool.code}: ${remaining.toFixed(0)} g (${delta.gte(0) ? "+" : ""}${delta.toFixed(0)} g vs estimate)`,
+    });
     return { remaining: remaining.toFixed(2), delta: delta.toFixed(2) };
   });
 }
@@ -304,9 +335,7 @@ export async function deductFromSpool(tx: Tx, spoolId: string, grams: InstanceTy
   if (updated !== 1) {
     const s = await tx.spool.findUnique({ where: { id: spoolId }, select: { code: true, remainingG: true, status: true } });
     if (!s) throw new NotFoundError("Spool");
-    throw new ServiceError(
-      `Spool ${s.code} has only ≈${Number(s.remainingG).toFixed(0)} g recorded (${s.status.toLowerCase()}). Weigh it to correct the estimate, or split the usage across spools.`,
-    );
+    throw new ServiceError(`Spool ${s.code} has only ≈${Number(s.remainingG).toFixed(0)} g recorded (${s.status.toLowerCase()}). Weigh it to correct the estimate, or split the usage across spools.`);
   }
 }
 
@@ -318,7 +347,9 @@ export async function recordWaste(userId: string, spoolId: string, grams: string
     const spool = await tx.spool.findUnique({ where: { id: spoolId } });
     if (!spool) throw new NotFoundError("Spool");
     await deductFromSpool(tx, spoolId, g);
-    await tx.stockMovement.create({ data: { materialId: spool.materialId, spoolId, type: "WASTE", quantityG: g.neg().toFixed(2), reason: reason.trim(), createdById: userId, costPerKg: spoolCostPerKg(spool) } });
+    await tx.stockMovement.create({
+      data: { materialId: spool.materialId, spoolId, type: "WASTE", quantityG: g.neg().toFixed(2), reason: reason.trim(), createdById: userId, costPerKg: spoolCostPerKg(spool) },
+    });
     await audit(tx, { userId, entityType: "SPOOL", entityId: spoolId, action: "WASTE", summary: `Waste ${g.toFixed(0)} g from ${spool.code}: ${reason.trim()}` });
   });
 }
@@ -330,7 +361,15 @@ export async function setSpoolStatus(userId: string, spoolId: string, status: "E
     const remaining = dec(spool.remainingG.toString());
     if ((status === "EMPTY" || status === "DISCARDED") && remaining.gt(0)) {
       await tx.stockMovement.create({
-        data: { materialId: spool.materialId, spoolId, type: status === "EMPTY" ? "ADJUSTMENT" : "WASTE", quantityG: remaining.neg().toFixed(2), reason: status === "EMPTY" ? "Marked empty" : "Discarded", createdById: userId, costPerKg: spoolCostPerKg(spool) },
+        data: {
+          materialId: spool.materialId,
+          spoolId,
+          type: status === "EMPTY" ? "ADJUSTMENT" : "WASTE",
+          quantityG: remaining.neg().toFixed(2),
+          reason: status === "EMPTY" ? "Marked empty" : "Discarded",
+          createdById: userId,
+          costPerKg: spoolCostPerKg(spool),
+        },
       });
     }
     await tx.spool.update({ where: { id: spoolId }, data: { status, ...(status !== "OPEN" ? { remainingG: "0" } : {}) } });

@@ -24,9 +24,7 @@ export async function loginAction(_prev: FormState, fd: FormData): Promise<FormS
   const ip = clientIp(await headers());
   const result = await attemptLogin(email, password, ip);
   if (!result.ok) {
-    return result.reason === "rate_limited"
-      ? { error: `Too many failed attempts. Try again in ${result.retryAfterMinutes} minutes.` }
-      : { error: "Incorrect email or password." };
+    return result.reason === "rate_limited" ? { error: `Too many failed attempts. Try again in ${result.retryAfterMinutes} minutes.` } : { error: "Incorrect email or password." };
   }
   await createSession(result.userId);
   redirect(safeNext(fd.get("next")));

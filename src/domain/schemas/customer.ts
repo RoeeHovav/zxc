@@ -45,5 +45,12 @@ export function normalizeEmail(email: string | null | undefined): string | null 
 
 export function parseTags(tags: string | null): string[] {
   if (!tags) return [];
-  return [...new Set(tags.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean))].slice(0, 20);
+  return [
+    ...new Set(
+      tags
+        .split(",")
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ].slice(0, 20);
 }

@@ -2,14 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { getCurrentUser, type SessionUser } from "./session";
 
-export type Permission =
-  | "customers"
-  | "sales"
-  | "production"
-  | "inventory"
-  | "finance"
-  | "settings"
-  | "export";
+export type Permission = "customers" | "sales" | "production" | "inventory" | "finance" | "settings" | "export";
 
 /** Role → permissions. STAFF is prepared for future employee accounts. */
 const ROLE_PERMISSIONS: Record<SessionUser["role"], Permission[]> = {

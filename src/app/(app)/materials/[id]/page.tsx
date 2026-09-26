@@ -152,7 +152,10 @@ export default async function MaterialPage({ params }: { params: Promise<{ id: s
                           </Link>
                         )}
                       </TD>
-                      <TD className="tabular text-end">{Number(mv.quantityG) > 0 ? "+" : ""}{grams(mv.quantityG)}</TD>
+                      <TD className="tabular text-end">
+                        {Number(mv.quantityG) > 0 ? "+" : ""}
+                        {grams(mv.quantityG)}
+                      </TD>
                     </TR>
                   ))}
                 </TBody>

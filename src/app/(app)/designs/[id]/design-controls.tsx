@@ -42,7 +42,9 @@ export function DesignControls({ id, status }: { id: string; status: string }) {
   if (actions.length === 0 && !["REQUESTED", "IN_PROGRESS", "AWAITING_APPROVAL", "REVISION_REQUESTED"].includes(status)) return null;
   return (
     <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
-      <p className="text-sm text-muted-foreground">Status: <span className="font-medium text-foreground">{enumLabel("designStatus", status)}</span></p>
+      <p className="text-sm text-muted-foreground">
+        Status: <span className="font-medium text-foreground">{enumLabel("designStatus", status)}</span>
+      </p>
       <div className="flex flex-wrap gap-2">
         {["REQUESTED", "IN_PROGRESS", "AWAITING_APPROVAL", "REVISION_REQUESTED"].includes(status) && (
           <Button variant="danger-ghost" onClick={() => go("CANCELED")} disabled={busy}>
@@ -76,7 +78,15 @@ export function DesignControls({ id, status }: { id: string; status: string }) {
 
 const CATS = ["MODELING", "SCANNING", "SCAN_CLEANUP", "REVERSE_ENGINEERING", "REVISION", "OTHER"];
 
-export function TimeLog({ id, entries, byCategory }: { id: string; entries: { id: string; category: string; hours: string; date: string; billable: boolean; notes: string | null }[]; byCategory: Record<string, string> }) {
+export function TimeLog({
+  id,
+  entries,
+  byCategory,
+}: {
+  id: string;
+  entries: { id: string; category: string; hours: string; date: string; billable: boolean; notes: string | null }[];
+  byCategory: Record<string, string>;
+}) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   return (
@@ -193,7 +203,14 @@ export function RevisionControls({
                     <MessageSquareWarning /> Changes requested
                   </Button>
                 </DialogTrigger>
-                <DialogContent title="Customer requested changes" description={revisions.length + 1 > included ? `This will be revision ${revisions.length + 1} — beyond the ${included} included, so it is chargeable.` : `Revision ${revisions.length + 1} of ${included} included.`}>
+                <DialogContent
+                  title="Customer requested changes"
+                  description={
+                    revisions.length + 1 > included
+                      ? `This will be revision ${revisions.length + 1} — beyond the ${included} included, so it is chargeable.`
+                      : `Revision ${revisions.length + 1} of ${included} included.`
+                  }
+                >
                   <ActionForm action={requestRevisionAction.bind(null, id)} submitLabel="Record revision" onSuccess={() => setOpen(false)}>
                     <TextareaField name="description" label="What should change?" required rows={3} autoFocus />
                   </ActionForm>
@@ -217,7 +234,11 @@ export function RevisionControls({
                       chargeable{r.charge ? ` ${money(r.charge)}` : ""}
                     </Badge>
                   )}
-                  {r.billedAt && <Badge tone="success" className="ms-2">billed</Badge>}
+                  {r.billedAt && (
+                    <Badge tone="success" className="ms-2">
+                      billed
+                    </Badge>
+                  )}
                 </p>
                 <p className="text-muted-foreground">{r.description}</p>
                 <p className="text-xs text-muted-foreground">

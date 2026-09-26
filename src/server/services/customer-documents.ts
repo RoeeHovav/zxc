@@ -17,7 +17,17 @@ export interface CustomerDocument {
   reference: string | null;
   issueDate: string;
   meta: [string, string][];
-  business: { name: string; legalName: string | null; taxId: string | null; address: string[]; phone: string | null; email: string | null; website: string | null; brandColor: string; logo: { data: Buffer; format: "png" | "jpg" } | null };
+  business: {
+    name: string;
+    legalName: string | null;
+    taxId: string | null;
+    address: string[];
+    phone: string | null;
+    email: string | null;
+    website: string | null;
+    brandColor: string;
+    logo: { data: Buffer; format: "png" | "jpg" } | null;
+  };
   customer: { name: string; company: string | null; taxId: string | null; address: string[]; phone: string | null; email: string | null };
   lines: { description: string; details: string[]; quantity: number | null; unitPrice: string | null; total: string | null }[];
   totals: [string, string, boolean?][];
@@ -59,7 +69,21 @@ async function businessBlock() {
   };
 }
 
-function customerBlock(c: { name: string; company: string | null; taxId: string | null; addressLine1: string | null; addressLine2: string | null; city: string | null; postalCode: string | null; country: string | null; phone: string | null; email: string | null }, overrideAddress?: string | null) {
+function customerBlock(
+  c: {
+    name: string;
+    company: string | null;
+    taxId: string | null;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city: string | null;
+    postalCode: string | null;
+    country: string | null;
+    phone: string | null;
+    email: string | null;
+  },
+  overrideAddress?: string | null,
+) {
   return {
     name: c.name,
     company: c.company,
@@ -72,7 +96,17 @@ function customerBlock(c: { name: string; company: string | null; taxId: string 
 
 const fmtDate = (d: Date | null | undefined) => (d ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d) : "");
 
-type ItemLike = { partName: string; description: string | null; quantity: number; colorNote: string | null; specialInstructions: string | null; deadline: Date | null; serviceType: string; pricingResult: unknown; pricingInput: unknown };
+type ItemLike = {
+  partName: string;
+  description: string | null;
+  quantity: number;
+  colorNote: string | null;
+  specialInstructions: string | null;
+  deadline: Date | null;
+  serviceType: string;
+  pricingResult: unknown;
+  pricingInput: unknown;
+};
 
 const SERVICE_LABEL: Record<string, string> = {
   PRINT_ONLY: "3D printing",
@@ -101,12 +135,22 @@ function customerLines(items: ItemLike[], showPrices: boolean): CustomerDocument
     }
     if (showPrices && r?.discount && Number(r.discount) > 0) details.push(`Discount −${r.discount}`);
     const unit = r?.production ? r.production.unitPrice : null;
-    out.push({ description: it.partName, details, quantity: it.quantity, unitPrice: showPrices ? unit : null, total: showPrices ? r?.net ?? null : null });
+    out.push({ description: it.partName, details, quantity: it.quantity, unitPrice: showPrices ? unit : null, total: showPrices ? (r?.net ?? null) : null });
   }
   return out;
 }
 
-type TotalsLike = { itemsNet: { toString(): string }; orderDiscount: { toString(): string }; minimumAdjustment: { toString(): string }; shippingCharge: { toString(): string }; taxableAmount: { toString(): string }; vatAmount: { toString(): string }; total: { toString(): string }; depositAmount: { toString(): string }; pricingContext: unknown };
+type TotalsLike = {
+  itemsNet: { toString(): string };
+  orderDiscount: { toString(): string };
+  minimumAdjustment: { toString(): string };
+  shippingCharge: { toString(): string };
+  taxableAmount: { toString(): string };
+  vatAmount: { toString(): string };
+  total: { toString(): string };
+  depositAmount: { toString(): string };
+  pricingContext: unknown;
+};
 
 function totalsRows(d: TotalsLike): [string, string, boolean?][] {
   const ctx = d.pricingContext as PricingContext;
@@ -223,11 +267,7 @@ export async function paymentAckDocument(paymentId: string): Promise<CustomerDoc
     number: p.number,
     reference: null,
     issueDate: fmtDate(p.receivedAt),
-    meta: [
-      ["Order", o.number],
-      ["Method", method[p.method] ?? p.method],
-      ...(p.reference ? ([["Reference", p.reference]] as [string, string][]) : []),
-    ],
+    meta: [["Order", o.number], ["Method", method[p.method] ?? p.method], ...(p.reference ? ([["Reference", p.reference]] as [string, string][]) : [])],
     business,
     customer: customerBlock(o.customer),
     lines: [{ description: `${p.isDeposit ? "Deposit" : "Payment"} for order ${o.number}`, details: o.title ? [o.title] : [], quantity: null, unitPrice: null, total: p.amount.toString() }],

@@ -41,12 +41,15 @@ export async function sendQuoteAction(id: string) {
 
 export async function acceptQuoteAction(id: string, note: string, createOrder: boolean) {
   const user = await requireUser("sales");
-  return runAction(async () => {
-    const r = await acceptQuote(user.id, id, note.trim().slice(0, 300) || null, createOrder);
-    refresh(id);
-    revalidatePath("/orders");
-    return r;
-  }, createOrder ? "Accepted — order created." : "Quote accepted.");
+  return runAction(
+    async () => {
+      const r = await acceptQuote(user.id, id, note.trim().slice(0, 300) || null, createOrder);
+      refresh(id);
+      revalidatePath("/orders");
+      return r;
+    },
+    createOrder ? "Accepted — order created." : "Quote accepted.",
+  );
 }
 
 export async function convertQuoteAction(id: string) {

@@ -1,0 +1,8 @@
+src/generated
+prisma/migrations
+tests/fixtures/bambu/*.config
+playwright-report
+test-results
+storage
+backups
+package-lock.json

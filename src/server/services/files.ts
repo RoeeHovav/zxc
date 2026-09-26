@@ -89,7 +89,10 @@ export async function saveUpload(userId: string, file: { name: string; bytes: Bu
 
 export function sanitizeFileName(name: string) {
   const base = path.basename(name.replace(/\\/g, "/"));
-  const cleaned = base.replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, "_").replace(/^\.+/, "").trim();
+  const cleaned = base
+    .replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, "_")
+    .replace(/^\.+/, "")
+    .trim();
   return (cleaned || "file").slice(0, 180);
 }
 

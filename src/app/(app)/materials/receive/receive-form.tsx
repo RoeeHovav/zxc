@@ -9,7 +9,19 @@ import { money } from "@/lib/format";
 import { isoDate } from "@/lib/format";
 import { receiveSpoolsAction } from "../actions";
 
-export function ReceiveForm({ materials, suppliers, defaultMaterialId, vatRegistered, vatRate }: { materials: { id: string; label: string }[]; suppliers: { id: string; name: string }[]; defaultMaterialId: string; vatRegistered: boolean; vatRate: string }) {
+export function ReceiveForm({
+  materials,
+  suppliers,
+  defaultMaterialId,
+  vatRegistered,
+  vatRate,
+}: {
+  materials: { id: string; label: string }[];
+  suppliers: { id: string; name: string }[];
+  defaultMaterialId: string;
+  vatRegistered: boolean;
+  vatRate: string;
+}) {
   const [count, setCount] = React.useState("1");
   const [net, setNet] = React.useState("1000");
   const [price, setPrice] = React.useState("");
@@ -21,7 +33,9 @@ export function ReceiveForm({ materials, suppliers, defaultMaterialId, vatRegist
     const n = Number(count);
     if (n >= 1 && Number(net) > 0 && price !== "") {
       const toNet = (v: InstanceType<typeof D>) => (vatRegistered && inclVat ? v.div(new D(vatRate).plus(1)) : v);
-      const per = toNet(new D(price)).plus(toNet(new D(ship || "0")).div(n)).toDecimalPlaces(2);
+      const per = toNet(new D(price))
+        .plus(toNet(new D(ship || "0")).div(n))
+        .toDecimalPlaces(2);
       preview = { per: per.toFixed(2), perKg: per.div(new D(net).div(1000)).toDecimalPlaces(2).toFixed(2) };
     }
   } catch {

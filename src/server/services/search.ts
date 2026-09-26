@@ -48,11 +48,35 @@ export async function globalSearch(qRaw: string): Promise<SearchHit[]> {
     prisma.printJob.findMany({ where: { number: ci }, take: 4, select: { id: true, number: true, status: true, order: { select: { number: true } } } }),
   ]);
   return [
-    ...customers.map((c) => ({ type: "customer" as const, id: c.id, title: c.name, subtitle: [c.number, c.company, c.phone, c.archivedAt ? "archived" : null].filter(Boolean).join(" · "), href: `/customers/${c.id}` })),
-    ...orders.map((o) => ({ type: "order" as const, id: o.id, title: `${o.number}${o.title ? ` — ${o.title}` : ""}`, subtitle: `${o.customer.name} · ${o.status.toLowerCase().replace(/_/g, " ")}`, href: `/orders/${o.id}` })),
-    ...quotes.map((x) => ({ type: "quote" as const, id: x.id, title: `${x.number}${x.revision > 1 ? ` rev ${x.revision}` : ""}${x.title ? ` — ${x.title}` : ""}`, subtitle: `${x.customer.name} · ${x.status.toLowerCase()}`, href: `/quotes/${x.id}` })),
+    ...customers.map((c) => ({
+      type: "customer" as const,
+      id: c.id,
+      title: c.name,
+      subtitle: [c.number, c.company, c.phone, c.archivedAt ? "archived" : null].filter(Boolean).join(" · "),
+      href: `/customers/${c.id}`,
+    })),
+    ...orders.map((o) => ({
+      type: "order" as const,
+      id: o.id,
+      title: `${o.number}${o.title ? ` — ${o.title}` : ""}`,
+      subtitle: `${o.customer.name} · ${o.status.toLowerCase().replace(/_/g, " ")}`,
+      href: `/orders/${o.id}`,
+    })),
+    ...quotes.map((x) => ({
+      type: "quote" as const,
+      id: x.id,
+      title: `${x.number}${x.revision > 1 ? ` rev ${x.revision}` : ""}${x.title ? ` — ${x.title}` : ""}`,
+      subtitle: `${x.customer.name} · ${x.status.toLowerCase()}`,
+      href: `/quotes/${x.id}`,
+    })),
     ...designs.map((d) => ({ type: "design" as const, id: d.id, title: `${d.number} — ${d.title}`, subtitle: d.customer.name, href: `/designs/${d.id}` })),
-    ...materials.map((m) => ({ type: "material" as const, id: m.id, title: `${m.materialType.code} · ${m.brand}${m.productLine ? ` ${m.productLine}` : ""}`, subtitle: m.colorName, href: `/materials/${m.id}` })),
+    ...materials.map((m) => ({
+      type: "material" as const,
+      id: m.id,
+      title: `${m.materialType.code} · ${m.brand}${m.productLine ? ` ${m.productLine}` : ""}`,
+      subtitle: m.colorName,
+      href: `/materials/${m.id}`,
+    })),
     ...printers.map((p) => ({ type: "printer" as const, id: p.id, title: p.name, subtitle: p.model, href: `/printers/${p.id}` })),
     ...jobs.map((j) => ({ type: "job" as const, id: j.id, title: j.number, subtitle: `Order ${j.order.number} · ${j.status.toLowerCase()}`, href: `/production?job=${j.id}` })),
   ];

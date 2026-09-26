@@ -28,8 +28,7 @@ export function checkQuoteTransition(q: QuoteFacts, to: QuoteStatus, now = new D
     if (!q.validUntil) errors.push("Set a validity date.");
     else if (q.validUntil < startOfDay(now)) errors.push("The validity date is in the past. Extend it first.");
   }
-  if (to === "ACCEPTED" && q.validUntil && q.validUntil < startOfDay(now))
-    errors.push("This quote has expired. Revise or re-send it before accepting.");
+  if (to === "ACCEPTED" && q.validUntil && q.validUntil < startOfDay(now)) errors.push("This quote has expired. Revise or re-send it before accepting.");
   if (to === "REVISED" && q.hasOrder) errors.push("This quote already has an order.");
   return errors;
 }

@@ -33,7 +33,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     computeAlerts(),
     can(user, "finance") ? financeSummary(month) : null,
     prisma.order.groupBy({ by: ["status"], where: { status: { notIn: ["COMPLETED", "CANCELED"] } }, _count: true }),
-    prisma.printer.findMany({ where: { status: { not: "RETIRED" } }, orderBy: { name: "asc" }, include: { jobs: { where: { status: "PRINTING" }, select: { id: true, number: true, startedAt: true, estimatedMinutes: true, order: { select: { number: true } } } } } }),
+    prisma.printer.findMany({
+      where: { status: { not: "RETIRED" } },
+      orderBy: { name: "asc" },
+      include: { jobs: { where: { status: "PRINTING" }, select: { id: true, number: true, startedAt: true, estimatedMinutes: true, order: { select: { number: true } } } } },
+    }),
     prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8, include: { user: { select: { name: true } } } }),
     Promise.all([prisma.material.count(), prisma.printer.count(), prisma.customer.count(), prisma.order.count()]),
   ]);
@@ -79,7 +83,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               ].map((s, i) => (
                 <li key={i}>
                   <Link href={s.href} className="flex h-full items-start gap-3 rounded-lg border border-border bg-card p-3 hover:border-primary/40">
-                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${s.done ? "bg-success text-white" : "bg-muted"}`}>{s.done ? "✓" : i + 1}</span>
+                    <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${s.done ? "bg-success text-white" : "bg-muted"}`}>
+                      {s.done ? "✓" : i + 1}
+                    </span>
                     <span>
                       <span className="block font-medium">{s.label}</span>
                       <span className="block text-xs text-muted-foreground">{s.hint}</span>
@@ -105,7 +111,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       {fin && (
         <Card className="mb-6">
-          <CardHeader title={`${monthName} so far`} description="Revenue is recognized on delivery and excludes VAT. Cash counts money actually received." actions={<Button size="sm" variant="ghost" asChild><Link href="/finance">Finance →</Link></Button>} />
+          <CardHeader
+            title={`${monthName} so far`}
+            description="Revenue is recognized on delivery and excludes VAT. Cash counts money actually received."
+            actions={
+              <Button size="sm" variant="ghost" asChild>
+                <Link href="/finance">Finance →</Link>
+              </Button>
+            }
+          />
           <CardContent className="grid grid-cols-2 gap-4 lg:grid-cols-5">
             {[
               ["Revenue (delivered)", money(fin.revenue), `${fin.ordersRecognized} order(s)`],
@@ -136,7 +150,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 return (
                   <li key={a.id}>
                     <Link href={a.href} className="flex items-start gap-3 px-5 py-3 hover:bg-muted/40">
-                      <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${a.severity === "danger" ? "bg-destructive-soft text-destructive" : a.severity === "warning" ? "bg-warning-soft text-warning" : "bg-info-soft text-info"}`}>
+                      <span
+                        className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${a.severity === "danger" ? "bg-destructive-soft text-destructive" : a.severity === "warning" ? "bg-warning-soft text-warning" : "bg-info-soft text-info"}`}
+                      >
                         <Icon className="size-3.5" />
                       </span>
                       <span className="min-w-0">
@@ -154,7 +170,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <div className="grid content-start gap-6">
           <Card>
-            <CardHeader title="Printers" actions={<Button size="sm" variant="ghost" asChild><Link href="/production?view=queues">Queues →</Link></Button>} />
+            <CardHeader
+              title="Printers"
+              actions={
+                <Button size="sm" variant="ghost" asChild>
+                  <Link href="/production?view=queues">Queues →</Link>
+                </Button>
+              }
+            />
             {printers.length === 0 ? (
               <CardContent>
                 <Alert tone="info" icon={Printer} title="No printers yet">

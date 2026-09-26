@@ -23,16 +23,7 @@ export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const TERMINAL_ORDER_STATUSES: OrderStatus[] = ["COMPLETED", "CANCELED"];
 /** Statuses in which inventory is reserved and production may happen. */
-export const ACTIVE_ORDER_STATUSES: OrderStatus[] = [
-  "AWAITING_PAYMENT",
-  "AWAITING_MODELING",
-  "AWAITING_APPROVAL",
-  "QUEUED",
-  "PRINTING",
-  "POST_PROCESSING",
-  "QUALITY_CHECK",
-  "READY",
-];
+export const ACTIVE_ORDER_STATUSES: OrderStatus[] = ["AWAITING_PAYMENT", "AWAITING_MODELING", "AWAITING_APPROVAL", "QUEUED", "PRINTING", "POST_PROCESSING", "QUALITY_CHECK", "READY"];
 /** Line items can be edited (order revision) only before production output exists. */
 export const EDITABLE_ORDER_STATUSES: OrderStatus[] = ["DRAFT", "AWAITING_PAYMENT", "AWAITING_MODELING", "AWAITING_APPROVAL", "QUEUED"];
 
@@ -51,14 +42,7 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   CANCELED: [],
 };
 
-export type DesignStatusLike =
-  | "REQUESTED"
-  | "IN_PROGRESS"
-  | "AWAITING_APPROVAL"
-  | "REVISION_REQUESTED"
-  | "APPROVED"
-  | "DELIVERED"
-  | "CANCELED";
+export type DesignStatusLike = "REQUESTED" | "IN_PROGRESS" | "AWAITING_APPROVAL" | "REVISION_REQUESTED" | "APPROVED" | "DELIVERED" | "CANCELED";
 
 export interface OrderFacts {
   status: OrderStatus;
@@ -125,9 +109,7 @@ function printItems(facts: OrderFacts) {
 }
 
 function serviceItemsPending(facts: OrderFacts) {
-  return facts.items.filter(
-    (i) => !requiresPrint(i.serviceType) && i.designStatus !== null && !designReady(i.designStatus),
-  );
+  return facts.items.filter((i) => !requiresPrint(i.serviceType) && i.designStatus !== null && !designReady(i.designStatus));
 }
 
 /** Checks whether `to` is a valid next status, including business guards. */
@@ -146,40 +128,32 @@ export function checkOrderTransition(facts: OrderFacts, to: OrderStatus): Transi
       if (dec(facts.depositAmount).lte(0)) fail("This order has no deposit requirement.");
       break;
     case "AWAITING_MODELING":
-      if (modelingPending(facts).length === 0 && facts.items.every((i) => !requiresModeling(i.serviceType)))
-        fail("No item on this order requires modeling.");
+      if (modelingPending(facts).length === 0 && facts.items.every((i) => !requiresModeling(i.serviceType))) fail("No item on this order requires modeling.");
       break;
     case "AWAITING_APPROVAL":
       break;
     case "QUEUED": {
-      if (facts.requireDepositToProduce && !depositSatisfied(facts))
-        fail(`Deposit of ${dec(facts.depositAmount).toFixed(2)} has not been received (paid ${dec(facts.amountPaid).toFixed(2)}).`, true);
+      if (facts.requireDepositToProduce && !depositSatisfied(facts)) fail(`Deposit of ${dec(facts.depositAmount).toFixed(2)} has not been received (paid ${dec(facts.amountPaid).toFixed(2)}).`, true);
       const pending = modelingPending(facts);
-      if (pending.length > 0)
-        fail(`Design not yet approved for: ${pending.map((p) => p.partName).join(", ")}.`, true);
-      if (from === "PRINTING" && facts.jobs.some((j) => j.status === "PRINTING"))
-        fail("A print job is still printing. Finish, fail or undo it first.");
+      if (pending.length > 0) fail(`Design not yet approved for: ${pending.map((p) => p.partName).join(", ")}.`, true);
+      if (from === "PRINTING" && facts.jobs.some((j) => j.status === "PRINTING")) fail("A print job is still printing. Finish, fail or undo it first.");
       break;
     }
     case "PRINTING":
-      if (!facts.jobs.some((j) => ["PRINTING", "POST_PROCESSING", "QUALITY_CHECK", "DONE"].includes(j.status)))
-        fail("Start a print job for this order first (Production board).");
+      if (!facts.jobs.some((j) => ["PRINTING", "POST_PROCESSING", "QUALITY_CHECK", "DONE"].includes(j.status))) fail("Start a print job for this order first (Production board).");
       break;
     case "POST_PROCESSING":
     case "QUALITY_CHECK": {
       const unprinted = printItems(facts).filter((i) => i.quantityPrinted < i.quantity);
-      if (unprinted.length > 0)
-        fail(`Printing is not finished for: ${unprinted.map((i) => `${i.partName} (${i.quantityPrinted}/${i.quantity})`).join(", ")}.`);
+      if (unprinted.length > 0) fail(`Printing is not finished for: ${unprinted.map((i) => `${i.partName} (${i.quantityPrinted}/${i.quantity})`).join(", ")}.`);
       break;
     }
     case "READY": {
       const incomplete = printItems(facts).filter((i) => i.quantityCompleted < i.quantity);
-      if (incomplete.length > 0)
-        fail(`Not all units have passed quality check: ${incomplete.map((i) => `${i.partName} (${i.quantityCompleted}/${i.quantity})`).join(", ")}.`);
+      if (incomplete.length > 0) fail(`Not all units have passed quality check: ${incomplete.map((i) => `${i.partName} (${i.quantityCompleted}/${i.quantity})`).join(", ")}.`);
       const pendingDesigns = [...modelingPending(facts), ...serviceItemsPending(facts)];
       if (pendingDesigns.length > 0) fail(`Design/scan work not approved for: ${pendingDesigns.map((p) => p.partName).join(", ")}.`);
-      if (facts.jobs.some((j) => ["QUEUED", "PRINTING", "POST_PROCESSING", "QUALITY_CHECK"].includes(j.status)))
-        fail("There are unfinished print jobs. Complete or cancel them first.");
+      if (facts.jobs.some((j) => ["QUEUED", "PRINTING", "POST_PROCESSING", "QUALITY_CHECK"].includes(j.status))) fail("There are unfinished print jobs. Complete or cancel them first.");
       break;
     }
     case "DELIVERED":

@@ -67,7 +67,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const year = Number(firstParam(sp.year)) || period.from.getFullYear();
   const qs = `period=${period.key}${period.key === "custom" ? `&from=${firstParam(sp.from) ?? ""}&to=${firstParam(sp.to) ?? ""}` : ""}`;
   const [months, prof, daily] = await Promise.all([monthlySeries(year), view === "summary" ? null : profitability(period), view === "daily" ? dailySeries(period) : null]);
-  const yearTotals = months.reduce((a, m) => ({ revenue: a.revenue.plus(dec(m.revenue)), cogs: a.cogs.plus(dec(m.cogs)), cash: a.cash.plus(dec(m.cash)), expenses: a.expenses.plus(dec(m.expenses)) }), { revenue: ZERO, cogs: ZERO, cash: ZERO, expenses: ZERO });
+  const yearTotals = months.reduce(
+    (a, m) => ({ revenue: a.revenue.plus(dec(m.revenue)), cogs: a.cogs.plus(dec(m.cogs)), cash: a.cash.plus(dec(m.cash)), expenses: a.expenses.plus(dec(m.expenses)) }),
+    { revenue: ZERO, cogs: ZERO, cash: ZERO, expenses: ZERO },
+  );
 
   return (
     <>
@@ -132,7 +135,16 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             </CardContent>
           </Card>
           <Card>
-            <CardHeader title="Monthly table" actions={<Button size="sm" variant="ghost" asChild><a href={`/api/export/daily?period=custom&from=${year}-01-01&to=${year}-12-31`}><Download /> Daily CSV for {year}</a></Button>} />
+            <CardHeader
+              title="Monthly table"
+              actions={
+                <Button size="sm" variant="ghost" asChild>
+                  <a href={`/api/export/daily?period=custom&from=${year}-01-01&to=${year}-12-31`}>
+                    <Download /> Daily CSV for {year}
+                  </a>
+                </Button>
+              }
+            />
             <Table>
               <THead>
                 <tr>
@@ -171,7 +183,16 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       {view === "daily" && daily && (
         <Card>
-          <CardHeader title={`Daily — ${period.label}`} actions={<Button size="sm" variant="ghost" asChild><a href={`/api/export/daily?${qs}`}><Download /> CSV</a></Button>} />
+          <CardHeader
+            title={`Daily — ${period.label}`}
+            actions={
+              <Button size="sm" variant="ghost" asChild>
+                <a href={`/api/export/daily?${qs}`}>
+                  <Download /> CSV
+                </a>
+              </Button>
+            }
+          />
           {daily.length === 0 ? (
             <p className="px-5 py-6 text-sm text-muted-foreground">No deliveries or payments in this period.</p>
           ) : (
@@ -203,7 +224,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       {view === "orders" && prof && (
         <Card>
-          <CardHeader title={`Orders delivered — ${period.label}`} description="Pricing variance = actual cost − estimated cost (positive means it cost more than quoted)." actions={<Button size="sm" variant="ghost" asChild><a href={`/api/export/profitability-orders?${qs}`}><Download /> CSV</a></Button>} />
+          <CardHeader
+            title={`Orders delivered — ${period.label}`}
+            description="Pricing variance = actual cost − estimated cost (positive means it cost more than quoted)."
+            actions={
+              <Button size="sm" variant="ghost" asChild>
+                <a href={`/api/export/profitability-orders?${qs}`}>
+                  <Download /> CSV
+                </a>
+              </Button>
+            }
+          />
           {prof.byOrder.length === 0 ? (
             <p className="px-5 py-6 text-sm text-muted-foreground">No delivered orders in this period.</p>
           ) : (
@@ -257,7 +288,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               )
             }
           />
-          <GroupTable rows={view === "customers" ? prof.byCustomer : view === "materials" ? prof.byMaterial : view === "printers" ? prof.byPrinter : prof.byService} showProduction={view !== "customers"} services={view === "services"} />
+          <GroupTable
+            rows={view === "customers" ? prof.byCustomer : view === "materials" ? prof.byMaterial : view === "printers" ? prof.byPrinter : prof.byService}
+            showProduction={view !== "customers"}
+            services={view === "services"}
+          />
         </Card>
       )}
 

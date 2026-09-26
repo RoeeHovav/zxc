@@ -1,14 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  ORDER_STATUSES,
-  ORDER_TRANSITIONS,
-  canForceTransition,
-  checkOrderTransition,
-  paymentState,
-  statusAfterConfirm,
-  syncProductionStatus,
-  type OrderFacts,
-} from "./order";
+import { ORDER_STATUSES, ORDER_TRANSITIONS, canForceTransition, checkOrderTransition, paymentState, statusAfterConfirm, syncProductionStatus, type OrderFacts } from "./order";
 import { checkDesignTransition, checkJobTransition, checkQuoteTransition, isQuoteExpired, isRevisionChargeable } from "./other";
 
 function facts(over: Partial<OrderFacts> = {}): OrderFacts {
@@ -127,16 +118,43 @@ describe("syncProductionStatus", () => {
     expect(syncProductionStatus(facts({ jobs: [{ number: "J-1", status: "PRINTING" }] }))).toBe("PRINTING");
   });
   it("stays printing while any unit is unprinted, even if one job finished", () => {
-    const f = withItems(facts({ status: "PRINTING", jobs: [{ number: "J-1", status: "DONE" }, { number: "J-2", status: "QUEUED" }] }), [4, 0], [4, 0]);
+    const f = withItems(
+      facts({
+        status: "PRINTING",
+        jobs: [
+          { number: "J-1", status: "DONE" },
+          { number: "J-2", status: "QUEUED" },
+        ],
+      }),
+      [4, 0],
+      [4, 0],
+    );
     expect(syncProductionStatus(f)).toBeNull();
   });
   it("becomes ready only when every unit of every item passed QC", () => {
-    const f = withItems(facts({ status: "PRINTING", jobs: [{ number: "J-1", status: "DONE" }, { number: "J-2", status: "DONE" }] }), [4, 2], [4, 2]);
+    const f = withItems(
+      facts({
+        status: "PRINTING",
+        jobs: [
+          { number: "J-1", status: "DONE" },
+          { number: "J-2", status: "DONE" },
+        ],
+      }),
+      [4, 2],
+      [4, 2],
+    );
     expect(syncProductionStatus(f)).toBe("READY");
   });
   it("returns to printing when a QC failure triggers a reprint", () => {
     const f = withItems(
-      facts({ status: "QUALITY_CHECK", jobs: [{ number: "J-1", status: "DONE" }, { number: "J-2", status: "FAILED" }, { number: "J-3", status: "QUEUED" }] }),
+      facts({
+        status: "QUALITY_CHECK",
+        jobs: [
+          { number: "J-1", status: "DONE" },
+          { number: "J-2", status: "FAILED" },
+          { number: "J-3", status: "QUEUED" },
+        ],
+      }),
       [4, 0],
       [4, 0],
     );
@@ -154,8 +172,7 @@ describe("syncProductionStatus", () => {
 });
 
 describe("paymentState", () => {
-  const p = (total: string, paid: string, status: OrderFacts["status"] = "QUEUED", deposit = "0") =>
-    paymentState({ total, amountPaid: paid, status, depositAmount: deposit });
+  const p = (total: string, paid: string, status: OrderFacts["status"] = "QUEUED", deposit = "0") => paymentState({ total, amountPaid: paid, status, depositAmount: deposit });
   it("derives states from the ledger", () => {
     expect(p("100", "0")).toBe("UNPAID");
     expect(p("100", "30", "QUEUED", "30")).toBe("DEPOSIT_PAID");

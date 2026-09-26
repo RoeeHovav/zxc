@@ -8,12 +8,34 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { ActionForm, CheckboxField, NumberField, SelectField, TextField } from "@/components/action-form";
 import { archivePolicyAction, savePolicyAction } from "../actions";
 
-type Values = { name: string; description: string; method: string; markupPercent: string; marginPercent: string; minimumOrderCharge: string; minimumMarginPercent: string; priceRoundingStep: string; roundingMode: string; isDefault: boolean };
+type Values = {
+  name: string;
+  description: string;
+  method: string;
+  markupPercent: string;
+  marginPercent: string;
+  minimumOrderCharge: string;
+  minimumMarginPercent: string;
+  priceRoundingStep: string;
+  roundingMode: string;
+  isDefault: boolean;
+};
 
 export function PolicyDialog({ id, initial }: { id?: string; initial?: Values }) {
   const [open, setOpen] = React.useState(false);
   const [method, setMethod] = React.useState(initial?.method ?? "MARKUP");
-  const v = initial ?? { name: "", description: "", method: "MARKUP", markupPercent: "100", marginPercent: "50", minimumOrderCharge: "30", minimumMarginPercent: "30", priceRoundingStep: "1", roundingMode: "UP", isDefault: false };
+  const v = initial ?? {
+    name: "",
+    description: "",
+    method: "MARKUP",
+    markupPercent: "100",
+    marginPercent: "50",
+    minimumOrderCharge: "30",
+    minimumMarginPercent: "30",
+    priceRoundingStep: "1",
+    roundingMode: "UP",
+    isDefault: false,
+  };
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -32,7 +54,16 @@ export function PolicyDialog({ id, initial }: { id?: string; initial?: Values })
           <TextField name="name" label="Name" required defaultValue={v.name} placeholder="Wholesale" />
           <TextField name="description" label="Description" defaultValue={v.description} />
           <div className="grid gap-4 sm:grid-cols-2">
-            <SelectField name="method" label="Method" value={method} onChange={(e) => setMethod(e.target.value)} options={[{ value: "MARKUP", label: "Markup on cost" }, { value: "MARGIN", label: "Target gross margin" }]} />
+            <SelectField
+              name="method"
+              label="Method"
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
+              options={[
+                { value: "MARKUP", label: "Markup on cost" },
+                { value: "MARGIN", label: "Target gross margin" },
+              ]}
+            />
             {method === "MARKUP" ? (
               <NumberField name="markupPercent" label="Markup" suffix="%" defaultValue={v.markupPercent} />
             ) : (
@@ -41,7 +72,15 @@ export function PolicyDialog({ id, initial }: { id?: string; initial?: Values })
             <NumberField name="minimumOrderCharge" label="Minimum order" suffix="₪" defaultValue={v.minimumOrderCharge} />
             <NumberField name="minimumMarginPercent" label="Warn below margin" suffix="%" defaultValue={v.minimumMarginPercent} />
             <NumberField name="priceRoundingStep" label="Round unit prices to" suffix="₪" defaultValue={v.priceRoundingStep} hint="0 = agorot only" />
-            <SelectField name="roundingMode" label="Rounding" defaultValue={v.roundingMode} options={[{ value: "UP", label: "Always up" }, { value: "NEAREST", label: "Nearest" }]} />
+            <SelectField
+              name="roundingMode"
+              label="Rounding"
+              defaultValue={v.roundingMode}
+              options={[
+                { value: "UP", label: "Always up" },
+                { value: "NEAREST", label: "Nearest" },
+              ]}
+            />
           </div>
           <CheckboxField name="isDefault" label="Use as default policy" defaultChecked={v.isDefault} />
           {method === "MARKUP" ? <input type="hidden" name="marginPercent" value={v.marginPercent} /> : <input type="hidden" name="markupPercent" value={v.markupPercent} />}

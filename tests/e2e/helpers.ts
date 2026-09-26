@@ -24,7 +24,10 @@ export async function login(page: Page) {
 /** Picks an option in a Combobox (trigger id or locator) by visible option text. */
 export async function combo(page: Page, trigger: string | Locator, text: string) {
   await (typeof trigger === "string" ? page.locator(`#${trigger}`) : trigger).click();
-  await page.getByRole("option", { name: new RegExp(text) }).first().click();
+  await page
+    .getByRole("option", { name: new RegExp(text) })
+    .first()
+    .click();
 }
 
 export async function noHorizontalOverflow(page: Page) {

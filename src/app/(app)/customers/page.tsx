@@ -100,7 +100,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     <TD className="hidden text-muted-foreground lg:table-cell">{c.city ?? "—"}</TD>
                     <TD className="tabular text-end">{c._count.orders}</TD>
                     <TD className="tabular text-end">
-                      {Number(c.balance) > 0 ? <span className="font-medium text-warning">{money(c.balance)}</span> : Number(c.balance) < 0 ? <span className="text-info">{money(c.balance)} credit</span> : <span className="text-muted-foreground">—</span>}
+                      {Number(c.balance) > 0 ? (
+                        <span className="font-medium text-warning">{money(c.balance)}</span>
+                      ) : Number(c.balance) < 0 ? (
+                        <span className="text-info">{money(c.balance)} credit</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TD>
                   </TR>
                 ))}

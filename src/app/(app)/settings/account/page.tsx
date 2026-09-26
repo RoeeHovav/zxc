@@ -61,7 +61,8 @@ export default async function AccountPage() {
       <Card className="lg:col-span-2">
         <CardHeader title="Forgotten password?" />
         <CardContent className="text-sm text-muted-foreground">
-          PrintForge does not send emails, so recovery is done on the server: run <code className="rounded bg-muted px-1 py-0.5">npm run user:reset-password -- owner@example.com</code> (or the Docker equivalent in the README). It sets a new password and signs out all sessions.
+          PrintForge does not send emails, so recovery is done on the server: run <code className="rounded bg-muted px-1 py-0.5">npm run user:reset-password -- owner@example.com</code> (or the Docker
+          equivalent in the README). It sets a new password and signs out all sessions.
         </CardContent>
       </Card>
     </div>

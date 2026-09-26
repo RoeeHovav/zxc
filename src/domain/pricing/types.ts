@@ -3,12 +3,7 @@
  * results can be snapshotted as JSON and reproduced exactly later.
  */
 
-export type ServiceType =
-  | "PRINT_ONLY"
-  | "MODELING_AND_PRINTING"
-  | "MODELING_ONLY"
-  | "SCANNING_ONLY"
-  | "SCANNING_AND_PRINTING";
+export type ServiceType = "PRINT_ONLY" | "MODELING_AND_PRINTING" | "MODELING_ONLY" | "SCANNING_ONLY" | "SCANNING_AND_PRINTING";
 
 export type PricingMethod = "MARKUP" | "MARGIN";
 export type RoundingMode = "UP" | "NEAREST";

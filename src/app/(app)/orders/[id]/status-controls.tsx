@@ -76,7 +76,11 @@ export function OrderStatusControls({ id, status, transitions, pricingComplete }
       <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm">
           <p className="font-medium">Draft order</p>
-          <p className="text-muted-foreground">{pricingComplete ? "Confirming reserves material, creates design projects where needed, and moves the order into its first stage." : "Resolve pricing errors (edit the order) before confirming."}</p>
+          <p className="text-muted-foreground">
+            {pricingComplete
+              ? "Confirming reserves material, creates design projects where needed, and moves the order into its first stage."
+              : "Resolve pricing errors (edit the order) before confirming."}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={() => start({ to: "CANCELED", ok: true, reasons: [], overridable: true })}>

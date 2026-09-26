@@ -6,7 +6,7 @@ describe("csv", () => {
     expect(csvCell('a,"b"\nc')).toBe('"a,""b""\nc"');
   });
   it("neutralizes formula injection but keeps negative numbers", () => {
-    expect(csvCell("=HYPERLINK(\"x\")")).toBe("\"'=HYPERLINK(\"\"x\"\")\"");
+    expect(csvCell('=HYPERLINK("x")')).toBe('"\'=HYPERLINK(""x"")"');
     expect(csvCell("+1+1")).toBe("'+1+1");
     expect(csvCell("@SUM(A1)")).toBe("'@SUM(A1)");
     expect(csvCell("-12.50")).toBe("-12.50");

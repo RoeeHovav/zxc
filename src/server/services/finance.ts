@@ -37,7 +37,10 @@ export async function financeSummary(p: Period) {
     prisma.order.findMany({ where: { status: { notIn: ["DRAFT", "CANCELED"] }, confirmedAt: { gte: p.from, lt: p.to } }, select: { taxableAmount: true, estimatedProfit: true } }),
     prisma.payment.findMany({ where: { voidedAt: null, receivedAt: { gte: p.from, lt: p.to } }, select: { kind: true, amount: true, feeAmount: true, method: true } }),
     prisma.order.findMany({ where: { status: { notIn: ["DRAFT", "CANCELED"] } }, select: { total: true, amountPaid: true } }),
-    prisma.order.findMany({ where: { status: { in: ["AWAITING_PAYMENT", "AWAITING_MODELING", "AWAITING_APPROVAL", "QUEUED", "PRINTING", "POST_PROCESSING", "QUALITY_CHECK", "READY"] } }, select: { amountPaid: true } }),
+    prisma.order.findMany({
+      where: { status: { in: ["AWAITING_PAYMENT", "AWAITING_MODELING", "AWAITING_APPROVAL", "QUEUED", "PRINTING", "POST_PROCESSING", "QUALITY_CHECK", "READY"] } },
+      select: { amountPaid: true },
+    }),
     prisma.expense.groupBy({ by: ["category"], where: { date: { gte: p.from, lt: p.to } }, _sum: { amount: true, vatAmount: true } }),
   ]);
   const revenue = sumDec(recognized.map((o) => o.taxableAmount));
@@ -91,7 +94,10 @@ export type FinanceSummary = Awaited<ReturnType<typeof financeSummary>>;
 export async function monthlySeries(year: number) {
   const { from, to } = yearPeriod(year);
   const [orders, payments, expenses] = await Promise.all([
-    prisma.order.findMany({ where: { status: { in: ["DELIVERED", "COMPLETED"] }, deliveredAt: { gte: from, lt: to } }, select: { deliveredAt: true, taxableAmount: true, estimatedCost: true, actualCost: true } }),
+    prisma.order.findMany({
+      where: { status: { in: ["DELIVERED", "COMPLETED"] }, deliveredAt: { gte: from, lt: to } },
+      select: { deliveredAt: true, taxableAmount: true, estimatedCost: true, actualCost: true },
+    }),
     prisma.payment.findMany({ where: { voidedAt: null, receivedAt: { gte: from, lt: to } }, select: { receivedAt: true, kind: true, amount: true } }),
     prisma.expense.findMany({ where: { date: { gte: from, lt: to } }, select: { date: true, amount: true, category: true } }),
   ]);
@@ -109,15 +115,32 @@ export async function monthlySeries(year: number) {
     const m = months[e.date.getMonth()];
     m.expenses = m.expenses.plus(dec(e.amount.toString()));
   }
-  return months.map((m) => ({ month: m.month, revenue: m.revenue.toFixed(2), cogs: m.cogs.toFixed(2), grossProfit: m.revenue.minus(m.cogs).toFixed(2), cash: m.cash.toFixed(2), expenses: m.expenses.toFixed(2) }));
+  return months.map((m) => ({
+    month: m.month,
+    revenue: m.revenue.toFixed(2),
+    cogs: m.cogs.toFixed(2),
+    grossProfit: m.revenue.minus(m.cogs).toFixed(2),
+    cash: m.cash.toFixed(2),
+    expenses: m.expenses.toFixed(2),
+  }));
 }
 
 export async function listExpenses(opts: { from?: Date; to?: Date; category?: string; q?: string }) {
   const where: Prisma.ExpenseWhereInput = {};
   if (opts.from || opts.to) where.date = { ...(opts.from ? { gte: opts.from } : {}), ...(opts.to ? { lt: opts.to } : {}) };
   if (opts.category) where.category = opts.category as Prisma.ExpenseWhereInput["category"];
-  if (opts.q) where.OR = [{ description: { contains: opts.q, mode: "insensitive" } }, { reference: { contains: opts.q, mode: "insensitive" } }, { supplier: { name: { contains: opts.q, mode: "insensitive" } } }];
-  return prisma.expense.findMany({ where, orderBy: { date: "desc" }, take: 500, include: { supplier: { select: { name: true } }, printer: { select: { name: true } }, order: { select: { id: true, number: true } }, _count: { select: { files: true } } } });
+  if (opts.q)
+    where.OR = [
+      { description: { contains: opts.q, mode: "insensitive" } },
+      { reference: { contains: opts.q, mode: "insensitive" } },
+      { supplier: { name: { contains: opts.q, mode: "insensitive" } } },
+    ];
+  return prisma.expense.findMany({
+    where,
+    orderBy: { date: "desc" },
+    take: 500,
+    include: { supplier: { select: { name: true } }, printer: { select: { name: true } }, order: { select: { id: true, number: true } }, _count: { select: { files: true } } },
+  });
 }
 
 import { ServiceError, audit } from "./common";
@@ -162,6 +185,12 @@ export async function deleteExpense(userId: string, id: string) {
   return prisma.$transaction(async (tx) => {
     const spools = await tx.spool.count({ where: { expenseId: id } });
     const e = await tx.expense.delete({ where: { id } });
-    await audit(tx, { userId, entityType: "EXPENSE", entityId: id, action: "DELETE", summary: `Deleted expense ${e.description} (${e.amount.toString()})${spools ? `; ${spools} spool(s) keep their landed cost` : ""}` });
+    await audit(tx, {
+      userId,
+      entityType: "EXPENSE",
+      entityId: id,
+      action: "DELETE",
+      summary: `Deleted expense ${e.description} (${e.amount.toString()})${spools ? `; ${spools} spool(s) keep their landed cost` : ""}`,
+    });
   });
 }

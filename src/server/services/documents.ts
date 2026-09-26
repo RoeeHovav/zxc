@@ -9,7 +9,17 @@ import { buildLineInput, resolveContext, type StoredLineInput } from "./pricing-
 export function totalsColumns(result: OrderResult) {
   const t = result.totals;
   return {
-    pricingSummary: JSON.parse(JSON.stringify({ totals: result.totals, costs: result.costs, grossProfit: result.grossProfit, marginPercent: result.marginPercent, markupPercent: result.markupPercent, issues: result.issues, steps: result.steps })),
+    pricingSummary: JSON.parse(
+      JSON.stringify({
+        totals: result.totals,
+        costs: result.costs,
+        grossProfit: result.grossProfit,
+        marginPercent: result.marginPercent,
+        markupPercent: result.markupPercent,
+        issues: result.issues,
+        steps: result.steps,
+      }),
+    ),
     pricingComplete: result.complete,
     itemsNet: t?.itemsNet ?? "0",
     orderDiscount: t?.orderDiscount ?? "0",
@@ -38,10 +48,6 @@ export async function priceDocument(
     form.orderDiscountType && form.orderDiscountValue !== null
       ? { type: form.orderDiscountType, value: form.orderDiscountType === "PERCENT" ? dec(form.orderDiscountValue).div(100).toString() : form.orderDiscountValue }
       : null;
-  const result = priceOrder(
-    { lines: stored, orderDiscount, shippingCharge: form.shippingCharge, shippingCost: form.shippingCost, depositPercent: form.depositPercent, customerVatExempt },
-    ctx,
-  );
+  const result = priceOrder({ lines: stored, orderDiscount, shippingCharge: form.shippingCharge, shippingCost: form.shippingCost, depositPercent: form.depositPercent, customerVatExempt }, ctx);
   return { ctx, stored, result };
 }
-

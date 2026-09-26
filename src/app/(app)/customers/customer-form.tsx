@@ -67,12 +67,7 @@ export function CustomerForm({ id, initial, policies, returnTo }: { id: string |
                   </li>
                 ))}
               </ul>
-              <Checkbox
-                name="allowDuplicate"
-                checked={allowDuplicate}
-                onChange={(e) => setAllowDuplicate(e.target.checked)}
-                label="This is a different customer — save anyway"
-              />
+              <Checkbox name="allowDuplicate" checked={allowDuplicate} onChange={(e) => setAllowDuplicate(e.target.checked)} label="This is a different customer — save anyway" />
             </Alert>
           )}
           <FormSection title="Contact" description="Who the customer is and how they prefer to be reached.">
@@ -138,7 +133,13 @@ export function CustomerForm({ id, initial, policies, returnTo }: { id: string |
             <Field label="Internal notes" error={fe.notes} className="sm:col-span-2">
               <Textarea name="notes" defaultValue={v.notes ?? ""} rows={3} />
             </Field>
-            <Checkbox name="marketingConsent" defaultChecked={v.marketingConsent} label="Consents to marketing messages" hint="Record explicit consent only. PrintForge never sends messages automatically." className="sm:col-span-2" />
+            <Checkbox
+              name="marketingConsent"
+              defaultChecked={v.marketingConsent}
+              label="Consents to marketing messages"
+              hint="Record explicit consent only. PrintForge never sends messages automatically."
+              className="sm:col-span-2"
+            />
           </FormSection>
         </CardContent>
         <CardFooter>

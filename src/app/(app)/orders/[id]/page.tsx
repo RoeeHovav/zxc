@@ -55,7 +55,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const overdue = o.dueDate && o.dueDate < new Date() && !["COMPLETED", "CANCELED", "DELIVERED"].includes(status);
   const showActual = o.jobs.some((j) => ["POST_PROCESSING", "QUALITY_CHECK", "DONE", "FAILED"].includes(j.status));
   const actualSummary = showActual
-    ? { total: actual.total, complete: actual.complete, profit: dec(o.taxableAmount.toString()).minus(dec(actual.total)).toFixed(2), variance: dec(actual.total).minus(dec(o.estimatedCost.toString())).toFixed(2) }
+    ? {
+        total: actual.total,
+        complete: actual.complete,
+        profit: dec(o.taxableAmount.toString()).minus(dec(actual.total)).toFixed(2),
+        variance: dec(actual.total).minus(dec(o.estimatedCost.toString())).toFixed(2),
+      }
     : null;
 
   return (
@@ -138,9 +143,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           {Number(o.amountPaid) > 0 && <> Refund due: {money(o.amountPaid)}.</>}
         </Alert>
       )}
-      {overdue && (
-        <Alert tone="danger" className="mb-6" title={`Overdue — was due ${date(o.dueDate)} (${relativeDays(o.dueDate)})`} />
-      )}
+      {overdue && <Alert tone="danger" className="mb-6" title={`Overdue — was due ${date(o.dueDate)} (${relativeDays(o.dueDate)})`} />}
 
       <OrderStatusControls id={o.id} status={status} transitions={transitions} pricingComplete={o.pricingComplete} />
 
@@ -168,7 +171,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                       {requiresPrint(it.serviceType) && (
                         <>
-                          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={it.quantity} aria-valuenow={it.quantityCompleted} aria-label={`${it.partName} completed units`}>
+                          <div
+                            className="h-1.5 w-24 overflow-hidden rounded-full bg-muted"
+                            role="progressbar"
+                            aria-valuemin={0}
+                            aria-valuemax={it.quantity}
+                            aria-valuenow={it.quantityCompleted}
+                            aria-label={`${it.partName} completed units`}
+                          >
                             <div className="h-full bg-success" style={{ width: `${Math.min(100, (it.quantityCompleted / it.quantity) * 100)}%` }} />
                           </div>
                           <span className="text-muted-foreground">
@@ -177,11 +187,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                           {reserved > 0 && <span className="text-muted-foreground">· {grams(reserved)} reserved</span>}
                         </>
                       )}
-                      {it.designProject && (
-                        <Badge tone={DESIGN_STATUS_TONE[it.designProject.status]}>
-                          Design {enumLabel("designStatus", it.designProject.status).toLowerCase()}
-                        </Badge>
-                      )}
+                      {it.designProject && <Badge tone={DESIGN_STATUS_TONE[it.designProject.status]}>Design {enumLabel("designStatus", it.designProject.status).toLowerCase()}</Badge>}
                       {it.deadline && <span className="text-muted-foreground">· due {date(it.deadline)}</span>}
                     </div>
                   ),
@@ -270,7 +276,19 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             paid={o.amountPaid.toString()}
             balance={balance.toFixed(2)}
             deposit={o.depositAmount.toString()}
-            payments={o.payments.map((p) => ({ id: p.id, number: p.number, kind: p.kind, method: p.method, amount: p.amount.toString(), receivedAt: p.receivedAt.toISOString(), isDeposit: p.isDeposit, reference: p.reference, voidedAt: p.voidedAt?.toISOString() ?? null, voidReason: p.voidReason, feeAmount: p.feeAmount.toString() }))}
+            payments={o.payments.map((p) => ({
+              id: p.id,
+              number: p.number,
+              kind: p.kind,
+              method: p.method,
+              amount: p.amount.toString(),
+              receivedAt: p.receivedAt.toISOString(),
+              isDeposit: p.isDeposit,
+              reference: p.reference,
+              voidedAt: p.voidedAt?.toISOString() ?? null,
+              voidReason: p.voidReason,
+              feeAmount: p.feeAmount.toString(),
+            }))}
           />
           <InternalSummary doc={o} actual={actualSummary} />
           <Card>

@@ -5,7 +5,19 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
   return <div className={cn("rounded-xl border border-border bg-card text-card-foreground shadow-[var(--shadow-card)]", className)} {...props} />;
 }
 
-export function CardHeader({ className, title, description, actions, children }: { className?: string; title?: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode; children?: React.ReactNode }) {
+export function CardHeader({
+  className,
+  title,
+  description,
+  actions,
+  children,
+}: {
+  className?: string;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  actions?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
   return (
     <div className={cn("flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4", className)}>
       <div className="min-w-0">

@@ -35,10 +35,21 @@ export function PrinterForm({ id, initial, materialTypes }: { id: string | null;
   return (
     <Card>
       <CardContent className="py-6">
-        <ActionForm action={savePrinterAction.bind(null, id)} submitLabel={id ? "Save changes" : "Add printer"} successMessage={id ? "Printer saved." : "Printer added."} redirectTo={(d: { id: string }) => `/printers/${d.id}`} className="gap-6">
+        <ActionForm
+          action={savePrinterAction.bind(null, id)}
+          submitLabel={id ? "Save changes" : "Add printer"}
+          successMessage={id ? "Printer saved." : "Printer added."}
+          redirectTo={(d: { id: string }) => `/printers/${d.id}`}
+          className="gap-6"
+        >
           <FormSection title="Machine" description="Identify the printer and its setup.">
             <TextField name="name" label="Name" required defaultValue={v.name ?? ""} placeholder="X1C #1" />
-            <SelectField name="status" label="Status" defaultValue={v.status ?? "AVAILABLE"} options={["AVAILABLE", "PRINTING", "MAINTENANCE", "OFFLINE", "RETIRED"].map((s) => ({ value: s, label: enumLabel("printerStatus", s) }))} />
+            <SelectField
+              name="status"
+              label="Status"
+              defaultValue={v.status ?? "AVAILABLE"}
+              options={["AVAILABLE", "PRINTING", "MAINTENANCE", "OFFLINE", "RETIRED"].map((s) => ({ value: s, label: enumLabel("printerStatus", s) }))}
+            />
             <TextField name="manufacturer" label="Manufacturer" defaultValue={v.manufacturer ?? "Bambu Lab"} />
             <TextField name="model" label="Model" required defaultValue={v.model ?? ""} placeholder="X1 Carbon, P1S, A1…" />
             <TextField name="serialNumber" label="Serial number" defaultValue={v.serialNumber ?? ""} />
@@ -50,7 +61,10 @@ export function PrinterForm({ id, initial, materialTypes }: { id: string | null;
               <legend className="mb-2 text-sm font-medium">Supported materials</legend>
               <div className="flex flex-wrap gap-2">
                 {materialTypes.map((t) => (
-                  <label key={t.id} className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary-soft">
+                  <label
+                    key={t.id}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary-soft"
+                  >
                     <input type="checkbox" name="materialTypeIds" value={t.id} defaultChecked={selected.has(t.id)} className="accent-[var(--primary)]" />
                     {t.code}
                   </label>
@@ -58,7 +72,10 @@ export function PrinterForm({ id, initial, materialTypes }: { id: string | null;
               </div>
             </fieldset>
           </FormSection>
-          <FormSection title="Operating cost" description="Machine cost per hour = purchase ÷ lifetime + power × tariff + maintenance + consumables. Missing values are flagged on quotes, never silently zero.">
+          <FormSection
+            title="Operating cost"
+            description="Machine cost per hour = purchase ÷ lifetime + power × tariff + maintenance + consumables. Missing values are flagged on quotes, never silently zero."
+          >
             <NumberField name="purchasePrice" label="Purchase price" suffix="₪" defaultValue={v.purchasePrice ?? ""} />
             <NumberField name="expectedLifetimeHours" label="Expected lifetime" suffix="hours" defaultValue={v.expectedLifetimeHours?.toString() ?? ""} placeholder="5000" />
             <NumberField name="powerWatts" label="Average power while printing" suffix="W" defaultValue={v.powerWatts?.toString() ?? ""} placeholder="150" />

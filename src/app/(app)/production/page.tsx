@@ -62,7 +62,14 @@ export default async function ProductionPage({ searchParams }: { searchParams: P
         <ProductionBoard
           jobs={data}
           printers={printers.map((p) => ({ id: p.id, name: p.name, status: p.status }))}
-          spools={spools.map((s) => ({ id: s.id, code: s.code, materialId: s.materialId, remainingG: s.remainingG.toString(), measured: s.remainingIsMeasured, label: `${s.material.materialType.code} ${s.material.brand} ${s.material.colorName}` }))}
+          spools={spools.map((s) => ({
+            id: s.id,
+            code: s.code,
+            materialId: s.materialId,
+            remainingG: s.remainingG.toString(),
+            measured: s.remainingIsMeasured,
+            label: `${s.material.materialType.code} ${s.material.brand} ${s.material.colorName}`,
+          }))}
           highlight={firstParam(sp.job) ?? null}
           initialView={firstParam(sp.view) === "queues" ? "queues" : "board"}
         />

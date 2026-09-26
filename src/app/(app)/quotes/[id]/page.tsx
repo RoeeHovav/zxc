@@ -141,8 +141,22 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                   ["Pricing policy", q.pricingPolicy?.name ?? (q.pricingContext as { policy: { name: string } }).policy.name],
                   ["Rates captured", dateTime((q.pricingContext as { capturedAt: string }).capturedAt)],
                   ["Sent", q.sentAt ? dateTime(q.sentAt) : null],
-                  ["Customer decision", q.acceptedAt ? `Accepted ${date(q.acceptedAt)}${q.approvalNote ? ` — ${q.approvalNote}` : ""}` : q.rejectedAt ? `Rejected ${date(q.rejectedAt)}${q.rejectionReason ? ` — ${q.rejectionReason}` : ""}` : null],
-                  ["Previous revision", q.previous ? <Link key="p" href={`/quotes/${q.previous.id}`} className="hover:text-primary">rev {q.previous.revision}</Link> : null],
+                  [
+                    "Customer decision",
+                    q.acceptedAt
+                      ? `Accepted ${date(q.acceptedAt)}${q.approvalNote ? ` — ${q.approvalNote}` : ""}`
+                      : q.rejectedAt
+                        ? `Rejected ${date(q.rejectedAt)}${q.rejectionReason ? ` — ${q.rejectionReason}` : ""}`
+                        : null,
+                  ],
+                  [
+                    "Previous revision",
+                    q.previous ? (
+                      <Link key="p" href={`/quotes/${q.previous.id}`} className="hover:text-primary">
+                        rev {q.previous.revision}
+                      </Link>
+                    ) : null,
+                  ],
                 ]}
               />
               {q.internalNotes && (

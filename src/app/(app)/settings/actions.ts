@@ -29,10 +29,13 @@ export async function savePolicyAction(id: string | null, _prev: unknown, fd: Fo
 
 export async function archivePolicyAction(id: string, archived: boolean) {
   const user = await requireUser("settings");
-  return runAction(async () => {
-    await archivePolicy(user.id, id, archived);
-    revalidatePath("/settings/policies");
-  }, archived ? "Policy archived." : "Policy restored.");
+  return runAction(
+    async () => {
+      await archivePolicy(user.id, id, archived);
+      revalidatePath("/settings/policies");
+    },
+    archived ? "Policy archived." : "Policy restored.",
+  );
 }
 
 export async function setLogoAction(fileId: string | null) {

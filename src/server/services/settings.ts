@@ -84,8 +84,7 @@ export async function updateSettings(userId: string, data: Omit<Prisma.SettingsU
     const before = await getSettings(tx);
     const after = await tx.settings.update({ where: { id: 1 }, data });
     const changed = Object.keys(data).filter((k) => String((before as Record<string, unknown>)[k]) !== String((after as Record<string, unknown>)[k]));
-    if (changed.length)
-      await audit(tx, { userId, entityType: "SETTINGS", entityId: "1", action: "UPDATE", summary: `Updated settings: ${changed.join(", ")}`, details: { changed } });
+    if (changed.length) await audit(tx, { userId, entityType: "SETTINGS", entityId: "1", action: "UPDATE", summary: `Updated settings: ${changed.join(", ")}`, details: { changed } });
     return after;
   });
 }
@@ -121,7 +120,13 @@ export async function savePolicy(userId: string, id: string | null, i: PolicyInp
       await tx.pricingPolicy.updateMany({ where: { NOT: { id: p.id } }, data: { isDefault: false } });
       await tx.pricingPolicy.update({ where: { id: p.id }, data: { isDefault: true, isArchived: false } });
     }
-    await audit(tx, { userId, entityType: "POLICY", entityId: p.id, action: id ? "UPDATE" : "CREATE", summary: `${id ? "Updated" : "Created"} pricing policy ${p.name} (existing quotes keep their snapshot)` });
+    await audit(tx, {
+      userId,
+      entityType: "POLICY",
+      entityId: p.id,
+      action: id ? "UPDATE" : "CREATE",
+      summary: `${id ? "Updated" : "Created"} pricing policy ${p.name} (existing quotes keep their snapshot)`,
+    });
     return p;
   });
 }

@@ -44,12 +44,10 @@ export const optDecimal = (opts: { min?: number; max?: number; label?: string } 
       return s;
     });
 
-export const reqDecimal = (opts: { min?: number; max?: number; label: string }) =>
-  optDecimal(opts).refine((v): v is string => v !== null, `${opts.label} is required.`);
+export const reqDecimal = (opts: { min?: number; max?: number; label: string }) => optDecimal(opts).refine((v): v is string => v !== null, `${opts.label} is required.`);
 
 /** Percentage entered as 0–100 in forms, stored as fraction string ("18" → "0.18"). */
-export const optPercent = (label = "Percentage", max = 100) =>
-  optDecimal({ min: 0, max, label }).transform((v) => (v === null ? null : fractionFromPercent(v)));
+export const optPercent = (label = "Percentage", max = 100) => optDecimal({ min: 0, max, label }).transform((v) => (v === null ? null : fractionFromPercent(v)));
 
 export function fractionFromPercent(v: string): string {
   return new D(v).div(100).toString();

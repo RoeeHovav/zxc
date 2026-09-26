@@ -17,5 +17,9 @@ export function useNow(): number | null {
 const noop = () => () => {};
 /** True after hydration. */
 export function useMounted() {
-  return React.useSyncExternalStore(noop, () => true, () => false);
+  return React.useSyncExternalStore(
+    noop,
+    () => true,
+    () => false,
+  );
 }

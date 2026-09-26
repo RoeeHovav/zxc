@@ -71,9 +71,7 @@ export default async function PrintersPage({ searchParams }: { searchParams: Pro
                 <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
                   <div>
                     <dt className="text-xs text-muted-foreground">Machine rate</dt>
-                    <dd className="tabular font-medium">
-                      {money(Number(p.rate).toFixed(2))}/h
-                    </dd>
+                    <dd className="tabular font-medium">{money(Number(p.rate).toFixed(2))}/h</dd>
                   </div>
                   <div>
                     <dt className="text-xs text-muted-foreground">Print hours</dt>

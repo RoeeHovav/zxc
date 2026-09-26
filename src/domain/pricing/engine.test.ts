@@ -127,10 +127,7 @@ describe("priceLine — production", () => {
 
   it("applies setup and purge per batch, not per unit", () => {
     // qty 10, 4 per batch → 3 batches; setup 12 min × 3 = 0.6 h × 60 = 36; purge 5 g × 3 = 15 g × 0.1 = 1.50
-    const r = priceLine(
-      printLine({ quantity: 10 }, { unitsPerBatch: 4, setupMinutesPerBatch: "12", purgeGramsPerBatch: "5" }),
-      bareContext(),
-    );
+    const r = priceLine(printLine({ quantity: 10 }, { unitsPerBatch: 4, setupMinutesPerBatch: "12", purgeGramsPerBatch: "5" }), bareContext());
     expect(r.production?.batches).toBe(3);
     expect(r.production?.costs.setupLabor).toBe("36.00");
     expect(r.production?.grams.purge).toBe("15");
@@ -302,19 +299,13 @@ describe("priceLine — price rounding", () => {
 
 describe("priceLine — services", () => {
   it("charges modeling once, not per unit", () => {
-    const r = priceLine(
-      printLine({ serviceType: "MODELING_AND_PRINTING", quantity: 10, modeling: { mode: "HOURLY", hours: "2", fixedFee: null, waived: false } }),
-      bareContext(),
-    );
+    const r = priceLine(printLine({ serviceType: "MODELING_AND_PRINTING", quantity: 10, modeling: { mode: "HOURLY", hours: "2", fixedFee: null, waived: false } }), bareContext());
     expect(r.services.modeling?.price).toBe("360.00");
     expect(r.gross).toBe("660.00"); // 10 × 30 + 360
     expect(r.cost).toBe("270.00"); // 150 production + 2 h × 60 internal
   });
   it("supports a fixed modeling fee and warns when hours are unknown", () => {
-    const r = priceLine(
-      printLine({ serviceType: "MODELING_AND_PRINTING", modeling: { mode: "FIXED", hours: null, fixedFee: "500", waived: false } }),
-      bareContext(),
-    );
+    const r = priceLine(printLine({ serviceType: "MODELING_AND_PRINTING", modeling: { mode: "FIXED", hours: null, fixedFee: "500", waived: false } }), bareContext());
     expect(r.services.modeling?.price).toBe("500.00");
     expect(codes(r)).toContain("MODELING_COST_UNKNOWN");
   });
@@ -328,28 +319,19 @@ describe("priceLine — services", () => {
     expect(codes(r)).toContain("DESIGN_FEE_WAIVED");
   });
   it("requires modeling hours for hourly modeling", () => {
-    const r = priceLine(
-      { ...printLine({ serviceType: "MODELING_ONLY", modeling: { mode: "HOURLY", hours: null, fixedFee: null, waived: false } }), print: null },
-      bareContext(),
-    );
+    const r = priceLine({ ...printLine({ serviceType: "MODELING_ONLY", modeling: { mode: "HOURLY", hours: null, fixedFee: null, waived: false } }), print: null }, bareContext());
     expect(r.complete).toBe(false);
     expect(codes(r)).toContain("MODELING_HOURS_REQUIRED");
   });
   it("prices scanning, cleanup and reverse engineering separately", () => {
-    const r = priceLine(
-      { ...printLine({ serviceType: "SCANNING_ONLY", scanning: { scanHours: "1.5", cleanupHours: "2", reverseEngineeringHours: "1" } }), print: null },
-      bareContext(),
-    );
+    const r = priceLine({ ...printLine({ serviceType: "SCANNING_ONLY", scanning: { scanHours: "1.5", cleanupHours: "2", reverseEngineeringHours: "1" } }), print: null }, bareContext());
     expect(r.services.scanning).toMatchObject({ scanPrice: "300.00", cleanupPrice: "300.00", reverseEngineeringPrice: "220.00", price: "820.00" });
     // (1.5 + 2 + 1) h × 60 + 1.5 h × 10 scanner = 285
     expect(r.cost).toBe("285.00");
     expect(r.net).toBe("820.00");
   });
   it("requires quantity 1 for service-only items", () => {
-    const r = priceLine(
-      { ...printLine({ serviceType: "MODELING_ONLY", quantity: 2, modeling: { mode: "FIXED", hours: "1", fixedFee: "100", waived: false } }), print: null },
-      bareContext(),
-    );
+    const r = priceLine({ ...printLine({ serviceType: "MODELING_ONLY", quantity: 2, modeling: { mode: "FIXED", hours: "1", fixedFee: "100", waived: false } }), print: null }, bareContext());
     expect(codes(r)).toContain("QUANTITY_MUST_BE_ONE");
   });
   it("combines scanning and printing", () => {

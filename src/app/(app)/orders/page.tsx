@@ -102,7 +102,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                       <TD className="max-w-40 truncate">{o.customer.name}</TD>
                       <TD>
                         <Badge tone={ORDER_STATUS_TONE[o.status]}>{enumLabel("orderStatus", o.status)}</Badge>
-                        {o.priority === "RUSH" && <Badge tone="danger" className="ms-1">Rush</Badge>}
+                        {o.priority === "RUSH" && (
+                          <Badge tone="danger" className="ms-1">
+                            Rush
+                          </Badge>
+                        )}
                       </TD>
                       <TD className="hidden md:table-cell">
                         {units > 0 ? (

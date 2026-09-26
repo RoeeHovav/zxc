@@ -28,7 +28,10 @@ export const lineSchema = z.object({
   postProcessMinutesPerUnit: optDecimal({ min: 0, max: 10000, label: "Post-processing minutes" }),
   extraCostPerUnit: optDecimal({ min: 0, max: 1000000, label: "Extra cost" }),
   extraCostNote: optText(120),
-  modelingMode: z.enum(["HOURLY", "FIXED"]).nullish().transform((v) => v ?? "HOURLY"),
+  modelingMode: z
+    .enum(["HOURLY", "FIXED"])
+    .nullish()
+    .transform((v) => v ?? "HOURLY"),
   modelingHours: optDecimal({ min: 0, max: 10000, label: "Modeling hours" }),
   modelingFee: optDecimal({ min: 0, max: 10000000, label: "Modeling fee" }),
   designFeeWaived: checkbox(),
@@ -36,7 +39,10 @@ export const lineSchema = z.object({
   scanHours: optDecimal({ min: 0, max: 10000, label: "Scan hours" }),
   scanCleanupHours: optDecimal({ min: 0, max: 10000, label: "Cleanup hours" }),
   reverseEngineeringHours: optDecimal({ min: 0, max: 10000, label: "Reverse-engineering hours" }),
-  discountType: z.enum(["PERCENT", "AMOUNT"]).nullish().transform((v) => v ?? null),
+  discountType: z
+    .enum(["PERCENT", "AMOUNT"])
+    .nullish()
+    .transform((v) => v ?? null),
   /** PERCENT as 0–100 in the editor; AMOUNT in currency. Converted server-side. */
   discountValue: optDecimal({ min: 0, max: 10000000, label: "Discount" }),
   manualUnitPrice: optDecimal({ min: 0, max: 10000000, label: "Manual unit price" }),
@@ -48,7 +54,10 @@ const docBase = {
   customerId: reqText("Customer", 40),
   title: optText(120),
   pricingPolicyId: optId(),
-  orderDiscountType: z.enum(["PERCENT", "AMOUNT"]).nullish().transform((v) => v ?? null),
+  orderDiscountType: z
+    .enum(["PERCENT", "AMOUNT"])
+    .nullish()
+    .transform((v) => v ?? null),
   orderDiscountValue: optDecimal({ min: 0, max: 10000000, label: "Order discount" }),
   shippingMethod: optText(80),
   shippingCharge: optDecimal({ min: 0, max: 1000000, label: "Shipping charge" }),
@@ -67,8 +76,14 @@ export type QuoteForm = z.output<typeof quoteSchema>;
 export const orderSchema = z.object({
   ...docBase,
   dueDate: optDate(),
-  priority: z.enum(["LOW", "NORMAL", "HIGH", "RUSH"]).nullish().transform((v) => v ?? "NORMAL"),
-  deliveryMethod: z.enum(["PICKUP", "COURIER", "POST", "OTHER"]).nullish().transform((v) => v ?? "PICKUP"),
+  priority: z
+    .enum(["LOW", "NORMAL", "HIGH", "RUSH"])
+    .nullish()
+    .transform((v) => v ?? "NORMAL"),
+  deliveryMethod: z
+    .enum(["PICKUP", "COURIER", "POST", "OTHER"])
+    .nullish()
+    .transform((v) => v ?? "PICKUP"),
   deliveryAddress: optText(300),
   confirm: checkbox(),
 });

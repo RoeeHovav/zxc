@@ -22,8 +22,7 @@ export async function verifyPassword(passwordHash: string, password: string): Pr
 export function passwordProblem(password: string, email?: string): string | null {
   if (password.length < PASSWORD_MIN_LENGTH) return `Use at least ${PASSWORD_MIN_LENGTH} characters.`;
   if (password.length > 256) return "Password is too long.";
-  if (email && password.toLowerCase().includes(email.split("@")[0].toLowerCase()) && email.split("@")[0].length >= 4)
-    return "Password must not contain your email name.";
+  if (email && password.toLowerCase().includes(email.split("@")[0].toLowerCase()) && email.split("@")[0].length >= 4) return "Password must not contain your email name.";
   if (/^(.)\1+$/.test(password)) return "Password is too repetitive.";
   const common = ["password", "1234567890", "qwertyuiop", "printforge"];
   if (common.some((c) => password.toLowerCase().includes(c))) return "Password is too common.";

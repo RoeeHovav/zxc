@@ -15,7 +15,14 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
 /** Native select: best mobile UX and fully keyboard accessible. */
 export function Select({ className, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cn(control, "h-9 pe-8 appearance-none bg-[length:16px] bg-[position:right_0.5rem_center] rtl:bg-[position:left_0.5rem_center] bg-no-repeat", className)} style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")" }} {...props}>
+    <select
+      className={cn(control, "h-9 pe-8 appearance-none bg-[length:16px] bg-[position:right_0.5rem_center] rtl:bg-[position:left_0.5rem_center] bg-no-repeat", className)}
+      style={{
+        backgroundImage:
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+      }}
+      {...props}
+    >
       {children}
     </select>
   );
@@ -68,7 +75,11 @@ export function Field({ label, htmlFor, error, hint, required, className, childr
     <div className={cn("grid gap-1.5 content-start", className)}>
       <Label htmlFor={id}>
         {label}
-        {required && <span className="text-destructive ms-0.5" aria-hidden>*</span>}
+        {required && (
+          <span className="text-destructive ms-0.5" aria-hidden>
+            *
+          </span>
+        )}
       </Label>
       {suffix ? (
         <div className="relative">

@@ -60,7 +60,19 @@ export function Combobox({
   };
 
   return (
-    <Popover.Root open={open} onOpenChange={(o) => { setOpen(o); if (o) setActive(Math.max(0, filtered.findIndex((f) => f.value === value))); }}>
+    <Popover.Root
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o)
+          setActive(
+            Math.max(
+              0,
+              filtered.findIndex((f) => f.value === value),
+            ),
+          );
+      }}
+    >
       <Popover.Trigger asChild>
         <button
           type="button"
@@ -81,7 +93,12 @@ export function Combobox({
         </button>
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content align="start" sideOffset={4} className="z-50 w-[var(--radix-popover-trigger-width)] min-w-64 overflow-hidden rounded-lg border border-border bg-card shadow-[var(--shadow-pop)]" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <Popover.Content
+          align="start"
+          sideOffset={4}
+          className="z-50 w-[var(--radix-popover-trigger-width)] min-w-64 overflow-hidden rounded-lg border border-border bg-card shadow-[var(--shadow-pop)]"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <div className="flex items-center gap-2 border-b border-border px-3">
             <Search className="size-4 text-muted-foreground" aria-hidden />
             <input

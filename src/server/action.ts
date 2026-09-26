@@ -5,9 +5,7 @@ import { fieldErrors } from "@/domain/schemas/common";
 import { AuthError } from "./auth";
 import { ServiceError } from "./services/common";
 
-export type ActionResult<T = undefined> =
-  | { ok: true; data: T; message?: string }
-  | { ok: false; error: string; fieldErrors?: Record<string, string>; details?: Record<string, unknown> };
+export type ActionResult<T = undefined> = { ok: true; data: T; message?: string } | { ok: false; error: string; fieldErrors?: Record<string, string>; details?: Record<string, unknown> };
 
 /**
  * Runs a server action body and maps known errors to user-safe results.

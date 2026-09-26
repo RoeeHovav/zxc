@@ -239,16 +239,17 @@ export async function getCustomerDetail(id: string) {
       pricingPolicy: { select: { id: true, name: true } },
       quotes: { orderBy: { createdAt: "desc" }, select: { id: true, number: true, revision: true, status: true, total: true, issueDate: true, validUntil: true, title: true } },
       orders: { orderBy: { orderDate: "desc" }, select: { id: true, number: true, status: true, total: true, amountPaid: true, orderDate: true, dueDate: true, title: true } },
-      payments: { orderBy: { receivedAt: "desc" }, select: { id: true, number: true, kind: true, method: true, amount: true, receivedAt: true, voidedAt: true, order: { select: { id: true, number: true } } } },
+      payments: {
+        orderBy: { receivedAt: "desc" },
+        select: { id: true, number: true, kind: true, method: true, amount: true, receivedAt: true, voidedAt: true, order: { select: { id: true, number: true } } },
+      },
       designs: { orderBy: { createdAt: "desc" }, select: { id: true, number: true, title: true, status: true, type: true } },
       files: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!customer) return null;
   const balance = (await customerBalances([id])).get(id) ?? "0.00";
-  const paid = customer.payments
-    .filter((p) => !p.voidedAt)
-    .reduce((acc, p) => (p.kind === "REFUND" ? acc.minus(dec(p.amount.toString())) : acc.plus(dec(p.amount.toString()))), ZERO);
+  const paid = customer.payments.filter((p) => !p.voidedAt).reduce((acc, p) => (p.kind === "REFUND" ? acc.minus(dec(p.amount.toString())) : acc.plus(dec(p.amount.toString()))), ZERO);
   const lifetime = customer.orders.filter((o) => !["DRAFT", "CANCELED"].includes(o.status)).reduce((acc, o) => acc.plus(dec(o.total.toString())), ZERO);
   return { customer, balance, totalPaid: paid.toFixed(2), lifetimeValue: lifetime.toFixed(2) };
 }

@@ -10,7 +10,13 @@ const L = dictionary.enums;
 export function enumLabel(group: keyof typeof L, value: string | null | undefined): string {
   if (!value) return "—";
   const g = L[group] as Record<string, string>;
-  return g[value] ?? value.toLowerCase().replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+  return (
+    g[value] ??
+    value
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .replace(/^\w/, (c) => c.toUpperCase())
+  );
 }
 
 export const ORDER_STATUS_TONE: Record<string, Tone> = {

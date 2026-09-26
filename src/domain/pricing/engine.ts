@@ -12,19 +12,7 @@
  * line is marked incomplete; they are never silently treated as zero.
  */
 import { D, ZERO, ONE, type Dec, dec, decOrNull, roundMoney, roundToStep, sum } from "../money";
-import type {
-  Discount,
-  LineInput,
-  LineResult,
-  OrderInput,
-  OrderResult,
-  PricingContext,
-  PricingIssue,
-  ProductionResult,
-  ResolvedPrinter,
-  ServicesResult,
-  Step,
-} from "./types";
+import type { Discount, LineInput, LineResult, OrderInput, OrderResult, PricingContext, PricingIssue, ProductionResult, ResolvedPrinter, ServicesResult, Step } from "./types";
 
 const PRINT_SERVICES = new Set(["PRINT_ONLY", "MODELING_AND_PRINTING", "SCANNING_AND_PRINTING"]);
 const MODELING_SERVICES = new Set(["MODELING_AND_PRINTING", "MODELING_ONLY"]);
@@ -81,8 +69,7 @@ export function validatePolicy(ctx: PricingContext): string[] {
   const markup = decOrNull(p.markupPercent);
   const margin = decOrNull(p.marginPercent);
   if (p.method === "MARKUP" && (markup === null || markup.lt(0))) errors.push("Markup must be zero or positive.");
-  if (p.method === "MARGIN" && (margin === null || margin.lt(0) || margin.gte(1)))
-    errors.push("Target margin must be at least 0% and below 100%.");
+  if (p.method === "MARGIN" && (margin === null || margin.lt(0) || margin.gte(1))) errors.push("Target margin must be at least 0% and below 100%.");
   const step = decOrNull(p.priceRoundingStep);
   if (step === null || step.lt(0)) errors.push("Rounding step must be zero or positive.");
   return errors;
@@ -250,14 +237,8 @@ function priceProduction(c: Collector, input: LineInput, ctx: PricingContext): {
 
   const materialCost = primaryG.times(price).div(1000);
   const supportCost = supportTotalG.times(supportPrice).div(1000);
-  c.step(
-    "material",
-    "Material",
-    `(${fg(modelG)} g model + ${fg(modelWasteG)} g waste @ ${pct(wastePct)} + ${fg(purgeG)} g purge) × ${f2(price)}/kg`,
-    materialCost,
-  );
-  if (supportTotalG.gt(0))
-    c.step("support", "Support material", `(${fg(supportG)} g + ${fg(supportWasteG)} g waste) × ${f2(supportPrice)}/kg`, supportCost);
+  c.step("material", "Material", `(${fg(modelG)} g model + ${fg(modelWasteG)} g waste @ ${pct(wastePct)} + ${fg(purgeG)} g purge) × ${f2(price)}/kg`, materialCost);
+  if (supportTotalG.gt(0)) c.step("support", "Support material", `(${fg(supportG)} g + ${fg(supportWasteG)} g waste) × ${f2(supportPrice)}/kg`, supportCost);
 
   const machineHours = minutes.times(qty).div(60);
   const machineCost = machineHours.times(machine.rate);
@@ -267,7 +248,11 @@ function priceProduction(c: Collector, input: LineInput, ctx: PricingContext): {
   const consumablesCost = machineHours.times(machine.perHour.consumables);
   c.step(
     "machine",
-    machine.source === "OVERRIDE" ? "Machine time (printer rate override)" : machine.source === "DEFAULT" ? "Machine time (default rate)" : "Machine time (energy + depreciation + maintenance + consumables)",
+    machine.source === "OVERRIDE"
+      ? "Machine time (printer rate override)"
+      : machine.source === "DEFAULT"
+        ? "Machine time (default rate)"
+        : "Machine time (energy + depreciation + maintenance + consumables)",
     `${fg(machineHours)} h × ${f4(machine.rate)}/h`,
     machineCost,
   );
@@ -395,8 +380,7 @@ function priceServices(c: Collector, input: LineInput, ctx: PricingContext): Ser
       } else {
         const hours = decOrNull(m.hours);
         let cost = ZERO;
-        if (hours === null || hours.lte(0))
-          c.warn("MODELING_COST_UNKNOWN", "No modeling hours estimate: internal modeling cost is excluded, so profit is overstated.", "modelingHours");
+        if (hours === null || hours.lte(0)) c.warn("MODELING_COST_UNKNOWN", "No modeling hours estimate: internal modeling cost is excluded, so profit is overstated.", "modelingHours");
         else cost = roundMoney(hours.times(laborRate));
         const price = roundMoney(fee);
         modeling = { mode: "FIXED", hours: hours?.toString() ?? null, price: f2(price), cost: f2(cost), waived: false };
@@ -439,8 +423,7 @@ export function priceLine(input: LineInput, ctx: PricingContext): LineResult {
 
   const qtyValid = Number.isInteger(input.quantity) && input.quantity >= 1 && input.quantity <= MAX_QUANTITY;
   if (!qtyValid) c.error("INVALID_QUANTITY", `Quantity must be a whole number between 1 and ${MAX_QUANTITY.toLocaleString("en")}.`, "quantity");
-  if (qtyValid && SERVICE_ONLY.has(input.serviceType) && input.quantity !== 1)
-    c.error("QUANTITY_MUST_BE_ONE", "Modeling-only and scanning-only items must have quantity 1.", "quantity");
+  if (qtyValid && SERVICE_ONLY.has(input.serviceType) && input.quantity !== 1) c.error("QUANTITY_MUST_BE_ONE", "Modeling-only and scanning-only items must have quantity 1.", "quantity");
 
   const empty: LineResult = {
     complete: false,
@@ -477,8 +460,7 @@ export function priceLine(input: LineInput, ctx: PricingContext): LineResult {
 
   const minMargin = dec(ctx.policy.minimumMarginPercent);
   if (profit.lt(0)) c.warn("BELOW_COST", `This line loses ${f2(profit.neg())} at the estimated cost.`);
-  else if (margin !== null && margin.lt(minMargin))
-    c.warn("LOW_MARGIN", `Gross margin ${pct(margin)} is below the policy minimum of ${pct(minMargin)}.`);
+  else if (margin !== null && margin.lt(minMargin)) c.warn("LOW_MARGIN", `Gross margin ${pct(margin)} is below the policy minimum of ${pct(minMargin)}.`);
 
   if (c.hasErrors) return { ...empty, production: production?.result ?? null, services };
   return {
@@ -526,7 +508,8 @@ export function priceOrder(input: OrderInput, ctx: PricingContext): OrderResult 
   c.step("itemsNet", "Items subtotal", `${lines.length} line(s), after line discounts`, itemsNet);
 
   const orderDiscount = applyDiscount(c, itemsNet, input.orderDiscount, "Order discount", "orderDiscount");
-  if (orderDiscount.gt(0)) c.step("orderDiscount", "Order discount", input.orderDiscount?.type === "PERCENT" ? `${f2(itemsNet)} × ${pct(dec(input.orderDiscount.value))}` : "fixed amount", orderDiscount.neg());
+  if (orderDiscount.gt(0))
+    c.step("orderDiscount", "Order discount", input.orderDiscount?.type === "PERCENT" ? `${f2(itemsNet)} × ${pct(dec(input.orderDiscount.value))}` : "fixed amount", orderDiscount.neg());
   const merchandiseNet = itemsNet.minus(orderDiscount);
 
   const minCharge = dec(ctx.policy.minimumOrderCharge);
@@ -561,8 +544,7 @@ export function priceOrder(input: OrderInput, ctx: PricingContext): OrderResult 
 
   const minMargin = dec(ctx.policy.minimumMarginPercent);
   if (grossProfit.lt(0)) c.warn("ORDER_BELOW_COST", `The order loses ${f2(grossProfit.neg())} at estimated cost.`);
-  else if (margin !== null && margin.lt(minMargin))
-    c.warn("ORDER_LOW_MARGIN", `Order gross margin ${pct(margin)} is below the policy minimum of ${pct(minMargin)}.`);
+  else if (margin !== null && margin.lt(minMargin)) c.warn("ORDER_LOW_MARGIN", `Order gross margin ${pct(margin)} is below the policy minimum of ${pct(minMargin)}.`);
 
   if (c.hasErrors) return base;
   return {

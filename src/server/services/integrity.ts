@@ -14,9 +14,16 @@ export async function integrityReport() {
     .map((s) => ({ code: s.code, cached: s.remainingG.toString(), ledger: s.movements.reduce((a, m) => a.plus(dec(m.quantityG.toString())), ZERO).toFixed(2) }))
     .filter((x) => !dec(x.cached).eq(dec(x.ledger)));
 
-  const items = await prisma.orderItem.findMany({ select: { partName: true, quantityCompleted: true, order: { select: { number: true } }, jobItems: { select: { quantity: true, quantityGood: true, job: { select: { status: true } } } } } });
+  const items = await prisma.orderItem.findMany({
+    select: { partName: true, quantityCompleted: true, order: { select: { number: true } }, jobItems: { select: { quantity: true, quantityGood: true, job: { select: { status: true } } } } },
+  });
   const itemMismatches = items
-    .map((i) => ({ order: i.order.number, part: i.partName, cached: i.quantityCompleted, jobs: i.jobItems.filter((j) => j.job.status === "DONE").reduce((a, j) => a + (j.quantityGood ?? j.quantity), 0) }))
+    .map((i) => ({
+      order: i.order.number,
+      part: i.partName,
+      cached: i.quantityCompleted,
+      jobs: i.jobItems.filter((j) => j.job.status === "DONE").reduce((a, j) => a + (j.quantityGood ?? j.quantity), 0),
+    }))
     .filter((x) => x.cached !== x.jobs);
 
   const production = await prisma.order.findMany({ where: { status: { in: ["QUEUED", "PRINTING", "POST_PROCESSING", "QUALITY_CHECK"] } }, select: { id: true, number: true, status: true } });

@@ -17,7 +17,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         )}
         <Topbar user={{ name: user.name, email: user.email }} businessName={settings.businessName} />
-        <main id="main" className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+        <main id="main" className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          {children}
+        </main>
       </div>
     </div>
   );

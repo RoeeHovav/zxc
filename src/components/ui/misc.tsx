@@ -24,7 +24,19 @@ export function Badge({ tone = "neutral", className, children, dot }: { tone?: T
   );
 }
 
-export function PageHeader({ title, description, actions, back, children }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode; back?: { href: string; label: string }; children?: React.ReactNode }) {
+export function PageHeader({
+  title,
+  description,
+  actions,
+  back,
+  children,
+}: {
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  actions?: React.ReactNode;
+  back?: { href: string; label: string };
+  children?: React.ReactNode;
+}) {
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
@@ -43,7 +55,19 @@ export function PageHeader({ title, description, actions, back, children }: { ti
   );
 }
 
-export function EmptyState({ icon: Icon, title, description, action, className }: { icon?: React.ComponentType<{ className?: string }>; title: string; description?: React.ReactNode; action?: React.ReactNode; className?: string }) {
+export function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+  className,
+}: {
+  icon?: React.ComponentType<{ className?: string }>;
+  title: string;
+  description?: React.ReactNode;
+  action?: React.ReactNode;
+  className?: string;
+}) {
   return (
     <div className={cn("flex flex-col items-center justify-center px-6 py-14 text-center", className)}>
       {Icon && (
@@ -62,7 +86,21 @@ export function Skeleton({ className }: { className?: string }) {
   return <div className={cn("animate-pulse rounded-md bg-muted", className)} aria-hidden />;
 }
 
-export function Stat({ label, value, hint, tone, icon: Icon, href }: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: Tone; icon?: React.ComponentType<{ className?: string }>; href?: string }) {
+export function Stat({
+  label,
+  value,
+  hint,
+  tone,
+  icon: Icon,
+  href,
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+  tone?: Tone;
+  icon?: React.ComponentType<{ className?: string }>;
+  href?: string;
+}) {
   const body = (
     <>
       <div className="flex items-center justify-between gap-2">
@@ -98,7 +136,12 @@ export function KeyValue({ items, className }: { items: [React.ReactNode, React.
 
 export function Pagination({ page, pageSize, total, params }: { page: number; pageSize: number; total: number; params: Record<string, string | undefined> }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  if (pages <= 1) return <p className="px-5 py-3 text-xs text-muted-foreground">{total} result{total === 1 ? "" : "s"}</p>;
+  if (pages <= 1)
+    return (
+      <p className="px-5 py-3 text-xs text-muted-foreground">
+        {total} result{total === 1 ? "" : "s"}
+      </p>
+    );
   const link = (p: number) => qs({ ...params, page: p > 1 ? p : undefined });
   return (
     <nav className="flex items-center justify-between gap-2 px-5 py-3 text-xs text-muted-foreground" aria-label="Pagination">
@@ -121,7 +164,19 @@ export function Pagination({ page, pageSize, total, params }: { page: number; pa
   );
 }
 
-export function Alert({ tone = "info", title, children, className, icon: Icon }: { tone?: Tone; title?: React.ReactNode; children?: React.ReactNode; className?: string; icon?: React.ComponentType<{ className?: string }> }) {
+export function Alert({
+  tone = "info",
+  title,
+  children,
+  className,
+  icon: Icon,
+}: {
+  tone?: Tone;
+  title?: React.ReactNode;
+  children?: React.ReactNode;
+  className?: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}) {
   return (
     <div role={tone === "danger" ? "alert" : "status"} className={cn("flex gap-3 rounded-lg px-4 py-3 text-sm ring-1 ring-inset", toneClass[tone], className)}>
       {Icon && <Icon className="mt-0.5 size-4 shrink-0" />}

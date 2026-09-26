@@ -69,9 +69,19 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
       />
       <DesignControls id={d.id} status={d.status} />
       <div className="my-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Logged hours" value={num(hours.total)} hint={d.estimatedHours ? `of ${num(d.estimatedHours)} estimated` : "No estimate"} tone={hours.variance && Number(hours.variance) > 0 ? "warning" : undefined} />
+        <Stat
+          label="Logged hours"
+          value={num(hours.total)}
+          hint={d.estimatedHours ? `of ${num(d.estimatedHours)} estimated` : "No estimate"}
+          tone={hours.variance && Number(hours.variance) > 0 ? "warning" : undefined}
+        />
         <Stat label="Design fee" value={fee ? money(fee) : "—"} hint={d.feeMode === "FIXED" ? "Fixed" : `${money(d.hourlyRate)}/h × estimate`} />
-        <Stat label="Revisions" value={`${revisionsUsed} / ${d.includedRevisions}`} hint={unbilled.length ? `${unbilled.length} chargeable unbilled` : "included"} tone={revisionsUsed > d.includedRevisions ? "warning" : undefined} />
+        <Stat
+          label="Revisions"
+          value={`${revisionsUsed} / ${d.includedRevisions}`}
+          hint={unbilled.length ? `${unbilled.length} chargeable unbilled` : "included"}
+          tone={revisionsUsed > d.includedRevisions ? "warning" : undefined}
+        />
         <Stat label="Orders" value={d.orderItems.length} hint={d.orderItems.length > 1 ? `${d.orderItems.length - 1} re-order(s)` : "—"} />
       </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
@@ -86,7 +96,16 @@ export default async function DesignPage({ params }: { params: Promise<{ id: str
             status={d.status}
             included={d.includedRevisions}
             fee={d.additionalRevisionFee?.toString() ?? null}
-            revisions={d.revisions.map((r) => ({ id: r.id, number: r.number, description: r.description, isChargeable: r.isChargeable, charge: r.charge?.toString() ?? null, billedAt: r.billedAt?.toISOString() ?? null, completedAt: r.completedAt?.toISOString() ?? null, requestedAt: r.requestedAt.toISOString() }))}
+            revisions={d.revisions.map((r) => ({
+              id: r.id,
+              number: r.number,
+              description: r.description,
+              isChargeable: r.isChargeable,
+              charge: r.charge?.toString() ?? null,
+              billedAt: r.billedAt?.toISOString() ?? null,
+              completedAt: r.completedAt?.toISOString() ?? null,
+              requestedAt: r.requestedAt.toISOString(),
+            }))}
           />
           <div className="grid gap-6 lg:grid-cols-2">
             {PURPOSES.map((p) => (

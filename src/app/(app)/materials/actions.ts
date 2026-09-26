@@ -72,9 +72,7 @@ export async function createTypeAction(_prev: unknown, fd: FormData) {
 export async function createSupplierAction(_prev: unknown, fd: FormData) {
   const user = await requireUser("inventory");
   return runAction(async () => {
-    const i = z
-      .object({ name: reqText("Name", 80), website: optText(200), contactName: optText(80), email: optText(120), phone: optText(40), notes: optText(500) })
-      .parse(formToObject(fd));
+    const i = z.object({ name: reqText("Name", 80), website: optText(200), contactName: optText(80), email: optText(120), phone: optText(40), notes: optText(500) }).parse(formToObject(fd));
     await createSupplier(user.id, i);
     revalidatePath("/materials/catalog");
   }, "Supplier added.");

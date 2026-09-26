@@ -45,7 +45,19 @@ type Spool = { id: string; code: string; materialId: string; remainingG: string;
 const COLUMNS = ["QUEUED", "PRINTING", "POST_PROCESSING", "QUALITY_CHECK", "DONE", "FAILED"] as const;
 type Dialogs = { kind: "finish"; job: BoardJob; outcome: string } | { kind: "advance"; job: BoardJob; to: string } | { kind: "start"; job: BoardJob } | null;
 
-export function ProductionBoard({ jobs, printers, spools, highlight, initialView }: { jobs: BoardJob[]; printers: Printer[]; spools: Spool[]; highlight: string | null; initialView: "board" | "queues" }) {
+export function ProductionBoard({
+  jobs,
+  printers,
+  spools,
+  highlight,
+  initialView,
+}: {
+  jobs: BoardJob[];
+  printers: Printer[];
+  spools: Spool[];
+  highlight: string | null;
+  initialView: "board" | "queues";
+}) {
   const router = useRouter();
   const [view, setView] = React.useState(initialView);
   const [dialog, setDialog] = React.useState<Dialogs>(null);
@@ -114,7 +126,11 @@ export function ProductionBoard({ jobs, printers, spools, highlight, initialView
           <div className="min-w-0">
             <p className="font-semibold">
               {j.number}
-              {j.isReprint && <Badge tone="warning" className="ms-1.5">reprint</Badge>}
+              {j.isReprint && (
+                <Badge tone="warning" className="ms-1.5">
+                  reprint
+                </Badge>
+              )}
               {(j.priority === "RUSH" || j.priority === "HIGH") && (
                 <Badge tone="danger" className="ms-1.5">
                   <Flag className="size-3" /> {enumLabel("priority", j.priority)}
@@ -125,7 +141,14 @@ export function ProductionBoard({ jobs, printers, spools, highlight, initialView
               {j.orderNumber} · {j.customer}
             </Link>
           </div>
-          <JobMenu job={j} onCancel={() => run(j.id, () => cancelJobAction(j.id))} onReprint={() => run(j.id, () => reprintAction(j.id))} onUndo={() => run(j.id, () => undoStartAction(j.id))} printers={printers} onAssign={(pid) => run(j.id, () => assignJobAction(j.id, pid, null))} />
+          <JobMenu
+            job={j}
+            onCancel={() => run(j.id, () => cancelJobAction(j.id))}
+            onReprint={() => run(j.id, () => reprintAction(j.id))}
+            onUndo={() => run(j.id, () => undoStartAction(j.id))}
+            printers={printers}
+            onAssign={(pid) => run(j.id, () => assignJobAction(j.id, pid, null))}
+          />
         </div>
         <ul className="text-xs">
           {j.items.map((i) => (
@@ -201,7 +224,13 @@ export function ProductionBoard({ jobs, printers, spools, highlight, initialView
     <>
       <div role="tablist" aria-label="View" className="mb-4 inline-flex rounded-lg bg-muted p-1">
         {(["board", "queues"] as const).map((v) => (
-          <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cn("rounded-md px-3 py-1.5 text-xs font-medium", view === v ? "bg-card shadow-sm" : "text-muted-foreground")}>
+          <button
+            key={v}
+            role="tab"
+            aria-selected={view === v}
+            onClick={() => setView(v)}
+            className={cn("rounded-md px-3 py-1.5 text-xs font-medium", view === v ? "bg-card shadow-sm" : "text-muted-foreground")}
+          >
             {v === "board" ? "Board" : "Printer queues"}
           </button>
         ))}
@@ -270,7 +299,13 @@ export function ProductionBoard({ jobs, printers, spools, highlight, initialView
                               <Button size="icon-sm" variant="ghost" aria-label={`Move ${j.number} up`} disabled={idx === 0} onClick={() => run(j.id, () => reorderJobAction(j.id, "up"))}>
                                 <ArrowUp />
                               </Button>
-                              <Button size="icon-sm" variant="ghost" aria-label={`Move ${j.number} down`} disabled={idx === queued.length - 1} onClick={() => run(j.id, () => reorderJobAction(j.id, "down"))}>
+                              <Button
+                                size="icon-sm"
+                                variant="ghost"
+                                aria-label={`Move ${j.number} down`}
+                                disabled={idx === queued.length - 1}
+                                onClick={() => run(j.id, () => reorderJobAction(j.id, "down"))}
+                              >
                                 <ArrowDown />
                               </Button>
                             </span>
@@ -288,8 +323,29 @@ export function ProductionBoard({ jobs, printers, spools, highlight, initialView
         </div>
       )}
 
-      {dialog?.kind === "finish" && <FinishDialog job={dialog.job} outcome={dialog.outcome} spools={spools} onClose={() => setDialog(null)} onDone={() => { setDialog(null); router.refresh(); }} />}
-      {dialog?.kind === "advance" && <AdvanceDialog job={dialog.job} to={dialog.to} onClose={() => setDialog(null)} onDone={() => { setDialog(null); router.refresh(); }} />}
+      {dialog?.kind === "finish" && (
+        <FinishDialog
+          job={dialog.job}
+          outcome={dialog.outcome}
+          spools={spools}
+          onClose={() => setDialog(null)}
+          onDone={() => {
+            setDialog(null);
+            router.refresh();
+          }}
+        />
+      )}
+      {dialog?.kind === "advance" && (
+        <AdvanceDialog
+          job={dialog.job}
+          to={dialog.to}
+          onClose={() => setDialog(null)}
+          onDone={() => {
+            setDialog(null);
+            router.refresh();
+          }}
+        />
+      )}
       {dialog?.kind === "start" && (
         <StartDialog
           job={dialog.job}
@@ -304,7 +360,21 @@ export function ProductionBoard({ jobs, printers, spools, highlight, initialView
   );
 }
 
-function JobMenu({ job, printers, onCancel, onReprint, onUndo, onAssign }: { job: BoardJob; printers: Printer[]; onCancel: () => void; onReprint: () => void; onUndo: () => void; onAssign: (pid: string | null) => void }) {
+function JobMenu({
+  job,
+  printers,
+  onCancel,
+  onReprint,
+  onUndo,
+  onAssign,
+}: {
+  job: BoardJob;
+  printers: Printer[];
+  onCancel: () => void;
+  onReprint: () => void;
+  onUndo: () => void;
+  onAssign: (pid: string | null) => void;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -376,7 +446,7 @@ function FinishDialog({ job, outcome: initialOutcome, spools, onClose, onDone }:
   const now = useNow();
   const elapsed = job.startedAt && now ? Math.max(1, Math.round((now - new Date(job.startedAt).getTime()) / 60000)) : null;
   const [outcome, setOutcome] = React.useState(initialOutcome);
-  const [minutes, setMinutes] = React.useState(String(job.estimatedMinutes ? Math.round(Number(job.estimatedMinutes)) : elapsed ?? ""));
+  const [minutes, setMinutes] = React.useState(String(job.estimatedMinutes ? Math.round(Number(job.estimatedMinutes)) : (elapsed ?? "")));
   const [rows, setRows] = React.useState<{ spoolId: string; grams: string }[]>([{ spoolId: relevant[0]?.id ?? "", grams: job.estimatedGrams ? String(Math.round(Number(job.estimatedGrams))) : "" }]);
   const [good, setGood] = React.useState<Record<string, string>>(Object.fromEntries(job.items.map((i) => [i.id, String(i.quantity)])));
   const [reason, setReason] = React.useState("");
@@ -490,7 +560,10 @@ function AdvanceDialog({ job, to, onClose, onDone }: { job: BoardJob; to: string
   const failed = to === "FAILED";
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent title={failed ? `Reject parts of ${job.number}` : `Quality check passed — ${job.number}`} description={failed ? "All parts of this job are scrapped. Queue a reprint afterwards." : "Record how many units are good. Rejected units can be reprinted."}>
+      <DialogContent
+        title={failed ? `Reject parts of ${job.number}` : `Quality check passed — ${job.number}`}
+        description={failed ? "All parts of this job are scrapped. Queue a reprint afterwards." : "Record how many units are good. Rejected units can be reprinted."}
+      >
         <div className="grid gap-3">
           {!failed &&
             job.items.map((i) => (
@@ -521,7 +594,10 @@ function AdvanceDialog({ job, to, onClose, onDone }: { job: BoardJob; to: string
             disabled={failed && reason.trim().length < 3}
             onClick={async () => {
               setBusy(true);
-              const r = await advanceJobAction(job.id, JSON.stringify({ to, good: Object.fromEntries(Object.entries(good).map(([k, v]) => [k, Number(v)])), qcNotes: notes || null, failureReason: failed ? reason : null }));
+              const r = await advanceJobAction(
+                job.id,
+                JSON.stringify({ to, good: Object.fromEntries(Object.entries(good).map(([k, v]) => [k, Number(v)])), qcNotes: notes || null, failureReason: failed ? reason : null }),
+              );
               setBusy(false);
               if (r.ok) {
                 toast.success("Job updated.");

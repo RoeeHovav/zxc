@@ -88,14 +88,28 @@ export function SettingsForm({ values: v, logo }: { values: V; logo: { id: strin
           </FormSection>
 
           <FormSection title="Tax" description="Osek Murshe / companies add VAT on top of net prices. Osek Patur (exempt dealer) charges no VAT.">
-            <SelectField name="vatMode" label="VAT mode" defaultValue={s("vatMode")} options={[{ value: "EXCLUSIVE", label: "VAT-registered — add VAT" }, { value: "EXEMPT", label: "Exempt dealer — no VAT" }]} />
+            <SelectField
+              name="vatMode"
+              label="VAT mode"
+              defaultValue={s("vatMode")}
+              options={[
+                { value: "EXCLUSIVE", label: "VAT-registered — add VAT" },
+                { value: "EXEMPT", label: "Exempt dealer — no VAT" },
+              ]}
+            />
             <NumberField name="vatRate" label="VAT rate" suffix="%" defaultValue={s("vatRate")} hint="Israel's standard rate is 18% (since Jan 2025). Verify with your accountant." />
           </FormSection>
 
           <FormSection title="Production costs" description="Internal costs used to estimate what a job costs you. Printer-specific costs are set on each printer.">
             <NumberField name="electricityTariffPerKwh" label="Electricity tariff" suffix="₪/kWh" defaultValue={s("electricityTariffPerKwh")} />
             <NumberField name="laborCostPerHour" label="Your labor cost" suffix="₪/h" defaultValue={s("laborCostPerHour")} hint="What an hour of your time costs the business." />
-            <NumberField name="defaultMachineCostPerHour" label="Fallback machine cost" suffix="₪/h" defaultValue={s("defaultMachineCostPerHour")} hint="Used (with a warning) when no printer data is available." />
+            <NumberField
+              name="defaultMachineCostPerHour"
+              label="Fallback machine cost"
+              suffix="₪/h"
+              defaultValue={s("defaultMachineCostPerHour")}
+              hint="Used (with a warning) when no printer data is available."
+            />
             <NumberField name="defaultSetupMinutes" label="Setup per plate" suffix="min" defaultValue={s("defaultSetupMinutes")} />
             <NumberField name="materialWastePercent" label="Material waste" suffix="%" defaultValue={s("materialWastePercent")} hint="Skirts, brims, stringing." />
             <NumberField name="failureAllowancePercent" label="Failure allowance" suffix="%" defaultValue={s("failureAllowancePercent")} hint="Expected reprints, on material + machine." />
@@ -116,7 +130,13 @@ export function SettingsForm({ values: v, logo }: { values: V; logo: { id: strin
           <FormSection title="Quotes & payments" description="Defaults for new documents.">
             <NumberField name="quoteValidityDays" label="Quote validity" suffix="days" defaultValue={s("quoteValidityDays")} />
             <NumberField name="defaultDepositPercent" label="Default deposit" suffix="%" defaultValue={s("defaultDepositPercent")} />
-            <CheckboxField name="requireDepositToProduce" label="Require the deposit before production" hint="Orders wait in “Awaiting payment” until paid (can be overridden per order with a reason)." defaultChecked={v.requireDepositToProduce === true} className="sm:col-span-2" />
+            <CheckboxField
+              name="requireDepositToProduce"
+              label="Require the deposit before production"
+              hint="Orders wait in “Awaiting payment” until paid (can be overridden per order with a reason)."
+              defaultChecked={v.requireDepositToProduce === true}
+              className="sm:col-span-2"
+            />
             <TextareaField name="defaultPaymentTerms" label="Default payment terms" defaultValue={s("defaultPaymentTerms")} rows={2} className="sm:col-span-2" />
             <TextareaField name="quoteTerms" label="Quote terms & conditions" defaultValue={s("quoteTerms")} rows={3} className="sm:col-span-2" />
             <TextField name="documentFooter" label="Document footer" defaultValue={s("documentFooter")} className="sm:col-span-2" placeholder="Thank you for your business!" />

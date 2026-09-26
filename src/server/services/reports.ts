@@ -4,7 +4,16 @@ import { D, ZERO, dec } from "@/domain/money";
 import type { LineResult } from "@/domain/pricing/types";
 import type { Period } from "./finance";
 
-type Agg = { key: string; label: string; revenue: InstanceType<typeof D>; cost: InstanceType<typeof D>; orders: Set<string>; units: number; grams: InstanceType<typeof D>; hours: InstanceType<typeof D> };
+type Agg = {
+  key: string;
+  label: string;
+  revenue: InstanceType<typeof D>;
+  cost: InstanceType<typeof D>;
+  orders: Set<string>;
+  units: number;
+  grams: InstanceType<typeof D>;
+  hours: InstanceType<typeof D>;
+};
 
 function agg(map: Map<string, Agg>, key: string, label: string) {
   let a = map.get(key);
@@ -105,7 +114,10 @@ export async function profitability(p: Period) {
 /** Daily revenue/cash for a period (daily report). */
 export async function dailySeries(p: Period) {
   const [orders, payments] = await Promise.all([
-    prisma.order.findMany({ where: { status: { in: ["DELIVERED", "COMPLETED"] }, deliveredAt: { gte: p.from, lt: p.to } }, select: { deliveredAt: true, taxableAmount: true, estimatedCost: true, actualCost: true } }),
+    prisma.order.findMany({
+      where: { status: { in: ["DELIVERED", "COMPLETED"] }, deliveredAt: { gte: p.from, lt: p.to } },
+      select: { deliveredAt: true, taxableAmount: true, estimatedCost: true, actualCost: true },
+    }),
     prisma.payment.findMany({ where: { voidedAt: null, receivedAt: { gte: p.from, lt: p.to } }, select: { receivedAt: true, kind: true, amount: true } }),
   ]);
   const days = new Map<string, { revenue: InstanceType<typeof D>; cogs: InstanceType<typeof D>; cash: InstanceType<typeof D>; orders: number }>();
@@ -125,5 +137,7 @@ export async function dailySeries(p: Period) {
     const d = get(key(pmt.receivedAt));
     d.cash = pmt.kind === "REFUND" ? d.cash.minus(dec(pmt.amount.toString())) : d.cash.plus(dec(pmt.amount.toString()));
   }
-  return [...days.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({ day, orders: v.orders, revenue: v.revenue.toFixed(2), cogs: v.cogs.toFixed(2), grossProfit: v.revenue.minus(v.cogs).toFixed(2), cash: v.cash.toFixed(2) }));
+  return [...days.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, v]) => ({ day, orders: v.orders, revenue: v.revenue.toFixed(2), cogs: v.cogs.toFixed(2), grossProfit: v.revenue.minus(v.cogs).toFixed(2), cash: v.cash.toFixed(2) }));
 }

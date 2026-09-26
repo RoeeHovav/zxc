@@ -56,7 +56,13 @@ export function SpoolActions({ spoolId, materialId, code, hasEmptyWeight }: { sp
         <DialogContent title={`Weigh ${code}`} description="Replaces the estimate with a measured value and records the difference in the ledger.">
           <ActionForm action={reconcileSpoolAction.bind(null, spoolId, materialId)} submitLabel="Save weight" onSuccess={close}>
             {hasEmptyWeight && <NumberField name="grossWeightG" label="Scale reading (spool + filament)" suffix="g" autoFocus />}
-            <NumberField name="remainingG" label={hasEmptyWeight ? "…or net filament remaining" : "Net filament remaining"} suffix="g" autoFocus={!hasEmptyWeight} hint={hasEmptyWeight ? "Fill one of the two." : "Set the empty spool weight on the material to enter scale readings directly."} />
+            <NumberField
+              name="remainingG"
+              label={hasEmptyWeight ? "…or net filament remaining" : "Net filament remaining"}
+              suffix="g"
+              autoFocus={!hasEmptyWeight}
+              hint={hasEmptyWeight ? "Fill one of the two." : "Set the empty spool weight on the material to enter scale readings directly."}
+            />
             <TextField name="note" label="Note" placeholder="Monthly weigh-in" />
           </ActionForm>
         </DialogContent>

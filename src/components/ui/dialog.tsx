@@ -63,7 +63,13 @@ export function ConfirmDialog({
   const [pending, setPending] = React.useState(false);
   const [typed, setTyped] = React.useState("");
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setTyped(""); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setTyped("");
+      }}
+    >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent title={title} description={description}>
         {requireText && (
@@ -113,7 +119,19 @@ export function DropdownMenuContent({ children, align = "end" }: { children: Rea
   );
 }
 
-export function DropdownMenuItem({ children, onSelect, danger, asChild, disabled }: { children: React.ReactNode; onSelect?: (e: Event) => void; danger?: boolean; asChild?: boolean; disabled?: boolean }) {
+export function DropdownMenuItem({
+  children,
+  onSelect,
+  danger,
+  asChild,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onSelect?: (e: Event) => void;
+  danger?: boolean;
+  asChild?: boolean;
+  disabled?: boolean;
+}) {
   return (
     <DM.Item
       asChild={asChild}

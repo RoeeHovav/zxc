@@ -14,7 +14,11 @@ export default async function ReceivePage({ searchParams }: { searchParams: Prom
   const [materials, suppliers, settings] = await Promise.all([materialOptions(), listSuppliers(), getSettings()]);
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Receive spools" description="Record a filament purchase. Creates individual spools, stock movements and (optionally) the expense." back={{ href: "/materials", label: "Materials" }} />
+      <PageHeader
+        title="Receive spools"
+        description="Record a filament purchase. Creates individual spools, stock movements and (optionally) the expense."
+        back={{ href: "/materials", label: "Materials" }}
+      />
       <ReceiveForm
         materials={materials.map((m) => ({ id: m.id, label: m.label }))}
         suppliers={suppliers.map((s) => ({ id: s.id, name: s.name }))}

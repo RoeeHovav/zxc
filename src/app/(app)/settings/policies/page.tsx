@@ -20,7 +20,10 @@ export default async function PoliciesPage() {
         <CardHeader title="Pricing policies" description="Choose one per quote/order, or set a default per customer (e.g. wholesale)." actions={<PolicyDialog />} />
         <ul className="divide-y divide-border">
           {policies.map((p) => {
-            const equivalent = p.method === "MARKUP" ? `≈ ${percent(markupToMargin(new D(p.markupPercent.toString())).toString())} margin` : `≈ ${percent(marginToMarkup(new D(p.marginPercent.toString())).toString())} markup`;
+            const equivalent =
+              p.method === "MARKUP"
+                ? `≈ ${percent(markupToMargin(new D(p.markupPercent.toString())).toString())} margin`
+                : `≈ ${percent(marginToMarkup(new D(p.marginPercent.toString())).toString())} markup`;
             return (
               <li key={p.id} className={`flex flex-wrap items-start justify-between gap-3 px-5 py-4 ${p.isArchived ? "opacity-60" : ""}`}>
                 <div className="min-w-0">
@@ -39,7 +42,8 @@ export default async function PoliciesPage() {
                   </p>
                   {p.description && <p className="text-sm text-muted-foreground">{p.description}</p>}
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {p.method === "MARKUP" ? `${percent(p.markupPercent)} markup on cost` : `${percent(p.marginPercent)} target margin`} ({equivalent}) · minimum order {money(p.minimumOrderCharge)} · warn below {percent(p.minimumMarginPercent)} margin · round {p.roundingMode === "UP" ? "up" : "to nearest"} to {money(p.priceRoundingStep)}
+                    {p.method === "MARKUP" ? `${percent(p.markupPercent)} markup on cost` : `${percent(p.marginPercent)} target margin`} ({equivalent}) · minimum order {money(p.minimumOrderCharge)} ·
+                    warn below {percent(p.minimumMarginPercent)} margin · round {p.roundingMode === "UP" ? "up" : "to nearest"} to {money(p.priceRoundingStep)}
                   </p>
                 </div>
                 <div className="flex gap-2">

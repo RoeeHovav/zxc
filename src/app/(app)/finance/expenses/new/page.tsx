@@ -10,7 +10,11 @@ export default async function NewExpensePage() {
   await requireUser("finance");
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="Record expense" description="Filament purchases are best recorded via Materials → Receive spools, which also updates stock." back={{ href: "/finance/expenses", label: "Expenses" }} />
+      <PageHeader
+        title="Record expense"
+        description="Filament purchases are best recorded via Materials → Receive spools, which also updates stock."
+        back={{ href: "/finance/expenses", label: "Expenses" }}
+      />
       <ExpenseForm id={null} {...await expenseFormData()} />
     </div>
   );

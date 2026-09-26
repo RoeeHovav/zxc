@@ -27,7 +27,18 @@ export async function editorOptions() {
       where: { status: { in: ["APPROVED", "DELIVERED"] } },
       orderBy: { updatedAt: "desc" },
       take: 500,
-      select: { id: true, number: true, title: true, customerId: true, status: true, defaultMaterialId: true, defaultPrinterId: true, defaultGramsPerUnit: true, defaultSupportGrams: true, defaultPrintMinutes: true },
+      select: {
+        id: true,
+        number: true,
+        title: true,
+        customerId: true,
+        status: true,
+        defaultMaterialId: true,
+        defaultPrinterId: true,
+        defaultGramsPerUnit: true,
+        defaultSupportGrams: true,
+        defaultPrintMinutes: true,
+      },
     }),
   ]);
   const contexts: Record<string, PricingContext> = {};
@@ -58,7 +69,6 @@ export async function editorOptions() {
 }
 
 export type EditorOptions = Awaited<ReturnType<typeof editorOptions>>;
-
 
 type DocLike = {
   customerId: string;
@@ -162,7 +172,7 @@ export function editorInitialFromDoc(doc: DocLike): EditorInitial {
 /** A brand-new document, optionally copying lines from an existing one (priced at current rates). */
 export function editorInitialBlank(options: EditorOptions, mode: "quote" | "order", customerId: string | null, copyFrom?: DocLike | null): EditorInitial {
   const customer = options.customers.find((c) => c.id === customerId);
-  const policyId = copyFrom?.pricingPolicyId && options.contexts[copyFrom.pricingPolicyId] ? copyFrom.pricingPolicyId : customer?.pricingPolicyId ?? null;
+  const policyId = copyFrom?.pricingPolicyId && options.contexts[copyFrom.pricingPolicyId] ? copyFrom.pricingPolicyId : (customer?.pricingPolicyId ?? null);
   const base = copyFrom ? editorInitialFromDoc(copyFrom) : null;
   const header: EditorHeader = {
     customerId: customerId ?? base?.header.customerId ?? null,

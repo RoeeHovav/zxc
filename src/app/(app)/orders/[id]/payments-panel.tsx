@@ -29,7 +29,23 @@ interface P {
 
 const METHODS = ["CASH", "BANK_TRANSFER", "CREDIT_CARD", "BIT", "PAYBOX", "PAYPAL", "CHECK", "OTHER"];
 
-export function PaymentsPanel({ orderId, status, total, paid, balance, deposit, payments }: { orderId: string; status: string; total: string; paid: string; balance: string; deposit: string; payments: P[] }) {
+export function PaymentsPanel({
+  orderId,
+  status,
+  total,
+  paid,
+  balance,
+  deposit,
+  payments,
+}: {
+  orderId: string;
+  status: string;
+  total: string;
+  paid: string;
+  balance: string;
+  deposit: string;
+  payments: P[];
+}) {
   const router = useRouter();
   const [open, setOpen] = React.useState<null | "PAYMENT" | "REFUND">(null);
   const [key, setKey] = React.useState("");
@@ -101,7 +117,10 @@ export function PaymentsPanel({ orderId, status, total, paid, balance, deposit, 
                   {p.voidReason && <p className="text-xs text-muted-foreground">Voided: {p.voidReason}</p>}
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className={`tabular whitespace-nowrap ${p.kind === "REFUND" ? "text-destructive" : ""}`}>{p.kind === "REFUND" ? "−" : ""}{money(p.amount)}</span>
+                  <span className={`tabular whitespace-nowrap ${p.kind === "REFUND" ? "text-destructive" : ""}`}>
+                    {p.kind === "REFUND" ? "−" : ""}
+                    {money(p.amount)}
+                  </span>
                   {!p.voidedAt && p.kind === "PAYMENT" && (
                     <Button variant="ghost" size="icon-sm" asChild>
                       <a href={`/api/pdf/receipt/${p.id}`} target="_blank" rel="noreferrer" aria-label={`Payment acknowledgement ${p.number}`} title="Payment acknowledgement (PDF)">
@@ -119,8 +138,16 @@ export function PaymentsPanel({ orderId, status, total, paid, balance, deposit, 
                       title={`Void ${p.number}?`}
                       description={
                         <span className="grid gap-3">
-                          <span>Use only for entries made by mistake. The record stays visible, marked void, and totals are recalculated. For money returned to the customer, record a refund instead.</span>
-                          <input className="h-9 rounded-md border border-input bg-card px-3 text-foreground" placeholder="Reason" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} aria-label="Reason for voiding" />
+                          <span>
+                            Use only for entries made by mistake. The record stays visible, marked void, and totals are recalculated. For money returned to the customer, record a refund instead.
+                          </span>
+                          <input
+                            className="h-9 rounded-md border border-input bg-card px-3 text-foreground"
+                            placeholder="Reason"
+                            value={voidReason}
+                            onChange={(e) => setVoidReason(e.target.value)}
+                            aria-label="Reason for voiding"
+                          />
                         </span>
                       }
                       confirmLabel="Void entry"

@@ -19,11 +19,14 @@ export async function saveCustomerAction(id: string | null, _prev: unknown, fd: 
 
 export async function archiveCustomerAction(id: string, archived: boolean) {
   const user = await requireUser("customers");
-  return runAction(async () => {
-    await setArchived(user.id, id, archived);
-    revalidatePath("/customers");
-    revalidatePath(`/customers/${id}`);
-  }, archived ? "Customer archived." : "Customer restored.");
+  return runAction(
+    async () => {
+      await setArchived(user.id, id, archived);
+      revalidatePath("/customers");
+      revalidatePath(`/customers/${id}`);
+    },
+    archived ? "Customer archived." : "Customer restored.",
+  );
 }
 
 export async function deleteCustomerAction(id: string) {

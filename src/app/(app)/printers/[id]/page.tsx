@@ -48,15 +48,28 @@ export default async function PrinterPage({ params }: { params: Promise<{ id: st
         }
       />
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Machine cost" value={`${money(Number(rate.total).toFixed(2))}/h`} hint={rate.source === "OVERRIDE" ? "Fixed override" : rate.source === "DEFAULT" ? "Default rate (no data)" : "Calculated"} />
+        <Stat
+          label="Machine cost"
+          value={`${money(Number(rate.total).toFixed(2))}/h`}
+          hint={rate.source === "OVERRIDE" ? "Fixed override" : rate.source === "DEFAULT" ? "Default rate (no data)" : "Calculated"}
+        />
         <Stat label="Print hours" value={num(hours, 0)} />
         <Stat label="Jobs completed" value={stats.done} />
-        <Stat label="Failure rate" value={stats.failureRate ? percent(stats.failureRate) : "—"} hint={`${stats.failed} failed`} tone={stats.failureRate && Number(stats.failureRate) > 0.1 ? "warning" : undefined} />
+        <Stat
+          label="Failure rate"
+          value={stats.failureRate ? percent(stats.failureRate) : "—"}
+          hint={`${stats.failed} failed`}
+          tone={stats.failureRate && Number(stats.failureRate) > 0.1 ? "warning" : undefined}
+        />
       </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div className="grid min-w-0 content-start gap-6">
           <Card>
-            <CardHeader title="Maintenance schedule" description="Due items appear on the dashboard." actions={<MaintenanceControls printerId={p.id} tasks={tasks.map((t) => ({ id: t.id, title: t.title }))} />} />
+            <CardHeader
+              title="Maintenance schedule"
+              description="Due items appear on the dashboard."
+              actions={<MaintenanceControls printerId={p.id} tasks={tasks.map((t) => ({ id: t.id, title: t.title }))} />}
+            />
             {tasks.length === 0 ? (
               <p className="px-5 py-6 text-sm text-muted-foreground">No scheduled maintenance. Add tasks like “Clean & lubricate rods — every 200 h” or “Replace nozzle — every 90 days”.</p>
             ) : (
