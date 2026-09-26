@@ -3,6 +3,7 @@ import { ActionForm, CheckboxField, NumberField, SelectField, TextField, Textare
 import { Card, CardContent } from "@/components/ui/card";
 import { FormSection } from "@/components/ui/form";
 import { saveMaterialAction } from "./actions";
+import { D } from "@/domain/money";
 
 export interface MaterialValues {
   materialTypeId?: string;
@@ -26,7 +27,7 @@ export interface MaterialValues {
 
 export function MaterialForm({ id, initial, types, suppliers }: { id: string | null; initial?: MaterialValues; types: { id: string; code: string; name: string }[]; suppliers: { id: string; name: string }[] }) {
   const v = initial ?? {};
-  const pct = (f: string | null | undefined) => (f ? String(Number(f) * 100) : "");
+  const pct = (f: string | null | undefined) => (f ? new D(f).times(100).toString() : "");
   return (
     <Card>
       <CardContent className="py-6">

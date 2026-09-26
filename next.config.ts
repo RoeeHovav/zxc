@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   output: "standalone",
   serverExternalPackages: ["@react-pdf/renderer", "@node-rs/argon2"],
+  // PDF fonts are read from disk at runtime; make sure standalone builds include them.
+  outputFileTracingIncludes: { "/api/pdf/**": ["./src/assets/fonts/**"] },
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
   },

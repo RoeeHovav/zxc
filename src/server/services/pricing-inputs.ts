@@ -1,9 +1,9 @@
 import "server-only";
 import type { Tx } from "../db";
-import { dec } from "@/domain/money";
 import type { LineForm } from "@/domain/schemas/sales";
 import type { LineInput, PricingContext, ResolvedMaterial, ResolvedPrinter } from "@/domain/pricing/types";
-import { requiresModeling, requiresPrint, requiresScanning } from "@/domain/pricing/engine";
+import { requiresPrint } from "@/domain/pricing/engine";
+import { lineToEngineInput } from "@/domain/pricing/from-form";
 import { resolveMaterial } from "./materials";
 import { resolvePrinter } from "./printers";
 import { buildPricingContext, getSettings, resolvePolicy } from "./settings";
@@ -60,39 +60,7 @@ export async function buildLineInput(tx: Tx, line: LineForm, existing: ExistingL
     printer = snap?.print?.printer && snap.print.printer.id === line.printerId ? snap.print.printer : await resolvePrinter(tx, line.printerId);
   }
 
-  const discountValue =
-    line.discountType && line.discountValue !== null
-      ? line.discountType === "PERCENT"
-        ? dec(line.discountValue).div(100).toString()
-        : line.discountValue
-      : null;
-
-  const input: LineInput = {
-    serviceType: line.serviceType,
-    quantity: line.quantity,
-    print: print
-      ? {
-          material,
-          supportMaterial,
-          printer,
-          gramsPerUnit: line.gramsPerUnit,
-          supportGramsPerUnit: line.supportGramsPerUnit,
-          purgeGramsPerBatch: line.purgeGramsPerBatch,
-          unitsPerBatch: line.unitsPerBatch ?? 1,
-          printMinutesPerUnit: line.printMinutesPerUnit,
-          setupMinutesPerBatch: line.setupMinutesPerBatch,
-          postProcessMinutesPerUnit: line.postProcessMinutesPerUnit,
-          extraCostPerUnit: line.extraCostPerUnit,
-          extraCostNote: line.extraCostNote,
-        }
-      : null,
-    modeling: requiresModeling(line.serviceType)
-      ? { mode: line.modelingMode, hours: line.modelingHours, fixedFee: line.modelingFee, waived: line.designFeeWaived, waivedReason: line.waivedReason }
-      : null,
-    scanning: requiresScanning(line.serviceType) ? { scanHours: line.scanHours, cleanupHours: line.scanCleanupHours, reverseEngineeringHours: line.reverseEngineeringHours } : null,
-    discount: line.discountType && discountValue !== null ? { type: line.discountType, value: discountValue } : null,
-    manualUnitPrice: line.manualUnitPrice !== null && print ? { price: line.manualUnitPrice, reason: line.manualPriceReason ?? "" } : null,
-  };
+  const input: LineInput = lineToEngineInput(line, { material, supportMaterial, printer });
   return { ...input, form: { ...line, deadline: line.deadline ? line.deadline.toISOString() : null } };
 }
 
