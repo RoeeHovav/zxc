@@ -8,11 +8,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { MobileNav } from "./sidebar";
 import { SearchPalette } from "./search";
 import { logoutAction } from "@/app/(auth)/actions";
+import { useMounted } from "@/components/use-now";
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
   const next = theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
   const Icon = !mounted ? Monitor : theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
   return (

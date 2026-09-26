@@ -48,7 +48,8 @@ export async function saveUpload(userId: string, file: { name: string; bytes: Bu
   if (!detected.ok) throw new ServiceError(detected.error);
 
   const targets = Object.entries(target).filter(([, v]) => v);
-  if (targets.length === 0) throw new ServiceError("A file must be attached to a record.");
+  if (targets.length === 0 && purpose !== "LOGO") throw new ServiceError("A file must be attached to a record.");
+  if (purpose === "LOGO" && !["png", "jpg", "jpeg"].includes(detected.extension)) throw new ServiceError("The logo must be a PNG or JPEG image.");
 
   const now = new Date();
   const key = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${randomUUID()}`;
@@ -84,7 +85,6 @@ export async function saveUpload(userId: string, file: { name: string; bytes: Bu
 
 export function sanitizeFileName(name: string) {
   const base = path.basename(name.replace(/\\/g, "/"));
-  // eslint-disable-next-line no-control-regex
   const cleaned = base.replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, "_").replace(/^\.+/, "").trim();
   return (cleaned || "file").slice(0, 180);
 }

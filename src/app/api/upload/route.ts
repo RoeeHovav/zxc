@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertSameOrigin, requireApiUser } from "@/server/auth";
+import { assertSameOrigin, can, requireApiUser } from "@/server/auth";
 import { apiHandler } from "@/server/api";
 import { saveUpload, type AttachTarget } from "@/server/services/files";
 import { ServiceError } from "@/server/services/common";
@@ -24,6 +24,8 @@ export async function POST(request: Request) {
       if (typeof v === "string" && v) target[k] = v.slice(0, 40);
     }
     const purpose = typeof form.get("purpose") === "string" ? String(form.get("purpose")).slice(0, 40) : null;
+    // The business logo is the only upload not attached to a record; it needs settings permission.
+    if (purpose === "LOGO" && !can(user, "settings")) throw new ServiceError("Only the owner can change the logo.");
     const bytes = Buffer.from(await file.arrayBuffer());
     const rec = await saveUpload(user.id, { name: file.name, bytes }, target, purpose);
     return NextResponse.json({ id: rec.id, name: rec.originalName, size: rec.sizeBytes });

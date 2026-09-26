@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma, type Tx } from "../db";
-import type { PricingPolicy, Settings } from "@/generated/prisma/client";
+import type { PricingPolicy, Prisma, Settings } from "@/generated/prisma/client";
 import type { PricingContext } from "@/domain/pricing/types";
 import { ServiceError, audit } from "./common";
 
@@ -79,7 +79,7 @@ export async function currentPricingContext(policyId?: string | null, tx: Tx | t
   return buildPricingContext(settings, policy);
 }
 
-export async function updateSettings(userId: string, data: Partial<Omit<Settings, "id" | "updatedAt" | "isDemo">>) {
+export async function updateSettings(userId: string, data: Omit<Prisma.SettingsUpdateInput, "isDemo" | "id">) {
   return prisma.$transaction(async (tx) => {
     const before = await getSettings(tx);
     const after = await tx.settings.update({ where: { id: 1 }, data });
@@ -87,5 +87,50 @@ export async function updateSettings(userId: string, data: Partial<Omit<Settings
     if (changed.length)
       await audit(tx, { userId, entityType: "SETTINGS", entityId: "1", action: "UPDATE", summary: `Updated settings: ${changed.join(", ")}`, details: { changed } });
     return after;
+  });
+}
+
+export interface PolicyInput {
+  name: string;
+  description: string | null;
+  method: "MARKUP" | "MARGIN";
+  markupPercent: string | null;
+  marginPercent: string | null;
+  minimumOrderCharge: string | null;
+  minimumMarginPercent: string | null;
+  priceRoundingStep: string | null;
+  roundingMode: "UP" | "NEAREST";
+  isDefault: boolean;
+}
+
+export async function savePolicy(userId: string, id: string | null, i: PolicyInput) {
+  const data = {
+    name: i.name,
+    description: i.description,
+    method: i.method,
+    markupPercent: i.markupPercent ?? "1",
+    marginPercent: i.marginPercent ?? "0.5",
+    minimumOrderCharge: i.minimumOrderCharge ?? "0",
+    minimumMarginPercent: i.minimumMarginPercent ?? "0",
+    priceRoundingStep: i.priceRoundingStep ?? "0",
+    roundingMode: i.roundingMode,
+  };
+  return prisma.$transaction(async (tx) => {
+    const p = id ? await tx.pricingPolicy.update({ where: { id }, data }) : await tx.pricingPolicy.create({ data });
+    if (i.isDefault) {
+      await tx.pricingPolicy.updateMany({ where: { NOT: { id: p.id } }, data: { isDefault: false } });
+      await tx.pricingPolicy.update({ where: { id: p.id }, data: { isDefault: true, isArchived: false } });
+    }
+    await audit(tx, { userId, entityType: "POLICY", entityId: p.id, action: id ? "UPDATE" : "CREATE", summary: `${id ? "Updated" : "Created"} pricing policy ${p.name} (existing quotes keep their snapshot)` });
+    return p;
+  });
+}
+
+export async function archivePolicy(userId: string, id: string, archived: boolean) {
+  return prisma.$transaction(async (tx) => {
+    const p = await tx.pricingPolicy.findUniqueOrThrow({ where: { id } });
+    if (archived && p.isDefault) throw new ServiceError("Choose another default policy before archiving this one.");
+    await tx.pricingPolicy.update({ where: { id }, data: { isArchived: archived } });
+    await audit(tx, { userId, entityType: "POLICY", entityId: id, action: archived ? "ARCHIVE" : "RESTORE", summary: `${archived ? "Archived" : "Restored"} pricing policy ${p.name}` });
   });
 }

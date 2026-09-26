@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { requireUser } from "@/server/auth";
 import { prisma } from "@/server/db";
-import { editorInitialBlank, editorOptions } from "@/server/services/editor";
+import { designLine, editorInitialBlank, editorOptions } from "@/server/services/editor";
 import { Alert, PageHeader } from "@/components/ui/misc";
 import { DocumentEditor } from "@/components/editor/document-editor";
 import { firstParam } from "@/lib/utils";
@@ -17,6 +17,9 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
   const fromId = firstParam(sp.from);
   const from = fromId ? await prisma.order.findUnique({ where: { id: fromId }, include: { items: { orderBy: { position: "asc" } } } }) : null;
   const initial = editorInitialBlank(options, "order", firstParam(sp.customerId) ?? from?.customerId ?? null, from);
+  const designId = firstParam(sp.design);
+  const fromDesign = designId ? designLine(options, designId) : null;
+  if (fromDesign) initial.lines = [fromDesign];
   async function save(payload: string, clientKey: string, intent: "draft" | "confirm") {
     "use server";
     return saveOrderAction(null, payload, clientKey, intent);

@@ -206,3 +206,48 @@ export function editorInitialBlank(options: EditorOptions, mode: "quote" | "orde
   });
   return { header, lines, context: ctx, status: "DRAFT" };
 }
+
+/** A print line pre-filled from a reusable design (no design fee — it was charged on the original order). */
+export function designLine(options: EditorOptions, designId: string): EditorInitial["lines"][number] | null {
+  const d = options.designs.find((x) => x.id === designId);
+  if (!d) return null;
+  const m = options.materials.find((x) => x.id === d.defaultMaterialId);
+  const p = options.printers.find((x) => x.id === d.defaultPrinterId) ?? options.printers[0];
+  return {
+    id: null,
+    serviceType: "PRINT_ONLY",
+    partName: d.title,
+    description: "",
+    category: "",
+    quantity: "1",
+    colorNote: "",
+    deadline: "",
+    specialInstructions: "",
+    materialId: m?.id ?? null,
+    supportMaterialId: null,
+    printerId: p?.id ?? null,
+    designProjectId: d.id,
+    gramsPerUnit: d.defaultGramsPerUnit ?? "",
+    supportGramsPerUnit: d.defaultSupportGrams ?? "",
+    purgeGramsPerBatch: "",
+    unitsPerBatch: "1",
+    printTime: d.defaultPrintMinutes ? formatMinutes(d.defaultPrintMinutes) : "",
+    setupMinutesPerBatch: "",
+    postProcessMinutesPerUnit: "",
+    extraCostPerUnit: "",
+    extraCostNote: "",
+    modelingMode: "HOURLY",
+    modelingHours: "",
+    modelingFee: "",
+    designFeeWaived: false,
+    waivedReason: "",
+    scanHours: "",
+    scanCleanupHours: "",
+    reverseEngineeringHours: "",
+    discountType: "",
+    discountValue: "",
+    manualUnitPrice: "",
+    manualPriceReason: "",
+    resolved: { material: m ? { id: m.id, label: m.label, pricePerKg: m.pricePerKg, wastePercent: m.wastePercent } : null, supportMaterial: null, printer: p ? p.resolved : null },
+  };
+}

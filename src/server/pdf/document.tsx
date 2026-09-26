@@ -51,6 +51,7 @@ function CustomerPdf({ doc }: { doc: CustomerDocument }) {
         <View style={{ position: "absolute", top: 0, left: 0, right: 0, height: 5, backgroundColor: accent }} fixed />
         <View style={s.header}>
           <View style={{ maxWidth: 280 }}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt attribute */}
             {doc.business.logo && <Image src={{ data: doc.business.logo.data, format: doc.business.logo.format }} style={{ maxHeight: 48, maxWidth: 160, marginBottom: 8, objectFit: "contain" }} />}
             <Text style={s.bizName}>{doc.business.name}</Text>
             {doc.business.legalName && <Text style={s.muted}>{doc.business.legalName}</Text>}

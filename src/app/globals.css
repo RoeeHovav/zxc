@@ -30,6 +30,8 @@
   --sidebar-foreground: #c9cede;
   --sidebar-active: #1d2336;
   --shadow-color: 220 40% 20%;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
   color-scheme: light;
 }
 
@@ -60,6 +62,8 @@
   --sidebar-foreground: #aeb6ca;
   --sidebar-active: #161b2a;
   --shadow-color: 0 0% 0%;
+  --series-1: #3987e5;
+  --series-2: #d95926;
   color-scheme: dark;
 }
 

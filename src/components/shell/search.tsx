@@ -30,7 +30,7 @@ export function SearchPalette() {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
-  const [hits, setHits] = React.useState<SearchHit[]>([]);
+  const [results, setHits] = React.useState<SearchHit[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [active, setActive] = React.useState(0);
   const reqId = React.useRef(0);
@@ -50,13 +50,10 @@ export function SearchPalette() {
   }, []);
 
   React.useEffect(() => {
-    if (q.trim().length < 2) {
-      setHits([]);
-      return;
-    }
+    if (q.trim().length < 2) return;
     const id = ++reqId.current;
-    setLoading(true);
     const t = setTimeout(async () => {
+      setLoading(true);
       try {
         const res = await searchAction(q);
         if (id === reqId.current) {
@@ -70,6 +67,7 @@ export function SearchPalette() {
     return () => clearTimeout(t);
   }, [q]);
 
+  const hits = q.trim().length < 2 ? [] : results;
   const go = (hit: SearchHit) => {
     setOpen(false);
     setQ("");
