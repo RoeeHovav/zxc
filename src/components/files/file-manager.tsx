@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { ACCEPT_ATTRIBUTE, formatBytes } from "@/domain/files";
 import { deleteFileAction } from "./actions";
+import { ModelPreviewButton } from "./model-viewer";
 import { cn } from "@/lib/utils";
 import { date } from "@/lib/format";
 
@@ -132,6 +133,7 @@ export function FileManager({
                     {f.purpose ? ` · ${f.purpose.toLowerCase()}` : ""}
                   </p>
                 </div>
+                <ModelPreviewButton fileId={f.id} name={f.originalName} extension={f.extension} sizeBytes={f.sizeBytes} />
                 <Button variant="ghost" size="icon-sm" asChild>
                   <a href={`/api/files/${f.id}?download=1`} aria-label={`Download ${f.originalName}`}>
                     <Download />
