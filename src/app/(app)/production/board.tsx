@@ -209,7 +209,7 @@ export function ProductionBoard({ jobs, printers, spools, highlight, initialView
 
       {view === "board" ? (
         <div className="-mx-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
-          <div className="grid min-w-[1100px] grid-cols-6 gap-3">
+          <div className="grid grid-cols-[repeat(6,minmax(240px,1fr))] gap-3">
             {COLUMNS.map((col) => {
               const list = jobs.filter((j) => j.status === col);
               return (
@@ -224,11 +224,11 @@ export function ProductionBoard({ jobs, printers, spools, highlight, initialView
                   }}
                   className="flex min-h-64 flex-col gap-2 rounded-xl bg-muted/60 p-2"
                 >
-                  <header className="flex items-center justify-between px-1 py-1">
+                  <header className="flex items-center justify-between gap-2 px-1 py-1">
                     <Badge tone={JOB_STATUS_TONE[col]}>{enumLabel("jobStatus", col)}</Badge>
-                    <span className="tabular text-xs text-muted-foreground">
+                    <span className="tabular whitespace-nowrap text-xs text-muted-foreground">
                       {list.length}
-                      {(col === "DONE" || col === "FAILED") && " · 7 days"}
+                      {(col === "DONE" || col === "FAILED") && " · last 7 days"}
                     </span>
                   </header>
                   {list.map((j) => card(j))}

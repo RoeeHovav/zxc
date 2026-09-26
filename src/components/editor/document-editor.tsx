@@ -273,7 +273,7 @@ export function DocumentEditor({
         setServerErrors(r.fieldErrors ?? {});
         setFormError(r.error);
         toast.error(r.error);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0 });
       }
     } catch {
       toast.error("Network error — nothing was saved. Try again.");

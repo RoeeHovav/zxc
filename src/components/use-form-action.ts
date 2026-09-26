@@ -23,7 +23,7 @@ export function useFormAction<S>(action: (prev: Awaited<S>, fd: FormData) => Pro
     const t = setTimeout(() => {
       const invalid = document.querySelector<HTMLElement>("[aria-invalid=true]");
       const alert = document.querySelector<HTMLElement>("form [role=alert]");
-      (alert ?? invalid)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      (alert ?? invalid)?.scrollIntoView({ behavior: "instant", block: "nearest" });
       invalid?.focus({ preventScroll: true });
     }, 50);
     return () => clearTimeout(t);

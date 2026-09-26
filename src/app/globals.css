@@ -129,6 +129,11 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+  /* A bare grid gets one shrinkable column instead of an auto track that grows with wide
+     content (tables, long strings). Responsive grid-cols-* utilities override this. */
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media print {
