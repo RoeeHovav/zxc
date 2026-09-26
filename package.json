@@ -6,7 +6,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:seed:demo": "tsx scripts/seed-demo.ts",
+    "user:reset-password": "tsx scripts/reset-password.ts",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:e2e": "playwright test",
+    "test:backup": "bash scripts/test-backup-restore.sh",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@node-rs/argon2": "2.2.1",
@@ -26,6 +41,7 @@
     "radix-ui": "1.6.7",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "server-only": "0.0.1",
     "sonner": "2.0.8",
     "tailwind-merge": "3.7.0",
     "zod": "4.6.5"
@@ -50,5 +66,8 @@
   "overrides": {
     "mysql2": "3.24.4",
     "deepmerge-ts": "8.0.2"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }
