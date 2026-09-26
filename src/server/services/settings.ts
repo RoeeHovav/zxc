@@ -74,7 +74,8 @@ export function buildPricingContext(settings: Settings, policy: PricingPolicy, n
 }
 
 export async function currentPricingContext(policyId?: string | null, tx: Tx | typeof prisma = prisma) {
-  const [settings, policy] = await Promise.all([getSettings(tx), resolvePolicy(tx, policyId)]);
+  const settings = await getSettings(tx);
+  const policy = await resolvePolicy(tx, policyId);
   return buildPricingContext(settings, policy);
 }
 

@@ -21,6 +21,7 @@ import type {
   PricingContext,
   PricingIssue,
   ProductionResult,
+  ResolvedPrinter,
   ServicesResult,
   Step,
 } from "./types";
@@ -142,27 +143,19 @@ function applyDiscount(c: Collector, base: Dec, discount: Discount | null, label
   return amount;
 }
 
-function machineRate(
-  c: Collector,
-  input: NonNullable<LineInput["print"]>,
-  ctx: PricingContext,
-): { rate: Dec; source: "OVERRIDE" | "COMPONENTS" | "DEFAULT"; perHour: Record<"energy" | "depreciation" | "maintenance" | "consumables", Dec> } {
+export interface MachineRateBreakdown {
+  rate: Dec;
+  source: "OVERRIDE" | "COMPONENTS" | "DEFAULT";
+  perHour: Record<"energy" | "depreciation" | "maintenance" | "consumables", Dec>;
+  missing: string[];
+}
+
+/** Machine cost per hour for a printer; shared by pricing and the printers page. */
+export function machineRateBreakdown(printer: ResolvedPrinter | null, tariffPerKwh: Dec, fallback: Dec): MachineRateBreakdown {
   const zeroes = { energy: ZERO, depreciation: ZERO, maintenance: ZERO, consumables: ZERO };
-  const printer = input.printer;
-  const fallback = ctxDec(ctx.rates.defaultMachineCostPerHour, "defaultMachineCostPerHour");
-  if (!printer) {
-    c.warn(
-      "PRINTER_NOT_ASSIGNED",
-      `No printer selected; using the default machine cost of ${f4(fallback)}/h.`,
-      "printerId",
-    );
-    return { rate: fallback, source: "DEFAULT", perHour: zeroes };
-  }
+  if (!printer) return { rate: fallback, source: "DEFAULT", perHour: zeroes, missing: [] };
   const override = decOrNull(printer.hourlyRateOverride);
-  if (override !== null) {
-    if (override.lt(0)) c.error("NEGATIVE_VALUE", "Printer hourly rate override cannot be negative.", "printerId");
-    return { rate: override, source: "OVERRIDE", perHour: zeroes };
-  }
+  if (override !== null) return { rate: override, source: "OVERRIDE", perHour: zeroes, missing: [] };
   const missing: string[] = [];
   const purchase = decOrNull(printer.purchasePrice);
   const lifetime = decOrNull(printer.expectedLifetimeHours);
@@ -171,35 +164,31 @@ function machineRate(
   else missing.push("depreciation (purchase price / lifetime hours)");
   const watts = decOrNull(printer.powerWatts);
   let energy = ZERO;
-  if (watts !== null) energy = watts.div(1000).times(ctxDec(ctx.rates.electricityTariffPerKwh, "electricityTariffPerKwh"));
+  if (watts !== null) energy = watts.div(1000).times(tariffPerKwh);
   else missing.push("energy (power draw)");
   const maintenance = decOrNull(printer.maintenancePerHour);
   if (maintenance === null) missing.push("maintenance reserve");
   const consumables = decOrNull(printer.consumablesPerHour);
   if (consumables === null) missing.push("consumables");
+  if (missing.length === 4) return { rate: fallback, source: "DEFAULT", perHour: zeroes, missing };
+  const perHour = { energy, depreciation, maintenance: maintenance ?? ZERO, consumables: consumables ?? ZERO };
+  return { rate: sum(Object.values(perHour)), source: "COMPONENTS", perHour, missing };
+}
 
-  if (missing.length === 4) {
-    c.warn(
-      "PRINTER_COST_MISSING",
-      `Printer "${printer.name}" has no cost data; using the default machine cost of ${f4(fallback)}/h.`,
-      "printerId",
-    );
-    return { rate: fallback, source: "DEFAULT", perHour: zeroes };
+function machineRate(c: Collector, input: NonNullable<LineInput["print"]>, ctx: PricingContext): MachineRateBreakdown {
+  const fallback = ctxDec(ctx.rates.defaultMachineCostPerHour, "defaultMachineCostPerHour");
+  const printer = input.printer;
+  const r = machineRateBreakdown(printer, ctxDec(ctx.rates.electricityTariffPerKwh, "electricityTariffPerKwh"), fallback);
+  if (!printer) {
+    c.warn("PRINTER_NOT_ASSIGNED", `No printer selected; using the default machine cost of ${f4(fallback)}/h.`, "printerId");
+  } else if (r.source === "OVERRIDE") {
+    if (r.rate.lt(0)) c.error("NEGATIVE_VALUE", "Printer hourly rate override cannot be negative.", "printerId");
+  } else if (r.source === "DEFAULT") {
+    c.warn("PRINTER_COST_MISSING", `Printer "${printer.name}" has no cost data; using the default machine cost of ${f4(fallback)}/h.`, "printerId");
+  } else if (r.missing.length > 0) {
+    c.warn("PRINTER_COST_PARTIAL", `Printer "${printer.name}" is missing: ${r.missing.join(", ")}. Those components are excluded from machine cost.`, "printerId");
   }
-  if (missing.length > 0) {
-    c.warn(
-      "PRINTER_COST_PARTIAL",
-      `Printer "${printer.name}" is missing: ${missing.join(", ")}. Those components are excluded from machine cost.`,
-      "printerId",
-    );
-  }
-  const perHour = {
-    energy,
-    depreciation,
-    maintenance: maintenance ?? ZERO,
-    consumables: consumables ?? ZERO,
-  };
-  return { rate: sum(Object.values(perHour)), source: "COMPONENTS", perHour };
+  return r;
 }
 
 function priceProduction(c: Collector, input: LineInput, ctx: PricingContext): { result: ProductionResult; cost: Dec } | null {
@@ -342,6 +331,8 @@ function priceProduction(c: Collector, input: LineInput, ctx: PricingContext): {
         purge: fg(purgeG),
         waste: fg(modelWasteG.plus(supportWasteG)),
         total: fg(primaryG.plus(supportTotalG)),
+        primaryTotal: fg(primaryG),
+        supportTotal: fg(supportTotalG),
       },
       machineHours: machineHours.toDecimalPlaces(4).toString(),
       laborHours: setupHours.plus(postHours).toDecimalPlaces(4).toString(),

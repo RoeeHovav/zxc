@@ -562,6 +562,7 @@ model Quote {
   rejectedAt      DateTime?
   rejectionReason String?
   approvalNote    String?
+  clientKey       String?   @unique
   previousId      String?   @unique
   previous        Quote?    @relation("QuoteRevisions", fields: [previousId], references: [id], onDelete: SetNull)
   next            Quote?    @relation("QuoteRevisions")
@@ -694,6 +695,7 @@ model Order {
   canceledAt         DateTime?
   cancelReason       String?
   deliveryNoteNumber String?   @unique
+  clientKey          String?   @unique
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -787,6 +789,7 @@ model Payment {
   notes       String?
   voidedAt    DateTime?
   voidReason  String?
+  clientKey   String?       @unique
   createdById String?
   createdBy   User?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())

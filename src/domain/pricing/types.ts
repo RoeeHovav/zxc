@@ -152,7 +152,7 @@ export interface Step {
 
 export interface ProductionResult {
   batches: number;
-  grams: { model: string; support: string; purge: string; waste: string; total: string };
+  grams: { model: string; support: string; purge: string; waste: string; total: string; primaryTotal: string; supportTotal: string };
   machineHours: string;
   laborHours: string;
   machineRatePerHour: string;
