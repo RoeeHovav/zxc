@@ -10,9 +10,22 @@ function createClient(url = process.env.DATABASE_URL) {
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-/** Shared Prisma client (reused across hot reloads in development). */
-export const prisma = globalForPrisma.prisma ?? createClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+function client(): PrismaClient {
+  if (!globalForPrisma.prisma) globalForPrisma.prisma = createClient();
+  return globalForPrisma.prisma;
+}
+
+/**
+ * Shared Prisma client, created lazily on first use so that importing server modules
+ * (e.g. during `next build`) never requires a database connection.
+ */
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    const c = client();
+    const value = Reflect.get(c, prop, c);
+    return typeof value === "function" ? value.bind(c) : value;
+  },
+});
 
 export type Db = PrismaClient;
 /** Transaction client type accepted by services that may run inside a caller's transaction. */
