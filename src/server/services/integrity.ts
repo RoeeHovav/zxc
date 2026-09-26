@@ -32,9 +32,9 @@ export async function integrityReport() {
   const known = new Set(files.map((f) => f.storageKey));
   const orphanFiles: string[] = [];
   try {
-    for (const y of await readdir(uploadRoot())) {
-      for (const m of await readdir(path.join(uploadRoot(), y)).catch(() => [])) {
-        for (const f of await readdir(path.join(uploadRoot(), y, m)).catch(() => [])) {
+    for (const y of await readdir(/*turbopackIgnore: true*/ uploadRoot())) {
+      for (const m of await readdir(/*turbopackIgnore: true*/ path.join(uploadRoot(), y)).catch(() => [])) {
+        for (const f of await readdir(/*turbopackIgnore: true*/ path.join(uploadRoot(), y, m)).catch(() => [])) {
           const key = `${y}/${m}/${f}`;
           if (!known.has(key)) orphanFiles.push(key);
         }

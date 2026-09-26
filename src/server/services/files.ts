@@ -7,15 +7,19 @@ import { ServiceError, audit } from "./common";
 import { getSettings } from "./settings";
 import { detectFileType } from "@/domain/files";
 
+/**
+ * Runtime data directory. The `turbopackIgnore` hints keep `next build` from tracing the whole
+ * project (including local .env files and uploads) into the standalone output.
+ */
 export function uploadRoot() {
-  return path.resolve(process.env.UPLOAD_DIR || "./storage/uploads");
+  return path.resolve(/*turbopackIgnore: true*/ process.env.UPLOAD_DIR || "./storage/uploads");
 }
 
 const KEY_RE = /^\d{4}\/\d{2}\/[0-9a-f-]{36}$/;
 
 function keyPath(key: string) {
   if (!KEY_RE.test(key)) throw new ServiceError("Invalid storage key.");
-  return path.join(uploadRoot(), key);
+  return path.join(/*turbopackIgnore: true*/ uploadRoot(), key);
 }
 
 export type AttachTarget = {
@@ -54,8 +58,8 @@ export async function saveUpload(userId: string, file: { name: string; bytes: Bu
   const now = new Date();
   const key = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, "0")}/${randomUUID()}`;
   const full = keyPath(key);
-  await mkdir(path.dirname(full), { recursive: true });
-  await writeFile(full, file.bytes, { mode: 0o600 });
+  await mkdir(/*turbopackIgnore: true*/ path.dirname(full), { recursive: true });
+  await writeFile(/*turbopackIgnore: true*/ full, file.bytes, { mode: 0o600 });
   const sha256 = createHash("sha256").update(file.bytes).digest("hex");
   const safeName = sanitizeFileName(file.name);
   try {
@@ -78,7 +82,7 @@ export async function saveUpload(userId: string, file: { name: string; bytes: Bu
       return rec;
     });
   } catch (e) {
-    await rm(full, { force: true });
+    await rm(/*turbopackIgnore: true*/ full, { force: true });
     throw e;
   }
 }
@@ -90,12 +94,12 @@ export function sanitizeFileName(name: string) {
 }
 
 export async function readStoredFile(key: string) {
-  return readFile(keyPath(key));
+  return readFile(/*turbopackIgnore: true*/ keyPath(key));
 }
 
 export async function storedFileExists(key: string) {
   try {
-    await stat(keyPath(key));
+    await stat(/*turbopackIgnore: true*/ keyPath(key));
     return true;
   } catch {
     return false;
@@ -104,7 +108,7 @@ export async function storedFileExists(key: string) {
 
 export async function deleteStoredFile(key: string) {
   try {
-    await rm(keyPath(key), { force: true });
+    await rm(/*turbopackIgnore: true*/ keyPath(key), { force: true });
   } catch {
     // best effort; orphan cleanup is reported by the storage check
   }

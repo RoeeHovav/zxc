@@ -20,10 +20,10 @@ async function latestBackup() {
   const dir = process.env.BACKUP_DIR;
   if (!dir) return null;
   try {
-    const files = (await readdir(dir)).filter((f) => f.endsWith(".dump") || f.endsWith(".tar.gz"));
+    const files = (await readdir(/*turbopackIgnore: true*/ dir)).filter((f) => f.endsWith(".dump") || f.endsWith(".tar.gz"));
     let best: { name: string; at: Date; size: number } | null = null;
     for (const f of files) {
-      const s = await stat(path.join(dir, f));
+      const s = await stat(/*turbopackIgnore: true*/ path.join(dir, f));
       if (!best || s.mtime > best.at) best = { name: f, at: s.mtime, size: s.size };
     }
     return best ? { ...best, stale: Date.now() - best.at.getTime() > 2 * 86400000 } : null;

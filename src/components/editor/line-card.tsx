@@ -1,6 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { ChevronDown, ChevronUp, Copy, Info, Layers, MoreVertical, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -16,17 +17,47 @@ import { enumLabel } from "@/lib/labels";
 import { grams, money, percent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { EditorLine } from "./types";
+import { SlicerImport, type SlicerImportPatch } from "./slicer-import";
 
 type Update = (patch: Partial<EditorLine>) => void;
 
-function Num({ label, value, onChange, suffix, id, invalid, placeholder, hint, className }: { label: string; value: string; onChange: (v: string) => void; suffix?: string; id: string; invalid?: boolean; placeholder?: string; hint?: string; className?: string }) {
+function Num({
+  label,
+  value,
+  onChange,
+  suffix,
+  id,
+  invalid,
+  placeholder,
+  hint,
+  className,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  suffix?: string;
+  id: string;
+  invalid?: boolean;
+  placeholder?: string;
+  hint?: string;
+  className?: string;
+}) {
   return (
     <div className={cn("grid min-w-0 content-start gap-1", className)}>
       <Label htmlFor={id} className="text-xs text-muted-foreground">
         {label}
       </Label>
       <div className="relative">
-        <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} inputMode="decimal" autoComplete="off" placeholder={placeholder} aria-invalid={invalid || undefined} className={cn("tabular", suffix && "pe-10")} />
+        <Input
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder={placeholder}
+          aria-invalid={invalid || undefined}
+          className={cn("tabular", suffix && "pe-10")}
+        />
         {suffix && <span className="pointer-events-none absolute inset-y-0 end-2.5 flex items-center text-xs text-muted-foreground">{suffix}</span>}
       </div>
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
@@ -34,7 +65,23 @@ function Num({ label, value, onChange, suffix, id, invalid, placeholder, hint, c
   );
 }
 
-function Txt({ label, value, onChange, id, placeholder, className, type = "text" }: { label: string; value: string; onChange: (v: string) => void; id: string; placeholder?: string; className?: string; type?: string }) {
+function Txt({
+  label,
+  value,
+  onChange,
+  id,
+  placeholder,
+  className,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  id: string;
+  placeholder?: string;
+  className?: string;
+  type?: string;
+}) {
   return (
     <div className={cn("grid min-w-0 content-start gap-1", className)}>
       <Label htmlFor={id} className="text-xs text-muted-foreground">
@@ -86,7 +133,13 @@ export function LineCard({
       hint: `${m.pricePerKg ? `${money(m.pricePerKg)}/kg` : "no price!"} · ${grams(m.availableG)} available`,
     }));
     const snap = line.resolved.material;
-    if (snap && !opts.some((o) => o.value === snap.id)) opts.unshift({ value: snap.id, label: `${snap.label} (inactive)`, swatch: null, hint: `snapshot ${snap.pricePerKg ?? "?"}/kg` });
+    if (snap && !opts.some((o) => o.value === snap.id))
+      opts.unshift({
+        value: snap.id,
+        label: `${snap.label} (inactive)`,
+        swatch: null,
+        hint: `snapshot ${snap.pricePerKg ?? "?"}/kg`,
+      });
     return opts;
   }, [options.materials, line.resolved.material]);
   const selectedMaterial = options.materials.find((m) => m.id === line.materialId);
@@ -101,15 +154,44 @@ export function LineCard({
 
   const setMaterial = (id: string | null) => {
     const m = options.materials.find((x) => x.id === id);
-    onUpdate({ materialId: id, resolved: { ...line.resolved, material: m ? { id: m.id, label: m.label, pricePerKg: m.pricePerKg, wastePercent: m.wastePercent } : null } });
+    onUpdate({
+      materialId: id,
+      resolved: {
+        ...line.resolved,
+        material: m
+          ? {
+              id: m.id,
+              label: m.label,
+              pricePerKg: m.pricePerKg,
+              wastePercent: m.wastePercent,
+            }
+          : null,
+      },
+    });
   };
   const setSupportMaterial = (id: string | null) => {
     const m = options.materials.find((x) => x.id === id);
-    onUpdate({ supportMaterialId: id, resolved: { ...line.resolved, supportMaterial: m ? { id: m.id, label: m.label, pricePerKg: m.pricePerKg, wastePercent: m.wastePercent } : null } });
+    onUpdate({
+      supportMaterialId: id,
+      resolved: {
+        ...line.resolved,
+        supportMaterial: m
+          ? {
+              id: m.id,
+              label: m.label,
+              pricePerKg: m.pricePerKg,
+              wastePercent: m.wastePercent,
+            }
+          : null,
+      },
+    });
   };
   const setPrinter = (id: string | null) => {
     const p = options.printers.find((x) => x.id === id);
-    onUpdate({ printerId: id, resolved: { ...line.resolved, printer: p ? p.resolved : null } });
+    onUpdate({
+      printerId: id,
+      resolved: { ...line.resolved, printer: p ? p.resolved : null },
+    });
   };
   const loadDesign = (id: string | null) => {
     const d = options.designs.find((x) => x.id === id);
@@ -129,10 +211,45 @@ export function LineCard({
       printTime: d.defaultPrintMinutes ? formatMinutes(d.defaultPrintMinutes) : line.printTime,
       resolved: {
         ...line.resolved,
-        material: m ? { id: m.id, label: m.label, pricePerKg: m.pricePerKg, wastePercent: m.wastePercent } : line.resolved.material,
+        material: m
+          ? {
+              id: m.id,
+              label: m.label,
+              pricePerKg: m.pricePerKg,
+              wastePercent: m.wastePercent,
+            }
+          : line.resolved.material,
         printer: p ? p.resolved : line.resolved.printer,
       },
     });
+  };
+
+  const applySlicer = (p: SlicerImportPatch) => {
+    const m = p.materialId ? options.materials.find((x) => x.id === p.materialId) : null;
+    onUpdate({
+      gramsPerUnit: p.gramsPerUnit,
+      printTime: formatMinutes(p.printMinutesPerUnit),
+      unitsPerBatch: String(p.unitsPerBatch),
+      // The slicer's plate weight already includes supports and purge.
+      supportGramsPerUnit: "",
+      purgeGramsPerBatch: "",
+      partName: line.partName || p.partName || "",
+      ...(m
+        ? {
+            materialId: m.id,
+            resolved: {
+              ...line.resolved,
+              material: {
+                id: m.id,
+                label: m.label,
+                pricePerKg: m.pricePerKg,
+                wastePercent: m.wastePercent,
+              },
+            },
+          }
+        : {}),
+    });
+    toast.success("Slicer data applied — review the price.");
   };
 
   const errors = result.issues.filter((i) => i.severity === "error");
@@ -148,14 +265,31 @@ export function LineCard({
             <Label htmlFor={`${idp}-name`} className="text-xs text-muted-foreground">
               Part name
             </Label>
-            <Input id={`${idp}-name`} value={line.partName} onChange={(e) => onUpdate({ partName: e.target.value })} placeholder="e.g. Phone stand" aria-invalid={!!serverErrors.partName || undefined} data-autofocus-line />
+            <Input
+              id={`${idp}-name`}
+              value={line.partName}
+              onChange={(e) => onUpdate({ partName: e.target.value })}
+              placeholder="e.g. Phone stand"
+              aria-invalid={!!serverErrors.partName || undefined}
+              data-autofocus-line
+            />
             {serverErrors.partName && <p className="text-xs text-destructive">{serverErrors.partName}</p>}
           </div>
           <div className="grid gap-1">
             <Label htmlFor={`${idp}-svc`} className="text-xs text-muted-foreground">
               Service
             </Label>
-            <Select id={`${idp}-svc`} value={line.serviceType} disabled={!!locked} onChange={(e) => onUpdate({ serviceType: e.target.value as EditorLine["serviceType"], quantity: ["MODELING_ONLY", "SCANNING_ONLY"].includes(e.target.value) ? "1" : line.quantity })}>
+            <Select
+              id={`${idp}-svc`}
+              value={line.serviceType}
+              disabled={!!locked}
+              onChange={(e) =>
+                onUpdate({
+                  serviceType: e.target.value as EditorLine["serviceType"],
+                  quantity: ["MODELING_ONLY", "SCANNING_ONLY"].includes(e.target.value) ? "1" : line.quantity,
+                })
+              }
+            >
               {SERVICE_TYPES.map((s) => (
                 <option key={s} value={s}>
                   {enumLabel("serviceType", s)}
@@ -200,36 +334,65 @@ export function LineCard({
       <div className="grid gap-4 px-4 py-4">
         {locked && <p className="text-xs text-muted-foreground">{locked}</p>}
         {print && (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_repeat(3,minmax(0,0.8fr))]">
-            <div className="grid min-w-0 gap-1">
-              <Label htmlFor={`${idp}-mat`} className="text-xs text-muted-foreground">
-                Material
-              </Label>
-              <Combobox id={`${idp}-mat`} options={materialOpts} value={line.materialId} onChange={setMaterial} placeholder="Choose filament…" searchPlaceholder="Type, brand, color…" invalid={errFields.has("materialId")} footer={<Link href="/materials/new" target="_blank" className="block rounded-md px-2.5 py-2 text-xs text-primary hover:bg-accent">+ New material (opens new tab)</Link>} />
-              {snapshotDiffers && <p className="text-[11px] text-warning">Priced at the saved {line.resolved.material?.pricePerKg}/kg (current {selectedMaterial?.pricePerKg}/kg).</p>}
+          <div className="grid gap-2">
+            <div className="-mt-1 flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-muted-foreground">Printing</p>
+              <SlicerImport materials={options.materials} currentMaterialId={line.materialId} onApply={applySlicer} />
             </div>
-            <div className="grid min-w-0 gap-1">
-              <Label htmlFor={`${idp}-prn`} className="text-xs text-muted-foreground">
-                Printer
-              </Label>
-              <Combobox id={`${idp}-prn`} options={printerOpts} value={line.printerId} onChange={setPrinter} placeholder="Choose printer…" allowClear />
-            </div>
-            <Num id={`${idp}-g`} label="Grams / unit" value={line.gramsPerUnit} onChange={(v) => onUpdate({ gramsPerUnit: v })} suffix="g" invalid={errFields.has("gramsPerUnit")} />
-            <div className="grid min-w-0 content-start gap-1">
-              <Label htmlFor={`${idp}-t`} className="text-xs text-muted-foreground">
-                Print time / unit
-              </Label>
-              <Input
-                id={`${idp}-t`}
-                value={line.printTime}
-                onChange={(e) => onUpdate({ printTime: e.target.value })}
-                onBlur={() => printMinutes !== null && onUpdate({ printTime: formatMinutes(printMinutes) })}
-                placeholder="2h 30m"
-                aria-invalid={errFields.has("printMinutesPerUnit") || (line.printTime !== "" && printMinutes === null) || undefined}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_repeat(3,minmax(0,0.8fr))]">
+              <div className="grid min-w-0 gap-1">
+                <Label htmlFor={`${idp}-mat`} className="text-xs text-muted-foreground">
+                  Material
+                </Label>
+                <Combobox
+                  id={`${idp}-mat`}
+                  options={materialOpts}
+                  value={line.materialId}
+                  onChange={setMaterial}
+                  placeholder="Choose filament…"
+                  searchPlaceholder="Type, brand, color…"
+                  invalid={errFields.has("materialId")}
+                  footer={
+                    <Link href="/materials/new" target="_blank" className="block rounded-md px-2.5 py-2 text-xs text-primary hover:bg-accent">
+                      + New material (opens new tab)
+                    </Link>
+                  }
+                />
+                {snapshotDiffers && (
+                  <p className="text-[11px] text-warning">
+                    Priced at the saved {line.resolved.material?.pricePerKg}/kg (current {selectedMaterial?.pricePerKg}/kg).
+                  </p>
+                )}
+              </div>
+              <div className="grid min-w-0 gap-1">
+                <Label htmlFor={`${idp}-prn`} className="text-xs text-muted-foreground">
+                  Printer
+                </Label>
+                <Combobox id={`${idp}-prn`} options={printerOpts} value={line.printerId} onChange={setPrinter} placeholder="Choose printer…" allowClear />
+              </div>
+              <Num id={`${idp}-g`} label="Grams / unit" value={line.gramsPerUnit} onChange={(v) => onUpdate({ gramsPerUnit: v })} suffix="g" invalid={errFields.has("gramsPerUnit")} />
+              <div className="grid min-w-0 content-start gap-1">
+                <Label htmlFor={`${idp}-t`} className="text-xs text-muted-foreground">
+                  Print time / unit
+                </Label>
+                <Input
+                  id={`${idp}-t`}
+                  value={line.printTime}
+                  onChange={(e) => onUpdate({ printTime: e.target.value })}
+                  onBlur={() => printMinutes !== null && onUpdate({ printTime: formatMinutes(printMinutes) })}
+                  placeholder="2h 30m"
+                  aria-invalid={errFields.has("printMinutesPerUnit") || (line.printTime !== "" && printMinutes === null) || undefined}
+                />
+                {line.printTime !== "" && printMinutes === null && <p className="text-[11px] text-destructive">Use e.g. 95, 1:35 or 1h 35m</p>}
+              </div>
+              <Num
+                id={`${idp}-b`}
+                label="Units / plate"
+                value={line.unitsPerBatch}
+                onChange={(v) => onUpdate({ unitsPerBatch: v.replace(/[^\d]/g, "") })}
+                hint={result.production ? `${result.production.batches} plate(s)` : undefined}
               />
-              {line.printTime !== "" && printMinutes === null && <p className="text-[11px] text-destructive">Use e.g. 95, 1:35 or 1h 35m</p>}
             </div>
-            <Num id={`${idp}-b`} label="Units / plate" value={line.unitsPerBatch} onChange={(v) => onUpdate({ unitsPerBatch: v.replace(/[^\d]/g, "") })} hint={result.production ? `${result.production.batches} plate(s)` : undefined} />
           </div>
         )}
 
@@ -239,12 +402,28 @@ export function LineCard({
               <Label htmlFor={`${idp}-mm`} className="text-xs text-muted-foreground">
                 Modeling charge
               </Label>
-              <Select id={`${idp}-mm`} value={line.modelingMode} onChange={(e) => onUpdate({ modelingMode: e.target.value as "HOURLY" | "FIXED" })} disabled={line.designFeeWaived}>
+              <Select
+                id={`${idp}-mm`}
+                value={line.modelingMode}
+                onChange={(e) =>
+                  onUpdate({
+                    modelingMode: e.target.value as "HOURLY" | "FIXED",
+                  })
+                }
+                disabled={line.designFeeWaived}
+              >
                 <option value="HOURLY">Hourly</option>
                 <option value="FIXED">Fixed fee</option>
               </Select>
             </div>
-            <Num id={`${idp}-mh`} label={line.modelingMode === "HOURLY" ? "Estimated hours" : "Est. hours (for cost)"} value={line.modelingHours} onChange={(v) => onUpdate({ modelingHours: v })} suffix="h" invalid={errFields.has("modelingHours")} />
+            <Num
+              id={`${idp}-mh`}
+              label={line.modelingMode === "HOURLY" ? "Estimated hours" : "Est. hours (for cost)"}
+              value={line.modelingHours}
+              onChange={(v) => onUpdate({ modelingHours: v })}
+              suffix="h"
+              invalid={errFields.has("modelingHours")}
+            />
             {line.modelingMode === "FIXED" ? (
               <Num id={`${idp}-mf`} label="Fixed fee" value={line.modelingFee} onChange={(v) => onUpdate({ modelingFee: v })} suffix="₪" invalid={errFields.has("modelingFee")} />
             ) : (
@@ -264,8 +443,14 @@ export function LineCard({
           </div>
         )}
 
-        <button type="button" onClick={() => onUpdate({ expanded: !line.expanded })} className="inline-flex w-fit items-center gap-1 text-xs font-medium text-primary hover:underline" aria-expanded={line.expanded}>
-          {line.expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />} {line.expanded ? "Fewer options" : "More options"} — {print ? "support, post-processing, " : ""}discount, deadline, notes
+        <button
+          type="button"
+          onClick={() => onUpdate({ expanded: !line.expanded })}
+          className="inline-flex w-fit items-center gap-1 text-xs font-medium text-primary hover:underline"
+          aria-expanded={line.expanded}
+        >
+          {line.expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />} {line.expanded ? "Fewer options" : "More options"} — {print ? "support, post-processing, " : ""}
+          discount, deadline, notes
         </button>
 
         {line.expanded && (
@@ -292,22 +477,53 @@ export function LineCard({
                 <Label htmlFor={`${idp}-dt`} className="text-xs text-muted-foreground">
                   Line discount
                 </Label>
-                <Select id={`${idp}-dt`} value={line.discountType} onChange={(e) => onUpdate({ discountType: e.target.value as EditorLine["discountType"] })}>
+                <Select
+                  id={`${idp}-dt`}
+                  value={line.discountType}
+                  onChange={(e) =>
+                    onUpdate({
+                      discountType: e.target.value as EditorLine["discountType"],
+                    })
+                  }
+                >
                   <option value="">None</option>
                   <option value="PERCENT">Percent</option>
                   <option value="AMOUNT">Amount</option>
                 </Select>
               </div>
-              {line.discountType && <Num id={`${idp}-dv`} label="Discount" value={line.discountValue} onChange={(v) => onUpdate({ discountValue: v })} suffix={line.discountType === "PERCENT" ? "%" : "₪"} invalid={errFields.has("discount")} />}
+              {line.discountType && (
+                <Num
+                  id={`${idp}-dv`}
+                  label="Discount"
+                  value={line.discountValue}
+                  onChange={(v) => onUpdate({ discountValue: v })}
+                  suffix={line.discountType === "PERCENT" ? "%" : "₪"}
+                  invalid={errFields.has("discount")}
+                />
+              )}
               {print && (
                 <>
-                  <Num id={`${idp}-mu`} label="Manual unit price" value={line.manualUnitPrice} onChange={(v) => onUpdate({ manualUnitPrice: v })} suffix="₪" placeholder={result.production?.suggestedUnitPrice ?? ""} invalid={errFields.has("manualUnitPrice")} />
+                  <Num
+                    id={`${idp}-mu`}
+                    label="Manual unit price"
+                    value={line.manualUnitPrice}
+                    onChange={(v) => onUpdate({ manualUnitPrice: v })}
+                    suffix="₪"
+                    placeholder={result.production?.suggestedUnitPrice ?? ""}
+                    invalid={errFields.has("manualUnitPrice")}
+                  />
                   {line.manualUnitPrice && (
                     <div className="grid gap-1 sm:col-span-2">
                       <Label htmlFor={`${idp}-mr`} className="text-xs text-muted-foreground">
                         Override reason (required)
                       </Label>
-                      <Input id={`${idp}-mr`} value={line.manualPriceReason} onChange={(e) => onUpdate({ manualPriceReason: e.target.value })} aria-invalid={errFields.has("manualPriceReason") || undefined} placeholder="Price agreed by phone" />
+                      <Input
+                        id={`${idp}-mr`}
+                        value={line.manualPriceReason}
+                        onChange={(e) => onUpdate({ manualPriceReason: e.target.value })}
+                        aria-invalid={errFields.has("manualPriceReason") || undefined}
+                        placeholder="Price agreed by phone"
+                      />
                     </div>
                   )}
                 </>
@@ -333,7 +549,11 @@ export function LineCard({
               <div className="grid gap-1 sm:max-w-md">
                 <Label className="text-xs text-muted-foreground">Re-order an existing design</Label>
                 <Combobox
-                  options={designs.map((d) => ({ value: d.id, label: `${d.number} — ${d.title}`, hint: enumLabel("designStatus", d.status) }))}
+                  options={designs.map((d) => ({
+                    value: d.id,
+                    label: `${d.number} — ${d.title}`,
+                    hint: enumLabel("designStatus", d.status),
+                  }))}
                   value={line.designProjectId}
                   onChange={loadDesign}
                   placeholder="Link a design (fills print settings)"
@@ -383,7 +603,11 @@ export function LineCard({
       </div>
 
       <Dialog open={breakdown} onOpenChange={setBreakdown}>
-        <DialogContent title={`How “${line.partName || `Item ${index + 1}`}” is priced`} description="Every number, the formula that produced it, and the rounding applied. Internal — never shown to customers." wide>
+        <DialogContent
+          title={`How “${line.partName || `Item ${index + 1}`}” is priced`}
+          description="Every number, the formula that produced it, and the rounding applied. Internal — never shown to customers."
+          wide
+        >
           {result.steps.length === 0 ? (
             <p className="text-sm text-muted-foreground">Complete the required fields to see the breakdown.</p>
           ) : (
