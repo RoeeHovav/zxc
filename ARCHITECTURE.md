@@ -28,7 +28,7 @@ src/
     status/          State machines for orders, quotes, jobs, designs
     schemas/         Zod input schemas shared by forms and server actions
   server/          Server-only code (imports "server-only").
-    db.ts            Prisma client singleton
+    db.ts            Prisma client (created lazily, so builds need no database)
     auth/            Password hashing, sessions, rate limiting, `requireUser()`
     services/        Business operations: every DB write lives here, inside transactions
   app/             Next.js routes. Pages read via services; mutations call Server Actions
@@ -96,7 +96,12 @@ See `prisma/schema.prisma` for full detail.
 - Passwords: argon2id (OWASP parameters). Sessions: 256-bit random token in an `HttpOnly`, `SameSite=Lax`,
   `Secure` (in production) cookie; only its SHA-256 is stored. Sliding 30-day expiry; logout deletes the row;
   password change revokes other sessions.
-- Login rate limiting per IP and per account with temporary lockout; generic error messages.
+- Login rate limiting per account (5 failures / 15 min) and per IP (20). Each attempt is recorded _before_
+  it is checked, so parallel bursts can't slip past the limit (integration test). Rejected attempts are
+  removed, so they can't extend the lockout. Error messages are generic. The client IP comes only from
+  the last `X-Forwarded-For` entry, and only when `TRUST_PROXY=1` (set behind your own reverse proxy).
+- Double submissions are harmless: quotes, orders and payments carry a client idempotency key backed by
+  a unique column. When two requests race, the loser returns the winner's record.
 - Server Actions are POST-only with Next.js origin checks; route handlers that mutate check `Origin`.
 - `proxy.ts` redirects unauthenticated requests early; real authorization happens server-side on every
   request (`requireUser()`), never only in the proxy.
@@ -108,11 +113,21 @@ See `prisma/schema.prisma` for full detail.
 
 ## Localization
 
-English-first. Strings for navigation, statuses and enums come from `src/lib/i18n` dictionaries; layouts use
-logical CSS properties (`ms-*`, `pe-*`, `start-*`) so `dir="rtl"` works; numbers/currency/dates go through
-`Intl` with the configured locale. See `docs/I18N.md` for the path to full Hebrew.
+English UI. Navigation and status/enum labels come from the `src/lib/i18n.ts` dictionary; page copy is
+still inline. Layouts use logical CSS properties only, so `dir="rtl"` mirrors correctly (screenshot in
+docs/WALKTHROUGH.md). Numbers, currency and dates go through `Intl`. Customer PDFs embed Heebo for
+Hebrew. See `docs/I18N.md` for the path to a full Hebrew UI.
+
+## Slicer import and 3D preview
+
+- `src/domain/slicer/bambu-3mf.ts` reads Bambu Studio / OrcaSlicer `.3mf`. It is isomorphic and runs in the
+  browser, so the file is never uploaded. The format was checked against the slicers' writer source; see the
+  file header and `tests/fixtures/bambu/README.md`.
+- `src/components/files/model-viewer.tsx` lazy-loads three.js to preview STL/OBJ/3MF attachments. It
+  reports the bounding box in mm.
 
 ## Deployment model
 
-Single Node.js process + PostgreSQL. Docker Compose file provided (app, db, scheduled backups). No paid
-services are required. See `docs/DEPLOYMENT.md`.
+Single Node.js process (Next.js `output: "standalone"`) + PostgreSQL. Docker Compose runs db, one-shot
+migrations, the app (bound to 127.0.0.1, behind your HTTPS proxy) and scheduled backups. No paid services
+are required. See `docs/DEPLOYMENT.md` and `docs/BACKUP.md`.

@@ -42,6 +42,12 @@ test("preview an uploaded STL in 3D with its dimensions", async ({ page }) => {
   await page.getByRole("button", { name: "Create customer" }).click();
   await expect(page.getByRole("heading", { name: "Preview Customer" })).toBeVisible();
 
+  // Privacy: the per-customer data export is a JSON download with the customer's records.
+  const exported = await page.request.get(page.url().replace("/customers/", "/api/customers/") + "/export");
+  expect(exported.status()).toBe(200);
+  expect(exported.headers()["content-disposition"]).toMatch(/attachment; filename=.*customer-C-\d+\.json/);
+  expect((await exported.json()).customer).toMatchObject({ name: "Preview Customer", phone: "053-777-8888" });
+
   const upload = page.locator("input[type=file][multiple]");
   await upload.setInputFiles({ name: "box.stl", mimeType: "model/stl", buffer: Buffer.from(boxStl(20, 10, 5)) });
   await expect(page.getByRole("link", { name: "box.stl", exact: true })).toBeVisible();
