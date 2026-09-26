@@ -3,7 +3,7 @@ import { prisma, type Tx } from "../db";
 import type { Prisma } from "@/generated/prisma/client";
 import { checkQuoteTransition, type QuoteStatus } from "@/domain/status/other";
 import type { QuoteForm } from "@/domain/schemas/sales";
-import { NotFoundError, ServiceError, audit, nextNumber } from "./common";
+import { NotFoundError, ServiceError, audit, idempotent, nextNumber } from "./common";
 import { lineColumns, type StoredLineInput } from "./pricing-inputs";
 import { priceDocument, totalsColumns } from "./documents";
 export { priceDocument, totalsColumns };
@@ -29,10 +29,11 @@ async function syncItems<T extends { id: string }>(
 }
 
 export async function saveQuote(userId: string, id: string | null, form: QuoteForm, clientKey?: string | null) {
-  if (!id && clientKey) {
-    const dup = await prisma.quote.findUnique({ where: { clientKey } });
-    if (dup) return dup;
-  }
+  const save = () => saveQuoteTx(userId, id, form, clientKey);
+  return id ? save() : idempotent(clientKey, (key) => prisma.quote.findUnique({ where: { clientKey: key } }), save);
+}
+
+async function saveQuoteTx(userId: string, id: string | null, form: QuoteForm, clientKey?: string | null) {
   return prisma.$transaction(async (tx) => {
     const customer = await tx.customer.findUnique({ where: { id: form.customerId } });
     if (!customer) throw new ServiceError("Select a customer.");
@@ -72,7 +73,13 @@ export async function saveQuote(userId: string, id: string | null, form: QuoteFo
         create: (data) => tx.quoteItem.create({ data: { ...(data as Prisma.QuoteItemUncheckedCreateInput), quoteId: existing.id } }),
         deleteMany: (ids) => tx.quoteItem.deleteMany({ where: { id: { in: ids }, quoteId: existing.id } }),
       });
-      await audit(tx, { userId, entityType: "QUOTE", entityId: quote.id, action: "UPDATE", summary: `Updated ${quote.number} (total ${quote.total})${form.refreshRates ? " — re-priced with current rates" : ""}` });
+      await audit(tx, {
+        userId,
+        entityType: "QUOTE",
+        entityId: quote.id,
+        action: "UPDATE",
+        summary: `Updated ${quote.number} (total ${quote.total})${form.refreshRates ? " — re-priced with current rates" : ""}`,
+      });
     } else {
       const number = await nextNumber(tx, "QUOTE");
       quote = await tx.quote.create({ data: { ...header, number, clientKey: clientKey ?? null } });
@@ -121,7 +128,10 @@ export async function getQuote(id: string) {
     where: { id },
     include: {
       customer: true,
-      items: { orderBy: { position: "asc" }, include: { material: { select: { id: true, colorHex: true } }, printer: { select: { id: true, name: true } }, designProject: { select: { id: true, number: true, title: true } }, files: true } },
+      items: {
+        orderBy: { position: "asc" },
+        include: { material: { select: { id: true, colorHex: true } }, printer: { select: { id: true, name: true } }, designProject: { select: { id: true, number: true, title: true } }, files: true },
+      },
       previous: { select: { id: true, number: true, revision: true, status: true } },
       next: { select: { id: true, number: true, revision: true, status: true } },
       order: { select: { id: true, number: true, status: true } },
@@ -193,8 +203,32 @@ export async function reviseQuote(userId: string, id: string) {
     const full = await tx.quote.findUniqueOrThrow({ where: { id }, include: { items: true } });
     await tx.quote.update({ where: { id }, data: { status: "REVISED" } });
     const settings = await getSettings(tx);
-    const { id: _id, items, createdAt: _c, updatedAt: _u, status: _s, sentAt: _se, acceptedAt: _a, rejectedAt: _r, rejectionReason: _rr, approvalNote: _ap, clientKey: _ck, previousId: _p, ...rest } = full;
-    void _id; void _c; void _u; void _s; void _se; void _a; void _r; void _rr; void _ap; void _ck; void _p;
+    const {
+      id: _id,
+      items,
+      createdAt: _c,
+      updatedAt: _u,
+      status: _s,
+      sentAt: _se,
+      acceptedAt: _a,
+      rejectedAt: _r,
+      rejectionReason: _rr,
+      approvalNote: _ap,
+      clientKey: _ck,
+      previousId: _p,
+      ...rest
+    } = full;
+    void _id;
+    void _c;
+    void _u;
+    void _s;
+    void _se;
+    void _a;
+    void _r;
+    void _rr;
+    void _ap;
+    void _ck;
+    void _p;
     const next = await tx.quote.create({
       data: {
         ...(rest as Omit<typeof rest, "pricingContext" | "pricingSummary">),
@@ -209,7 +243,8 @@ export async function reviseQuote(userId: string, id: string) {
     });
     for (const it of items) {
       const { id: _iid, quoteId: _q, ...itemRest } = it;
-      void _iid; void _q;
+      void _iid;
+      void _q;
       await tx.quoteItem.create({
         data: { ...itemRest, quoteId: next.id, pricingInput: it.pricingInput as Prisma.InputJsonValue, pricingResult: (it.pricingResult ?? undefined) as Prisma.InputJsonValue | undefined },
       });

@@ -20,6 +20,30 @@ export class NotFoundError extends ServiceError {
   }
 }
 
+function isUniqueViolation(e: unknown) {
+  return !!e && typeof e === "object" && (e as { code?: unknown }).code === "P2002";
+}
+
+/**
+ * Makes a create operation safe to submit twice (double click, retry after a network error).
+ * The unique `clientKey` column is the real guard: if two submissions race past the lookup,
+ * the loser's transaction fails on the constraint and gets the winner's record instead.
+ */
+export async function idempotent<T>(key: string | null | undefined, find: (key: string) => Promise<T | null>, create: () => Promise<T>): Promise<T> {
+  if (!key) return create();
+  const existing = await find(key);
+  if (existing) return existing;
+  try {
+    return await create();
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      const winner = await find(key);
+      if (winner) return winner;
+    }
+    throw e;
+  }
+}
+
 export type SequenceKey = "CUSTOMER" | "QUOTE" | "ORDER" | "JOB" | "PAYMENT" | "REFUND" | "DELIVERY" | "DESIGN" | "SPOOL";
 
 const DEFAULTS: Record<SequenceKey, { prefix: string; includeYear: boolean; padding: number }> = {
@@ -47,10 +71,7 @@ export async function nextNumber(tx: Tx, key: SequenceKey, now = new Date()): Pr
   return seq.includeYear ? `${seq.prefix}-${now.getFullYear()}-${n}` : `${seq.prefix}-${n}`;
 }
 
-export async function audit(
-  tx: Tx,
-  entry: { userId?: string | null; entityType: string; entityId: string; action: string; summary: string; details?: Prisma.InputJsonValue },
-) {
+export async function audit(tx: Tx, entry: { userId?: string | null; entityType: string; entityId: string; action: string; summary: string; details?: Prisma.InputJsonValue }) {
   await tx.auditLog.create({ data: { ...entry, userId: entry.userId ?? null } });
 }
 

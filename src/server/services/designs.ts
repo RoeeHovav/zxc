@@ -5,7 +5,7 @@ import { ZERO, dec } from "@/domain/money";
 import { checkDesignTransition, isRevisionChargeable, type DesignStatus } from "@/domain/status/other";
 import { NotFoundError, ServiceError, audit, nextNumber } from "./common";
 import { getSettings } from "./settings";
-import { saveOrder, syncOrderStatus } from "./orders";
+import { saveOrderTx, syncOrderStatus } from "./orders";
 import type { OrderForm } from "@/domain/schemas/sales";
 
 export interface DesignInput {
@@ -84,7 +84,9 @@ export async function getDesign(id: string) {
   let billable = ZERO;
   for (const t of d.timeEntries) {
     const h = dec(t.hours.toString());
-    byCategory[t.category] = dec(byCategory[t.category] ?? "0").plus(h).toFixed(2);
+    byCategory[t.category] = dec(byCategory[t.category] ?? "0")
+      .plus(h)
+      .toFixed(2);
     total = total.plus(h);
     if (t.billable) billable = billable.plus(h);
   }
@@ -109,12 +111,24 @@ export async function transitionDesign(userId: string, id: string, to: DesignSta
     // Linked orders waiting on this design may now advance.
     for (const orderId of new Set(d.orderItems.map((i) => i.orderId))) {
       const order = await tx.order.findUnique({ where: { id: orderId }, select: { status: true } });
-      if (order && (to === "AWAITING_APPROVAL" && order.status === "AWAITING_MODELING")) {
+      if (order && to === "AWAITING_APPROVAL" && order.status === "AWAITING_MODELING") {
         await tx.order.update({ where: { id: orderId }, data: { status: "AWAITING_APPROVAL" } });
-        await audit(tx, { userId: null, entityType: "ORDER", entityId: orderId, action: "STATUS", summary: `Automatically moved AWAITING_MODELING → AWAITING_APPROVAL (${d.number} sent for approval)` });
+        await audit(tx, {
+          userId: null,
+          entityType: "ORDER",
+          entityId: orderId,
+          action: "STATUS",
+          summary: `Automatically moved AWAITING_MODELING → AWAITING_APPROVAL (${d.number} sent for approval)`,
+        });
       } else if (order && to === "REVISION_REQUESTED" && order.status === "AWAITING_APPROVAL") {
         await tx.order.update({ where: { id: orderId }, data: { status: "AWAITING_MODELING" } });
-        await audit(tx, { userId: null, entityType: "ORDER", entityId: orderId, action: "STATUS", summary: `Automatically moved AWAITING_APPROVAL → AWAITING_MODELING (changes requested on ${d.number})` });
+        await audit(tx, {
+          userId: null,
+          entityType: "ORDER",
+          entityId: orderId,
+          action: "STATUS",
+          summary: `Automatically moved AWAITING_APPROVAL → AWAITING_MODELING (changes requested on ${d.number})`,
+        });
       } else await syncOrderStatus(tx, userId, orderId);
     }
   });
@@ -124,7 +138,9 @@ export async function logTime(userId: string, projectId: string, input: { catego
   const h = dec(input.hours);
   if (h.lte(0) || h.gt(24)) throw new ServiceError("Hours must be between 0 and 24 per entry.");
   return prisma.$transaction(async (tx) => {
-    const e = await tx.designTimeEntry.create({ data: { projectId, category: input.category as never, hours: h.toFixed(2), date: input.date ?? new Date(), billable: input.billable, notes: input.notes } });
+    const e = await tx.designTimeEntry.create({
+      data: { projectId, category: input.category as never, hours: h.toFixed(2), date: input.date ?? new Date(), billable: input.billable, notes: input.notes },
+    });
     const d = await tx.designProject.findUniqueOrThrow({ where: { id: projectId } });
     if (d.status === "REQUESTED") await tx.designProject.update({ where: { id: projectId }, data: { status: "IN_PROGRESS" } });
     await audit(tx, { userId, entityType: "DESIGN", entityId: projectId, action: "TIME", summary: `Logged ${h.toFixed(2)} h ${input.category.toLowerCase().replace("_", " ")}` });
@@ -142,31 +158,46 @@ export async function deleteTimeEntry(userId: string, entryId: string) {
 /** Records a customer revision request; beyond the included allowance it becomes chargeable. */
 export async function requestRevision(userId: string, projectId: string, description: string) {
   if (!description || description.trim().length < 3) throw new ServiceError("Describe the requested change.");
-  return prisma.$transaction(async (tx) => {
-    const d = await tx.designProject.findUnique({ where: { id: projectId }, include: { _count: { select: { revisions: true } } } });
-    if (!d) throw new NotFoundError("Design project");
-    const errors = checkDesignTransition(d.status as DesignStatus, "REVISION_REQUESTED");
-    if (errors.length) throw new ServiceError(errors[0]);
-    const number = d._count.revisions + 1;
-    const chargeable = isRevisionChargeable(number, d.includedRevisions);
-    const rev = await tx.designRevision.create({ data: { projectId, number, description: description.trim(), isChargeable: chargeable, charge: chargeable ? d.additionalRevisionFee : null } });
-    await tx.designProject.update({ where: { id: projectId }, data: { status: "REVISION_REQUESTED" } });
-    await audit(tx, { userId, entityType: "DESIGN", entityId: projectId, action: "REVISION", summary: `Revision ${number} requested${chargeable ? ` (beyond ${d.includedRevisions} included — chargeable)` : ""}` });
-    return rev;
-  }).then(async (rev) => {
-    // Keep linked orders consistent (awaiting approval → back to modeling).
-    const d = await prisma.designProject.findUniqueOrThrow({ where: { id: projectId }, include: { orderItems: { select: { orderId: true } } } });
-    for (const orderId of new Set(d.orderItems.map((i) => i.orderId))) {
-      const o = await prisma.order.findUnique({ where: { id: orderId }, select: { status: true } });
-      if (o?.status === "AWAITING_APPROVAL") {
-        await prisma.$transaction(async (tx) => {
-          await tx.order.update({ where: { id: orderId }, data: { status: "AWAITING_MODELING" } });
-          await audit(tx, { userId: null, entityType: "ORDER", entityId: orderId, action: "STATUS", summary: `Automatically moved AWAITING_APPROVAL → AWAITING_MODELING (revision requested on ${d.number})` });
-        });
+  return prisma
+    .$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "DesignProject" WHERE id = ${projectId} FOR UPDATE`;
+      const d = await tx.designProject.findUnique({ where: { id: projectId }, include: { _count: { select: { revisions: true } } } });
+      if (!d) throw new NotFoundError("Design project");
+      const errors = checkDesignTransition(d.status as DesignStatus, "REVISION_REQUESTED");
+      if (errors.length) throw new ServiceError(errors[0]);
+      const number = d._count.revisions + 1;
+      const chargeable = isRevisionChargeable(number, d.includedRevisions);
+      const rev = await tx.designRevision.create({ data: { projectId, number, description: description.trim(), isChargeable: chargeable, charge: chargeable ? d.additionalRevisionFee : null } });
+      await tx.designProject.update({ where: { id: projectId }, data: { status: "REVISION_REQUESTED" } });
+      await audit(tx, {
+        userId,
+        entityType: "DESIGN",
+        entityId: projectId,
+        action: "REVISION",
+        summary: `Revision ${number} requested${chargeable ? ` (beyond ${d.includedRevisions} included — chargeable)` : ""}`,
+      });
+      return rev;
+    })
+    .then(async (rev) => {
+      // Keep linked orders consistent (awaiting approval → back to modeling).
+      const d = await prisma.designProject.findUniqueOrThrow({ where: { id: projectId }, include: { orderItems: { select: { orderId: true } } } });
+      for (const orderId of new Set(d.orderItems.map((i) => i.orderId))) {
+        const o = await prisma.order.findUnique({ where: { id: orderId }, select: { status: true } });
+        if (o?.status === "AWAITING_APPROVAL") {
+          await prisma.$transaction(async (tx) => {
+            await tx.order.update({ where: { id: orderId }, data: { status: "AWAITING_MODELING" } });
+            await audit(tx, {
+              userId: null,
+              entityType: "ORDER",
+              entityId: orderId,
+              action: "STATUS",
+              summary: `Automatically moved AWAITING_APPROVAL → AWAITING_MODELING (revision requested on ${d.number})`,
+            });
+          });
+        }
       }
-    }
-    return rev;
-  });
+      return rev;
+    });
 }
 
 export async function completeRevision(userId: string, revisionId: string) {
@@ -178,72 +209,79 @@ export async function completeRevision(userId: string, revisionId: string) {
 
 /** Bills chargeable, unbilled revisions as a new draft order for the customer. */
 export async function billRevisions(userId: string, projectId: string) {
-  const d = await prisma.designProject.findUnique({ where: { id: projectId }, include: { revisions: { where: { isChargeable: true, billedAt: null } } } });
-  if (!d) throw new NotFoundError("Design project");
-  const pending = d.revisions.filter((r) => r.charge && dec(r.charge.toString()).gt(0));
-  if (pending.length === 0) throw new ServiceError("No unbilled chargeable revisions with a fee. Set the additional revision fee on the project first.");
-  const total = pending.reduce((a, r) => a.plus(dec(r.charge!.toString())), ZERO);
-  const form: OrderForm = {
-    customerId: d.customerId,
-    title: `Additional design work — ${d.number}`,
-    pricingPolicyId: null,
-    orderDiscountType: null,
-    orderDiscountValue: null,
-    shippingMethod: null,
-    shippingCharge: null,
-    shippingCost: null,
-    depositPercent: null,
-    paymentTerms: null,
-    customerNotes: null,
-    internalNotes: `Revisions ${pending.map((r) => r.number).join(", ")} beyond the ${d.includedRevisions} included.`,
-    refreshRates: true,
-    dueDate: null,
-    priority: "NORMAL",
-    deliveryMethod: "PICKUP",
-    deliveryAddress: null,
-    confirm: false,
-    lines: [
-      {
-        id: null,
-        serviceType: "MODELING_ONLY",
-        partName: `${d.title} — additional revisions (${pending.length})`,
-        description: pending.map((r) => `Rev ${r.number}: ${r.description}`).join("; ").slice(0, 1000),
-        category: "Design",
-        quantity: 1,
-        colorNote: null,
-        deadline: null,
-        specialInstructions: null,
-        materialId: null,
-        supportMaterialId: null,
-        printerId: null,
-        designProjectId: d.id,
-        gramsPerUnit: null,
-        supportGramsPerUnit: null,
-        purgeGramsPerBatch: null,
-        unitsPerBatch: null,
-        printMinutesPerUnit: null,
-        setupMinutesPerBatch: null,
-        postProcessMinutesPerUnit: null,
-        extraCostPerUnit: null,
-        extraCostNote: null,
-        modelingMode: "FIXED",
-        modelingHours: null,
-        modelingFee: total.toFixed(2),
-        designFeeWaived: false,
-        waivedReason: null,
-        scanHours: null,
-        scanCleanupHours: null,
-        reverseEngineeringHours: null,
-        discountType: null,
-        discountValue: null,
-        manualUnitPrice: null,
-        manualPriceReason: null,
-      },
-    ],
-  };
-  const order = await saveOrder(userId, null, form);
-  await prisma.designRevision.updateMany({ where: { id: { in: pending.map((r) => r.id) } }, data: { billedAt: new Date() } });
-  return order;
+  return prisma.$transaction(async (tx) => {
+    // The project row lock serializes concurrent clicks: the second one finds nothing left to bill.
+    await tx.$queryRaw`SELECT id FROM "DesignProject" WHERE id = ${projectId} FOR UPDATE`;
+    const d = await tx.designProject.findUnique({ where: { id: projectId }, include: { revisions: { where: { isChargeable: true, billedAt: null } } } });
+    if (!d) throw new NotFoundError("Design project");
+    const pending = d.revisions.filter((r) => r.charge && dec(r.charge.toString()).gt(0));
+    if (pending.length === 0) throw new ServiceError("No unbilled chargeable revisions with a fee. Set the additional revision fee on the project first.");
+    const total = pending.reduce((a, r) => a.plus(dec(r.charge!.toString())), ZERO);
+    const form: OrderForm = {
+      customerId: d.customerId,
+      title: `Additional design work — ${d.number}`,
+      pricingPolicyId: null,
+      orderDiscountType: null,
+      orderDiscountValue: null,
+      shippingMethod: null,
+      shippingCharge: null,
+      shippingCost: null,
+      depositPercent: null,
+      paymentTerms: null,
+      customerNotes: null,
+      internalNotes: `Revisions ${pending.map((r) => r.number).join(", ")} beyond the ${d.includedRevisions} included.`,
+      refreshRates: true,
+      dueDate: null,
+      priority: "NORMAL",
+      deliveryMethod: "PICKUP",
+      deliveryAddress: null,
+      confirm: false,
+      lines: [
+        {
+          id: null,
+          serviceType: "MODELING_ONLY",
+          partName: `${d.title} — additional revisions (${pending.length})`,
+          description: pending
+            .map((r) => `Rev ${r.number}: ${r.description}`)
+            .join("; ")
+            .slice(0, 1000),
+          category: "Design",
+          quantity: 1,
+          colorNote: null,
+          deadline: null,
+          specialInstructions: null,
+          materialId: null,
+          supportMaterialId: null,
+          printerId: null,
+          designProjectId: d.id,
+          gramsPerUnit: null,
+          supportGramsPerUnit: null,
+          purgeGramsPerBatch: null,
+          unitsPerBatch: null,
+          printMinutesPerUnit: null,
+          setupMinutesPerBatch: null,
+          postProcessMinutesPerUnit: null,
+          extraCostPerUnit: null,
+          extraCostNote: null,
+          modelingMode: "FIXED",
+          modelingHours: null,
+          modelingFee: total.toFixed(2),
+          designFeeWaived: false,
+          waivedReason: null,
+          scanHours: null,
+          scanCleanupHours: null,
+          reverseEngineeringHours: null,
+          discountType: null,
+          discountValue: null,
+          manualUnitPrice: null,
+          manualPriceReason: null,
+        },
+      ],
+    };
+    const order = await saveOrderTx(tx, userId, null, form);
+    await tx.designRevision.updateMany({ where: { id: { in: pending.map((r) => r.id) } }, data: { billedAt: new Date() } });
+    return order;
+  });
 }
 
 export function designFeeEstimate(d: { feeMode: string; fixedFee: { toString(): string } | null; hourlyRate: { toString(): string } | null; estimatedHours: { toString(): string } | null }) {
@@ -251,4 +289,3 @@ export function designFeeEstimate(d: { feeMode: string; fixedFee: { toString(): 
   if (!d.hourlyRate || !d.estimatedHours) return null;
   return dec(d.hourlyRate.toString()).times(dec(d.estimatedHours.toString())).toFixed(2);
 }
-

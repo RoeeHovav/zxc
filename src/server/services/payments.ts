@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "../db";
 import { ZERO, dec } from "@/domain/money";
 import type { PaymentForm } from "@/domain/schemas/sales";
-import { NotFoundError, ServiceError, audit, nextNumber } from "./common";
+import { NotFoundError, ServiceError, audit, idempotent, nextNumber } from "./common";
 import { syncOrderStatus } from "./orders";
 
 /**
@@ -10,10 +10,14 @@ import { syncOrderStatus } from "./orders";
  * both pass the balance checks; `amountPaid` is updated in the same transaction as the ledger row.
  */
 export async function recordPayment(userId: string, orderId: string, form: PaymentForm) {
-  if (form.idempotencyKey) {
-    const dup = await prisma.payment.findUnique({ where: { clientKey: form.idempotencyKey } });
-    if (dup) return dup;
-  }
+  return idempotent(
+    form.idempotencyKey,
+    (key) => prisma.payment.findUnique({ where: { clientKey: key } }),
+    () => recordPaymentTx(userId, orderId, form),
+  );
+}
+
+function recordPaymentTx(userId: string, orderId: string, form: PaymentForm) {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
     const order = await tx.order.findUnique({ where: { id: orderId } });

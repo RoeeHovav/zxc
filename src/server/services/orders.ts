@@ -4,17 +4,9 @@ import type { Prisma } from "@/generated/prisma/client";
 import { D, ZERO, dec, roundMoney } from "@/domain/money";
 import { machineRateBreakdown, requiresModeling, requiresPrint, requiresScanning } from "@/domain/pricing/engine";
 import type { LineResult, PricingContext } from "@/domain/pricing/types";
-import {
-  EDITABLE_ORDER_STATUSES,
-  canForceTransition,
-  checkOrderTransition,
-  statusAfterConfirm,
-  syncProductionStatus,
-  type OrderFacts,
-  type OrderStatus,
-} from "@/domain/status/order";
+import { EDITABLE_ORDER_STATUSES, canForceTransition, checkOrderTransition, statusAfterConfirm, syncProductionStatus, type OrderFacts, type OrderStatus } from "@/domain/status/order";
 import type { OrderForm } from "@/domain/schemas/sales";
-import { NotFoundError, ServiceError, audit, nextNumber } from "./common";
+import { NotFoundError, ServiceError, audit, idempotent, nextNumber } from "./common";
 import { lineColumns, type StoredLineInput } from "./pricing-inputs";
 import { priceDocument, totalsColumns } from "./documents";
 import { getSettings } from "./settings";
@@ -33,12 +25,12 @@ export function committedQuantity(item: ItemWithJobs) {
 /** Loads the facts the order state machine needs, straight from the database. */
 export async function orderFacts(tx: Tx | typeof prisma, orderId: string): Promise<OrderFacts> {
   const order = await tx.order.findUnique({
-      where: { id: orderId },
-      include: {
-        items: { include: { designProject: { select: { status: true } }, jobItems: { include: { job: { select: { status: true } } } } } },
-        jobs: { select: { number: true, status: true } },
-      },
-    });
+    where: { id: orderId },
+    include: {
+      items: { include: { designProject: { select: { status: true } }, jobItems: { include: { job: { select: { status: true } } } } } },
+      jobs: { select: { number: true, status: true } },
+    },
+  });
   const settings = await getSettings(tx);
   if (!order) throw new NotFoundError("Order");
   return {
@@ -112,7 +104,13 @@ async function ensureDesignProjects(tx: Tx, userId: string, orderId: string) {
     const number = await nextNumber(tx, "DESIGN");
     const modeling = stored?.modeling;
     const type = requiresScanning(item.serviceType) ? (requiresModeling(item.serviceType) || stored?.scanning?.reverseEngineeringHours ? "SCAN_TO_CAD" : "SCANNING") : "MODELING";
-    const est = modeling?.hours ? dec(modeling.hours) : stored?.scanning ? dec(stored.scanning.scanHours ?? "0").plus(dec(stored.scanning.cleanupHours ?? "0")).plus(dec(stored.scanning.reverseEngineeringHours ?? "0")) : null;
+    const est = modeling?.hours
+      ? dec(modeling.hours)
+      : stored?.scanning
+        ? dec(stored.scanning.scanHours ?? "0")
+            .plus(dec(stored.scanning.cleanupHours ?? "0"))
+            .plus(dec(stored.scanning.reverseEngineeringHours ?? "0"))
+        : null;
     const project = await tx.designProject.create({
       data: {
         number,
@@ -224,97 +222,95 @@ export async function createOrderFromQuote(tx: Tx, userId: string, quoteId: stri
 }
 
 export async function saveOrder(userId: string, id: string | null, form: OrderForm, clientKey?: string | null) {
-  if (!id && clientKey) {
-    const dup = await prisma.order.findUnique({ where: { clientKey } });
-    if (dup) return dup;
+  const save = () => prisma.$transaction((tx) => saveOrderTx(tx, userId, id, form, clientKey));
+  return id ? save() : idempotent(clientKey, (key) => prisma.order.findUnique({ where: { clientKey: key } }), save);
+}
+
+/** Creates or updates an order inside the caller's transaction. */
+export async function saveOrderTx(tx: Tx, userId: string, id: string | null, form: OrderForm, clientKey?: string | null) {
+  if (id) await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${id} FOR UPDATE`;
+  const customer = await tx.customer.findUnique({ where: { id: form.customerId } });
+  if (!customer) throw new ServiceError("Select a customer.");
+  if (customer.anonymizedAt) throw new ServiceError("This customer was anonymized and cannot receive new orders.");
+  const existing = id ? await tx.order.findUnique({ where: { id }, include: { items: { include: { jobItems: { include: { job: { select: { status: true } } } } } } } }) : null;
+  if (id && !existing) throw new NotFoundError("Order");
+  if (existing && !EDITABLE_ORDER_STATUSES.includes(existing.status as OrderStatus))
+    throw new ServiceError("Items can only be changed before printing starts. Cancel remaining jobs or create a new order for extra work.");
+  if (!existing && customer.archivedAt) throw new ServiceError("This customer is archived. Restore them first.");
+  if (existing && existing.customerId !== form.customerId && existing.status !== "DRAFT") throw new ServiceError("The customer of a confirmed order cannot be changed.");
+
+  const confirmed = existing && existing.status !== "DRAFT";
+  if (existing && confirmed) {
+    const byId = new Map(form.lines.filter((l) => l.id).map((l) => [l.id!, l]));
+    for (const item of existing.items) {
+      const committed = committedQuantity(item);
+      if (committed === 0) continue;
+      const line = byId.get(item.id);
+      if (!line) throw new ServiceError(`“${item.partName}” already has print jobs and cannot be removed. Cancel its jobs first.`);
+      if (line.quantity < committed) throw new ServiceError(`“${item.partName}” has ${committed} unit(s) scheduled or made; quantity cannot go below that.`);
+      if (line.materialId !== item.materialId || line.serviceType !== item.serviceType)
+        throw new ServiceError(`“${item.partName}” already has print jobs; its service and material cannot be changed.`);
+    }
   }
-  return prisma.$transaction(async (tx) => {
-    if (id) await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${id} FOR UPDATE`;
-    const customer = await tx.customer.findUnique({ where: { id: form.customerId } });
-    if (!customer) throw new ServiceError("Select a customer.");
-    if (customer.anonymizedAt) throw new ServiceError("This customer was anonymized and cannot receive new orders.");
-    const existing = id
-      ? await tx.order.findUnique({ where: { id }, include: { items: { include: { jobItems: { include: { job: { select: { status: true } } } } } } } })
-      : null;
-    if (id && !existing) throw new NotFoundError("Order");
-    if (existing && !EDITABLE_ORDER_STATUSES.includes(existing.status as OrderStatus))
-      throw new ServiceError("Items can only be changed before printing starts. Cancel remaining jobs or create a new order for extra work.");
-    if (!existing && customer.archivedAt) throw new ServiceError("This customer is archived. Restore them first.");
-    if (existing && existing.customerId !== form.customerId && existing.status !== "DRAFT") throw new ServiceError("The customer of a confirmed order cannot be changed.");
 
-    const confirmed = existing && existing.status !== "DRAFT";
-    if (existing && confirmed) {
-      const byId = new Map(form.lines.filter((l) => l.id).map((l) => [l.id!, l]));
-      for (const item of existing.items) {
-        const committed = committedQuantity(item);
-        if (committed === 0) continue;
-        const line = byId.get(item.id);
-        if (!line) throw new ServiceError(`“${item.partName}” already has print jobs and cannot be removed. Cancel its jobs first.`);
-        if (line.quantity < committed) throw new ServiceError(`“${item.partName}” has ${committed} unit(s) scheduled or made; quantity cannot go below that.`);
-        if (line.materialId !== item.materialId || line.serviceType !== item.serviceType)
-          throw new ServiceError(`“${item.partName}” already has print jobs; its service and material cannot be changed.`);
-      }
+  const { ctx, stored, result } = await priceDocument(tx, form, customer.vatExempt, existing);
+  if (confirmed && !result.complete) throw new ServiceError("A confirmed order must stay fully priced. Resolve the pricing errors first.");
+  const settings = await getSettings(tx);
+  const header = {
+    customerId: customer.id,
+    title: form.title,
+    dueDate: form.dueDate,
+    priority: form.priority,
+    deliveryMethod: form.deliveryMethod,
+    deliveryAddress: form.deliveryAddress,
+    pricingPolicyId: ctx.policy.id,
+    currency: ctx.currency,
+    pricingContext: JSON.parse(JSON.stringify(ctx)),
+    orderDiscountType: form.orderDiscountType,
+    orderDiscountValue: form.orderDiscountValue,
+    shippingMethod: form.shippingMethod,
+    shippingCharge: form.shippingCharge ?? "0",
+    shippingCost: form.shippingCost ?? "0",
+    depositPercent: form.depositPercent,
+    paymentTerms: form.paymentTerms ?? (existing ? null : settings.defaultPaymentTerms),
+    customerNotes: form.customerNotes,
+    internalNotes: form.internalNotes,
+    ...totalsColumns(result),
+  };
+
+  let order;
+  if (existing) {
+    order = await tx.order.update({ where: { id: existing.id }, data: { ...header, revision: confirmed ? { increment: 1 } : undefined } });
+    const keep = new Set(form.lines.map((l) => l.id).filter(Boolean) as string[]);
+    const removed = existing.items.filter((i) => !keep.has(i.id)).map((i) => i.id);
+    if (removed.length) await tx.orderItem.deleteMany({ where: { id: { in: removed }, orderId: existing.id } });
+    const existingIds = new Set(existing.items.map((i) => i.id));
+    for (let i = 0; i < form.lines.length; i++) {
+      const l = form.lines[i];
+      const data = lineColumns(l, i, stored[i], result.lines[i]);
+      if (l.id && existingIds.has(l.id)) await tx.orderItem.update({ where: { id: l.id }, data: data as Prisma.OrderItemUncheckedUpdateInput });
+      else await tx.orderItem.create({ data: { ...(data as Prisma.OrderItemUncheckedCreateInput), orderId: existing.id } });
     }
-
-    const { ctx, stored, result } = await priceDocument(tx, form, customer.vatExempt, existing);
-    if (confirmed && !result.complete) throw new ServiceError("A confirmed order must stay fully priced. Resolve the pricing errors first.");
-    const settings = await getSettings(tx);
-    const header = {
-      customerId: customer.id,
-      title: form.title,
-      dueDate: form.dueDate,
-      priority: form.priority,
-      deliveryMethod: form.deliveryMethod,
-      deliveryAddress: form.deliveryAddress,
-      pricingPolicyId: ctx.policy.id,
-      currency: ctx.currency,
-      pricingContext: JSON.parse(JSON.stringify(ctx)),
-      orderDiscountType: form.orderDiscountType,
-      orderDiscountValue: form.orderDiscountValue,
-      shippingMethod: form.shippingMethod,
-      shippingCharge: form.shippingCharge ?? "0",
-      shippingCost: form.shippingCost ?? "0",
-      depositPercent: form.depositPercent,
-      paymentTerms: form.paymentTerms ?? (existing ? null : settings.defaultPaymentTerms),
-      customerNotes: form.customerNotes,
-      internalNotes: form.internalNotes,
-      ...totalsColumns(result),
-    };
-
-    let order;
-    if (existing) {
-      order = await tx.order.update({ where: { id: existing.id }, data: { ...header, revision: confirmed ? { increment: 1 } : undefined } });
-      const keep = new Set(form.lines.map((l) => l.id).filter(Boolean) as string[]);
-      const removed = existing.items.filter((i) => !keep.has(i.id)).map((i) => i.id);
-      if (removed.length) await tx.orderItem.deleteMany({ where: { id: { in: removed }, orderId: existing.id } });
-      const existingIds = new Set(existing.items.map((i) => i.id));
-      for (let i = 0; i < form.lines.length; i++) {
-        const l = form.lines[i];
-        const data = lineColumns(l, i, stored[i], result.lines[i]);
-        if (l.id && existingIds.has(l.id)) await tx.orderItem.update({ where: { id: l.id }, data: data as Prisma.OrderItemUncheckedUpdateInput });
-        else await tx.orderItem.create({ data: { ...(data as Prisma.OrderItemUncheckedCreateInput), orderId: existing.id } });
-      }
-      if (confirmed) {
-        await ensureDesignProjects(tx, userId, existing.id);
-        await syncReservations(tx, existing.id);
-        await audit(tx, {
-          userId,
-          entityType: "ORDER",
-          entityId: existing.id,
-          action: "REVISE",
-          summary: `Revised ${existing.number} (rev ${order.revision}): total ${existing.total.toString()} → ${order.total.toString()}`,
-          details: { before: { total: existing.total.toString(), items: existing.items.map((i) => ({ part: i.partName, qty: i.quantity, net: i.lineNet?.toString() ?? null })) } },
-        });
-      } else await audit(tx, { userId, entityType: "ORDER", entityId: existing.id, action: "UPDATE", summary: `Updated draft ${existing.number}` });
-    } else {
-      const number = await nextNumber(tx, "ORDER");
-      order = await tx.order.create({ data: { ...header, number, status: "DRAFT", clientKey: clientKey ?? null } });
-      for (let i = 0; i < form.lines.length; i++) await tx.orderItem.create({ data: { ...lineColumns(form.lines[i], i, stored[i], result.lines[i]), orderId: order.id } });
-      await audit(tx, { userId, entityType: "ORDER", entityId: order.id, action: "CREATE", summary: `Created order ${number} for ${customer.name}` });
-    }
-    if (form.confirm && order.status === "DRAFT") await confirmOrderTx(tx, userId, order.id);
-    return order;
-  });
+    if (confirmed) {
+      await ensureDesignProjects(tx, userId, existing.id);
+      await syncReservations(tx, existing.id);
+      await audit(tx, {
+        userId,
+        entityType: "ORDER",
+        entityId: existing.id,
+        action: "REVISE",
+        summary: `Revised ${existing.number} (rev ${order.revision}): total ${existing.total.toString()} → ${order.total.toString()}`,
+        details: { before: { total: existing.total.toString(), items: existing.items.map((i) => ({ part: i.partName, qty: i.quantity, net: i.lineNet?.toString() ?? null })) } },
+      });
+    } else await audit(tx, { userId, entityType: "ORDER", entityId: existing.id, action: "UPDATE", summary: `Updated draft ${existing.number}` });
+  } else {
+    const number = await nextNumber(tx, "ORDER");
+    order = await tx.order.create({ data: { ...header, number, status: "DRAFT", clientKey: clientKey ?? null } });
+    for (let i = 0; i < form.lines.length; i++) await tx.orderItem.create({ data: { ...lineColumns(form.lines[i], i, stored[i], result.lines[i]), orderId: order.id } });
+    await audit(tx, { userId, entityType: "ORDER", entityId: order.id, action: "CREATE", summary: `Created order ${number} for ${customer.name}` });
+  }
+  if (form.confirm && order.status === "DRAFT") await confirmOrderTx(tx, userId, order.id);
+  return order;
 }
 
 export async function transitionOrder(userId: string, id: string, to: OrderStatus, reason?: string | null) {
@@ -371,7 +367,14 @@ export async function syncOrderStatus(tx: Tx, userId: string | null, orderId: st
   }
   if (!target) return null;
   await tx.order.update({ where: { id: orderId }, data: { status: target, ...(target === "READY" ? { readyAt: new Date() } : {}) } });
-  await audit(tx, { userId, entityType: "ORDER", entityId: orderId, action: "STATUS", summary: `Automatically moved ${facts.status} → ${target}`, details: { from: facts.status, to: target, automatic: true } });
+  await audit(tx, {
+    userId,
+    entityType: "ORDER",
+    entityId: orderId,
+    action: "STATUS",
+    summary: `Automatically moved ${facts.status} → ${target}`,
+    details: { from: facts.status, to: target, automatic: true },
+  });
   return target;
 }
 
@@ -447,7 +450,18 @@ export async function computeActualCost(tx: Tx | typeof prisma, orderId: string)
   const total = [material, machine, labor, services, extras, shipping, packing, fees].reduce((a, b) => a.plus(b), ZERO);
   void settings;
   const m = (v: InstanceType<typeof D>) => roundMoney(v).toFixed(2);
-  return { material: m(material), machine: m(machine), labor: m(labor), services: m(services), extras: m(extras), shipping: m(shipping), packing: m(packing), fees: m(fees), total: m(total), complete };
+  return {
+    material: m(material),
+    machine: m(machine),
+    labor: m(labor),
+    services: m(services),
+    extras: m(extras),
+    shipping: m(shipping),
+    packing: m(packing),
+    fees: m(fees),
+    total: m(total),
+    complete,
+  };
 }
 
 export async function listOrders(opts: { q?: string; view?: string; page?: number; pageSize?: number }) {
