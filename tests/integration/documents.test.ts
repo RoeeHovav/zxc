@@ -12,8 +12,34 @@ const SECRET_NOTE = "INTERNAL-ONLY-note-xyz";
 
 beforeAll(async () => {
   base = await seedBasics();
+  // Empty strings (not nulls) in settings once made react-pdf drop the whole footer.
+  await prisma.settings.update({ where: { id: 1 }, data: { documentFooter: "", legalName: "", businessTaxId: "" } });
   await prisma.customer.update({ where: { id: base.customer.id }, data: { name: "דנה לוי (Dana Levi)", addressLine1: "רחוב הרצל 10", city: "תל אביב" } });
 });
+
+/** Visible text of a rendered PDF (all pages), as a reader would see it. */
+async function pdfText(pdf: Buffer): Promise<string> {
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const task = getDocument({ data: new Uint8Array(pdf), useSystemFonts: false });
+  const doc = await task.promise;
+  let text = "";
+  for (let i = 1; i <= doc.numPages; i++) {
+    const content = await (await doc.getPage(i)).getTextContent();
+    text += content.items.map((it) => ("str" in it ? it.str : "")).join(" ") + "\n";
+  }
+  await task.destroy();
+  return text;
+}
+
+/** What the customer actually sees must carry the disclaimer and page footer, and no internals. */
+async function assertRenderedDocument(pdf: Buffer, number: string) {
+  const text = await pdfText(pdf);
+  if (process.env.PDF_DEBUG) console.log("PDFTEXT>>", text.slice(-600));
+  expect(text).toMatch(/not a tax (invoice|receipt)/i);
+  expect(text).toContain(`${number} · page 1 of 1`);
+  for (const forbidden of ["cost", "margin", "markup", "profit", SECRET_NOTE]) expect(text.toLowerCase(), `rendered PDF shows ${forbidden}`).not.toContain(forbidden.toLowerCase());
+  return text;
+}
 
 function assertNoInternals(doc: unknown) {
   const json = JSON.stringify(doc);
@@ -38,6 +64,8 @@ describe("customer documents", () => {
     const pdf = await renderCustomerPdf(doc);
     expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(5000);
+    const text = await assertRenderedDocument(pdf, doc.number);
+    expect(text).toContain("Dana Levi");
     // Optional: write the sample for visual review (PDF_SAMPLE_OUT=/path/quote.pdf).
     if (process.env.PDF_SAMPLE_OUT) (await import("node:fs")).writeFileSync(process.env.PDF_SAMPLE_OUT, pdf);
   });
@@ -59,6 +87,7 @@ describe("customer documents", () => {
       assertNoInternals(doc);
       const pdf = await renderCustomerPdf(doc);
       expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+      await assertRenderedDocument(pdf, doc.number);
     }
     const delivery = await deliveryNoteDocument(o.id);
     expect(delivery.showPrices).toBe(false);

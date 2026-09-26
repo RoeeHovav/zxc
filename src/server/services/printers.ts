@@ -5,6 +5,7 @@ import { machineRateBreakdown } from "@/domain/pricing/engine";
 import type { ResolvedPrinter } from "@/domain/pricing/types";
 import { NotFoundError, ServiceError, audit } from "./common";
 import { getSettings } from "./settings";
+import { plural } from "@/lib/format";
 
 type PrinterLike = {
   id: string;
@@ -87,7 +88,7 @@ export function maintenanceStatus(
   const overdue = (hoursLeft !== null && hoursLeft < 0) || (daysLeft !== null && daysLeft < 0);
   const parts: string[] = [];
   if (hoursLeft !== null) parts.push(hoursLeft < 0 ? `${-hoursLeft} h overdue` : `${hoursLeft} h left`);
-  if (daysLeft !== null) parts.push(daysLeft < 0 ? `${-daysLeft} days overdue` : `${daysLeft} days left`);
+  if (daysLeft !== null) parts.push(daysLeft < 0 ? `${plural(-daysLeft, "day")} overdue` : `${plural(daysLeft, "day")} left`);
   return { due: hoursDue || daysDue, overdue, reason: parts.join(" · "), hoursLeft, daysLeft };
 }
 

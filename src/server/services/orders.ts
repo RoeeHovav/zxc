@@ -1,4 +1,5 @@
 import "server-only";
+import { enumLabel } from "@/lib/labels";
 import { prisma, type Tx } from "../db";
 import type { Prisma } from "@/generated/prisma/client";
 import { D, ZERO, dec, roundMoney } from "@/domain/money";
@@ -146,7 +147,7 @@ export async function confirmOrderTx(tx: Tx, userId: string, orderId: string) {
   await syncReservations(tx, orderId);
   const next = statusAfterConfirm(await orderFacts(tx, orderId));
   await tx.order.update({ where: { id: orderId }, data: { status: next, confirmedAt: new Date(), ...(next === "READY" ? { readyAt: new Date() } : {}) } });
-  await audit(tx, { userId, entityType: "ORDER", entityId: orderId, action: "STATUS", summary: `Confirmed ${order.number} → ${next}`, details: { from: "DRAFT", to: next } });
+  await audit(tx, { userId, entityType: "ORDER", entityId: orderId, action: "STATUS", summary: `Confirmed ${order.number} → ${enumLabel("orderStatus", next)}`, details: { from: "DRAFT", to: next } });
   return next;
 }
 
@@ -349,7 +350,7 @@ export async function transitionOrder(userId: string, id: string, to: OrderStatu
       entityType: "ORDER",
       entityId: id,
       action: "STATUS",
-      summary: `${order.number}: ${order.status} → ${to}${!check.ok ? " (override)" : ""}${reason ? ` — ${reason}` : ""}`,
+      summary: `${order.number}: ${enumLabel("orderStatus", order.status)} → ${enumLabel("orderStatus", to)}${!check.ok ? " (override)" : ""}${reason ? ` — ${reason}` : ""}`,
       details: { from: order.status, to, reason: reason ?? null, forced: !check.ok, failures: check.ok ? [] : check.failures.map((f) => f.message) },
     });
     return { status: to, forced: !check.ok };
@@ -372,7 +373,7 @@ export async function syncOrderStatus(tx: Tx, userId: string | null, orderId: st
     entityType: "ORDER",
     entityId: orderId,
     action: "STATUS",
-    summary: `Automatically moved ${facts.status} → ${target}`,
+    summary: `Automatically moved ${enumLabel("orderStatus", facts.status)} → ${enumLabel("orderStatus", target)}`,
     details: { from: facts.status, to: target, automatic: true },
   });
   return target;

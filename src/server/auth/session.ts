@@ -90,11 +90,15 @@ export async function revokeOtherSessions(userId: string) {
   await prisma.session.deleteMany({ where: { userId, NOT: token ? { id: hashToken(token) } : undefined } });
 }
 
+/**
+ * Client address for per-IP rate limiting. Behind the reverse proxy (TRUST_PROXY=1) the proxy
+ * appends the real client address as the *last* X-Forwarded-For entry; earlier entries come from
+ * the client and can be forged. Without a trusted proxy no header identifies the client reliably
+ * (Next.js keeps a client-sent X-Forwarded-For), so none is used and only the per-account limit
+ * applies.
+ */
 export function clientIp(h: Headers): string | null {
-  // Only trust X-Forwarded-For when explicitly configured to run behind a reverse proxy.
-  if (process.env.TRUST_PROXY === "1") {
-    const fwd = h.get("x-forwarded-for");
-    if (fwd) return fwd.split(",")[0].trim().slice(0, 64);
-  }
-  return h.get("x-real-ip")?.slice(0, 64) ?? null;
+  if (process.env.TRUST_PROXY !== "1") return null;
+  const last = h.get("x-forwarded-for")?.split(",").at(-1)?.trim();
+  return last ? last.slice(0, 64) : null;
 }

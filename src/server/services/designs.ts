@@ -1,4 +1,5 @@
 import "server-only";
+import { enumLabel } from "@/lib/labels";
 import { prisma } from "../db";
 import type { Prisma } from "@/generated/prisma/client";
 import { ZERO, dec } from "@/domain/money";
@@ -107,7 +108,13 @@ export async function transitionDesign(userId: string, id: string, to: DesignSta
     }
     if (to === "DELIVERED") data.deliveredAt = new Date();
     await tx.designProject.update({ where: { id }, data });
-    await audit(tx, { userId, entityType: "DESIGN", entityId: id, action: "STATUS", summary: `${d.number}: ${d.status} → ${to}${note ? ` — ${note}` : ""}` });
+    await audit(tx, {
+      userId,
+      entityType: "DESIGN",
+      entityId: id,
+      action: "STATUS",
+      summary: `${d.number}: ${enumLabel("designStatus", d.status)} → ${enumLabel("designStatus", to)}${note ? ` — ${note}` : ""}`,
+    });
     // Linked orders waiting on this design may now advance.
     for (const orderId of new Set(d.orderItems.map((i) => i.orderId))) {
       const order = await tx.order.findUnique({ where: { id: orderId }, select: { status: true } });
@@ -118,7 +125,7 @@ export async function transitionDesign(userId: string, id: string, to: DesignSta
           entityType: "ORDER",
           entityId: orderId,
           action: "STATUS",
-          summary: `Automatically moved AWAITING_MODELING → AWAITING_APPROVAL (${d.number} sent for approval)`,
+          summary: `Automatically moved Awaiting modeling → Awaiting approval (${d.number} sent for approval)`,
         });
       } else if (order && to === "REVISION_REQUESTED" && order.status === "AWAITING_APPROVAL") {
         await tx.order.update({ where: { id: orderId }, data: { status: "AWAITING_MODELING" } });
@@ -127,7 +134,7 @@ export async function transitionDesign(userId: string, id: string, to: DesignSta
           entityType: "ORDER",
           entityId: orderId,
           action: "STATUS",
-          summary: `Automatically moved AWAITING_APPROVAL → AWAITING_MODELING (changes requested on ${d.number})`,
+          summary: `Automatically moved Awaiting approval → Awaiting modeling (changes requested on ${d.number})`,
         });
       } else await syncOrderStatus(tx, userId, orderId);
     }
@@ -191,7 +198,7 @@ export async function requestRevision(userId: string, projectId: string, descrip
               entityType: "ORDER",
               entityId: orderId,
               action: "STATUS",
-              summary: `Automatically moved AWAITING_APPROVAL → AWAITING_MODELING (revision requested on ${d.number})`,
+              summary: `Automatically moved Awaiting approval → Awaiting modeling (revision requested on ${d.number})`,
             });
           });
         }

@@ -94,3 +94,8 @@ function startOfDay(d: Date) {
   x.setHours(0, 0, 0, 0);
   return x;
 }
+
+/** "1 day", "3 days" — English pluralization for counts shown in the UI. */
+export function plural(n: number, word: string, pluralWord = `${word}s`): string {
+  return `${n} ${Math.abs(n) === 1 ? word : pluralWord}`;
+}

@@ -233,7 +233,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     {o.jobs.map((j) => (
                       <TR key={j.id}>
                         <TD>
-                          <Link href={`/production?job=${j.id}`} className="font-medium hover:text-primary">
+                          <Link href={`/production?job=${j.id}`} className="font-medium whitespace-nowrap hover:text-primary">
                             {j.number}
                           </Link>
                           {j.reprintOfId && <div className="text-xs text-muted-foreground">reprint</div>}
@@ -251,10 +251,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                             </div>
                           ))}
                         </TD>
-                        <TD className="tabular hidden text-end text-xs sm:table-cell">
+                        <TD className="tabular hidden text-end text-xs whitespace-nowrap sm:table-cell">
                           {minutesToHuman(j.estimatedMinutes)} → {j.actualMinutes ? minutesToHuman(j.actualMinutes) : "…"}
                         </TD>
-                        <TD className="tabular hidden text-end text-xs md:table-cell">
+                        <TD className="tabular hidden text-end text-xs whitespace-nowrap md:table-cell">
                           {grams(j.estimatedGrams)} → {j.actualGrams ? grams(j.actualGrams) : "…"}
                         </TD>
                       </TR>

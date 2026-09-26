@@ -14,7 +14,7 @@ import type { LineResult } from "@/domain/pricing/types";
 import { SERVICE_TYPES } from "@/domain/schemas/sales";
 import type { EditorOptions } from "@/server/services/editor";
 import { enumLabel } from "@/lib/labels";
-import { grams, money, percent } from "@/lib/format";
+import { grams, money, percent, plural } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { EditorLine } from "./types";
 import { SlicerImport, type SlicerImportPatch } from "./slicer-import";
@@ -339,8 +339,8 @@ export function LineCard({
               <p className="text-xs font-medium text-muted-foreground">Printing</p>
               <SlicerImport materials={options.materials} currentMaterialId={line.materialId} onApply={applySlicer} />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_repeat(3,minmax(0,0.8fr))]">
-              <div className="grid min-w-0 gap-1">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              <div className="grid min-w-0 gap-1 lg:col-span-3">
                 <Label htmlFor={`${idp}-mat`} className="text-xs text-muted-foreground">
                   Material
                 </Label>
@@ -364,14 +364,22 @@ export function LineCard({
                   </p>
                 )}
               </div>
-              <div className="grid min-w-0 gap-1">
+              <div className="grid min-w-0 gap-1 lg:col-span-3">
                 <Label htmlFor={`${idp}-prn`} className="text-xs text-muted-foreground">
                   Printer
                 </Label>
                 <Combobox id={`${idp}-prn`} options={printerOpts} value={line.printerId} onChange={setPrinter} placeholder="Choose printer…" allowClear />
               </div>
-              <Num id={`${idp}-g`} label="Grams / unit" value={line.gramsPerUnit} onChange={(v) => onUpdate({ gramsPerUnit: v })} suffix="g" invalid={errFields.has("gramsPerUnit")} />
-              <div className="grid min-w-0 content-start gap-1">
+              <Num
+                id={`${idp}-g`}
+                label="Grams / unit"
+                value={line.gramsPerUnit}
+                onChange={(v) => onUpdate({ gramsPerUnit: v })}
+                suffix="g"
+                invalid={errFields.has("gramsPerUnit")}
+                className="lg:col-span-2"
+              />
+              <div className="grid min-w-0 content-start gap-1 lg:col-span-2">
                 <Label htmlFor={`${idp}-t`} className="text-xs text-muted-foreground">
                   Print time / unit
                 </Label>
@@ -390,7 +398,8 @@ export function LineCard({
                 label="Units / plate"
                 value={line.unitsPerBatch}
                 onChange={(v) => onUpdate({ unitsPerBatch: v.replace(/[^\d]/g, "") })}
-                hint={result.production ? `${result.production.batches} plate(s)` : undefined}
+                hint={result.production ? plural(result.production.batches, "plate") : undefined}
+                className="lg:col-span-2"
               />
             </div>
           </div>

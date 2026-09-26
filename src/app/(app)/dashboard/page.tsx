@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Alert, Badge, EmptyState, PageHeader, Stat } from "@/components/ui/misc";
 import { ORDER_STATUS_TONE, PRINTER_STATUS_TONE, enumLabel } from "@/lib/labels";
-import { dateTime, money, percent } from "@/lib/format";
+import { dateTime, money, percent, plural } from "@/lib/format";
 import { firstParam } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -52,7 +52,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader
         title={`Hello, ${user.name.split(" ")[0]}`}
-        description={alerts.length ? `${alerts.filter((a) => a.severity !== "info").length} item(s) need attention.` : "Everything is on track."}
+        description={attentionSummary(alerts.filter((a) => a.severity !== "info").length, alerts.length)}
         actions={
           <>
             <Button variant="secondary" asChild>
@@ -241,4 +241,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
     </>
   );
+}
+
+function attentionSummary(urgent: number, total: number) {
+  if (total === 0) return "Everything is on track.";
+  if (urgent === 0) return `${plural(total, "note")} for your information.`;
+  return urgent === total ? `${plural(urgent, "item")} ${urgent === 1 ? "needs" : "need"} attention.` : `${urgent} of ${total} alerts need attention.`;
 }

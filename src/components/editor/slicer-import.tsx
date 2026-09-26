@@ -210,13 +210,7 @@ export function SlicerImport({ materials, currentMaterialId, onApply }: { materi
                     ))}
                   </Select>
                   <p className="text-[11px] text-muted-foreground">
-                    {primary?.type
-                      ? match
-                        ? match.exact
-                          ? `Matches the slicer's ${primary.type} ${primary.color ?? ""}.`
-                          : `Only ${primary.type} in stock — check the colour.`
-                        : `No ${primary.type} material matches the slicer's filament.`
-                      : "The file does not name the filament type."}
+                    {materialHint(primary?.type ?? null, match, primary?.type ? materials.filter((m) => m.typeCode.toUpperCase() === primary.type!.toUpperCase()).length : 0)}
                   </p>
                 </div>
               </div>
@@ -269,4 +263,12 @@ export function SlicerImport({ materials, currentMaterialId, onApply }: { materi
       </Dialog>
     </>
   );
+}
+
+function materialHint(type: string | null, match: { exact: boolean } | null, sameType: number) {
+  if (!type) return "The file does not name the filament type.";
+  if (match?.exact) return `Same type and colour as the slicer's ${type}.`;
+  if (match) return `The only ${type} material — check the colour.`;
+  if (sameType > 1) return `${sameType} ${type} materials, none in the slicer's colour — choose one.`;
+  return `No ${type} material yet — add it under Materials, or choose another.`;
 }
