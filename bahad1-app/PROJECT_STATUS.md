@@ -20,7 +20,7 @@ Last updated: 2026-10-11 (session 01E5qPhVjffQDtykJ1owxdae)
 | 2c. Image-borne text (anthem, infographics): author reading + blind second reading | ch1 DONE (5 units; 4 agree, 1 adjudicated on 14x zoom); other chapters TODO |
 | 3. App foundation: engines, IndexedDB, backup, UI (all modes), review dashboard | DONE; 61 unit tests + 27 Playwright tests (desktop+mobile, synthetic fixtures) pass |
 | 3b. Content pipeline: author guide, expander, validator, coverage, verdicts, batches, compiler, release packager | DONE |
-| 4. Pilot chapter 1 (13-23) | AUTHORED + 2 verification rounds done; round-3 re-check of 28 repaired items in progress |
+| 4. Pilot chapter 1 (13-23) | DONE except 1 pending question (q2425) awaiting round-4 re-check; 229 facts / 34 lessons / 592 questions |
 | 5. Remaining chapters ch2..ch13 | IN PROGRESS: wave 1 authors (ch2 pp24-35, ch3 pp53-64) running; map page 207 and image-heavy weapons chapter need visual transcription |
 | 6. Learning features | implemented in app; need real content to exercise |
 | 7. QA | automated suites exist; real-content smoke test pending |
@@ -50,7 +50,8 @@ are being produced **in controlled waves of ≤3-4 agents**. Work is resumable: 
 ## Pilot (chapter 1) verification numbers
 Round 1 (independent verification of the first full authoring): facts 220/228, lessons 23/34, questions 465/588 verified; 142 items went to a repair round (3 fixers).
 Round 2 (re-check of the repaired items): facts 227/228, lessons 33/34, questions 574/588 verified. The 16 remaining items were repaired by the orchestrator (one fact was split in two,
-four new questions added for it) and sent to a round-3 re-check (28 items). Nothing counts as verified without an independent `pass` verdict.
+four new questions added for it) and re-checked in round 3 (28 items: 27 pass, 1 fail). **Current chapter-1 state: facts 229/229, lessons 34/34, questions 591/592 verified**;
+the one remaining question (q2425, hint rewritten after the round-3 failure) is `pending` until a round-4 re-check. Nothing counts as verified without an independent `pass` verdict.
 Typical defects found by independent verifiers: hints that reveal the answer, missing natural accepted variants for short answers, open lists presented as complete, invented labels (e.g. "first stanza"), unsupported hints/attributions, dangling antecedents in stems. Guides and validator lints were tightened accordingly.
 
 ## Data durability
@@ -66,3 +67,9 @@ Typical defects found by independent verifiers: hints that reveal the answer, mi
 1. Scaffold `bahad1-app` (Vite + React + TS + idb + vitest + playwright), content schema + validators.
 2. Image-text transcription pass for pp. 15, 23 and every figure that carries text; second independent reading.
 3. Pilot chapter 1 end-to-end, evaluate, fix; then scale to ch2-ch13 with independent verification waves.
+
+## How to resume (usage-limit pause — no automatic resumption is scheduled; the user restarts the session manually)
+1. Check for container state: `ls private/content/*/src` (if `private/` is gone, re-run `pipeline/*` on the PDFs, then restore the content archive the user received from the session).
+2. Wave-1 authors (ch2 seg a pp24-35, ch3 seg a pp53-64) may or may not have finished: look for `private/content/ch2/src/*-a-*.json`, `NOTES-a.md`, `_seg-a/`. If output is partial, re-run the author with the same assignment (the guide + scripts are idempotent).
+3. Remaining segments (suggested): ch2 B 36-46, C 47-52; ch3 B 65-75, C 76-81; ch4 82-89/90-96; ch5 97-107, 108-117; ch6 118-133, 134-143, 144-157, 158-171; ch7 172-185, 186-195, 196-206; ch8 map p207; ch9 208-220; ch10 221-231, 232-242; ch11 243-247; ch12 248-260; ch13 261-272 … 308-314. Keep concurrency at 3-4 agents.
+4. After each chapter: `author-expand` (all segments) -> `validate-content` -> `coverage` -> `make-batches` -> independent verifiers -> `apply-verdicts` -> `export-fixlist` -> repair rounds (`make-repair-batches`) -> `final-audit`.
