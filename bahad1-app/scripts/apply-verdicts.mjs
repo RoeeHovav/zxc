@@ -33,6 +33,15 @@ if (fs.existsSync(vdir)) {
     }
   }
 }
+// ids edited by a fixer in round N (changed-rN.json) are void until re-verified in a round >= N
+for (const f of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
+  const m = f.match(/^changed-r(\d+)\.json$/);
+  if (!m) continue;
+  for (const raw of readJson(path.join(dir, f))) {
+    const id = raw.startsWith(`${ch}.`) ? raw : `${ch}.${raw}`;
+    if (byId[id] && byId[id].round < Number(m[1])) delete byId[id];
+  }
+}
 for (const [id, x] of Object.entries(byId)) verdicts[id] = { ...x.v, n: x.v.n, round: x.round };
 const P = (id) => (id.startsWith(`${ch}.`) ? id : `${ch}.${id}`);
 const verdictFor = (id) => verdicts[id] ?? verdicts[id.replace(`${ch}.`, '')];

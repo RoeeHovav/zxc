@@ -35,3 +35,14 @@ Write one JSON file `private/content/<ch>/verdicts/<your-batch-name>.json`:
 Be strict: a wrong "pass" puts a falsehood in front of a student; a wrong "fail" costs only a retry. When in doubt → `uncertain` or `fail`.
 Include an entry for **every** assigned id (facts, lessons and questions). Do not edit the content files yourself.
 Final answer: counts of pass/fail/uncertain and the 5 most serious problems (id + one line each).
+
+## Calibration rules (apply identically to every item)
+* **Facts / keys / distractors / explanations / lesson cards**: any unsupported claim, changed meaning, dropped qualifier that makes a statement too strong, wrong key, or a distractor that is also defensible → `fail`.
+* **Hints**: `fail` if the hint (a) states the keyed answer or a keyed option verbatim, (b) restates a true/false statement so the answer is obvious, (c) contains a claim the source does not support, or (d) contradicts the stem/key.
+  A hint that merely narrows the context ("think about who appoints judges") is fine. Note milder leaks in `n` but still `pass`.
+* **Short/blank answers**: grading is exact match after normalisation of spacing/punctuation/quote marks/niqqud only (no stemming, no word order, no "ה" prefix tolerance). `fail` if an obviously correct variant that a student who knows the answer would write
+  is missing from `accepted` (spelling variants such as תכנית/תוכנית, with/without the definite article or a preposition when the stem allows it, the book's own phrasing) or if the stem's own constraints contradict the key (e.g. "two words" but a three-word key).
+* **Structure/labels**: a label or structural claim that the book does not make (e.g. calling printed lines "the first stanza" or "four pairs", "the list has four items" when the book says "ועוד") → `fail`.
+* Every `fail` note must say exactly what to change (item field + wording) so a fixer can repair it without guessing.
+* **Distractors that name something from elsewhere in the same chapter** (a person, place, term, date) are allowed (the authoring guide recommends them). Confirm that the distractor is clearly WRONG for this question and that the named thing
+  really occurs in the book: search the chapter dump `private/work/source/chapters/<ch>.txt` (grep the name). If it occurs there and is clearly wrong here → `pass` for that aspect; if it does not occur anywhere in the chapter, treat it as an invented fact → `fail`.
