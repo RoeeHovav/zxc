@@ -20,8 +20,8 @@ Last updated: 2026-10-11 (session 01E5qPhVjffQDtykJ1owxdae)
 | 2c. Image-borne text (anthem, infographics): author reading + blind second reading | ch1 DONE (5 units; 4 agree, 1 adjudicated on 14x zoom); other chapters TODO |
 | 3. App foundation: engines, IndexedDB, backup, UI (all modes), review dashboard | DONE; 61 unit tests + 27 Playwright tests (desktop+mobile, synthetic fixtures) pass |
 | 3b. Content pipeline: author guide, expander, validator, coverage, verdicts, batches, compiler, release packager | DONE |
-| 4. Pilot chapter 1 (13-23) | IN PROGRESS: author agent running -> validate -> independent verification -> evaluate in UI |
-| 5. Remaining chapters ch2..ch13 | TODO (map page 207 and image-heavy weapons chapter need visual transcription) |
+| 4. Pilot chapter 1 (13-23) | AUTHORED + 2 verification rounds done; round-3 re-check of 28 repaired items in progress |
+| 5. Remaining chapters ch2..ch13 | IN PROGRESS: wave 1 authors (ch2 pp24-35, ch3 pp53-64) running; map page 207 and image-heavy weapons chapter need visual transcription |
 | 6. Learning features | implemented in app; need real content to exercise |
 | 7. QA | automated suites exist; real-content smoke test pending |
 | 8. Final audit | script ready (scripts/final-audit.mjs); run after content |
@@ -47,9 +47,11 @@ HTTP 429) and killed all running agents (no partial edits were left behind). Mea
 (≈110 items) ≈ 160-200K tokens / 7-9 min; repair pass ≈ 3 fixers. Extrapolated to the whole book at pilot density this is ≈ 20M+ author tokens plus verification, so the remaining chapters
 are being produced **in controlled waves of ≤3-4 agents**. Work is resumable: every stage writes files (src/, verdicts/, changed-rN-*.json, batches*.json) and the scripts are idempotent.
 
-## Pilot (chapter 1) verification numbers — round 1
-facts 220/228 verified, lessons 23/34, questions 465/588 (79%) after independent verification; 142 items went to a repair round (3 fixers) and will be re-verified (round 2).
-Typical defects found by independent verifiers: hints that reveal the answer, missing natural accepted variants for short answers, open lists presented as complete, invented labels (e.g. "first stanza"), unsupported hints/attributions. Guides were tightened accordingly.
+## Pilot (chapter 1) verification numbers
+Round 1 (independent verification of the first full authoring): facts 220/228, lessons 23/34, questions 465/588 verified; 142 items went to a repair round (3 fixers).
+Round 2 (re-check of the repaired items): facts 227/228, lessons 33/34, questions 574/588 verified. The 16 remaining items were repaired by the orchestrator (one fact was split in two,
+four new questions added for it) and sent to a round-3 re-check (28 items). Nothing counts as verified without an independent `pass` verdict.
+Typical defects found by independent verifiers: hints that reveal the answer, missing natural accepted variants for short answers, open lists presented as complete, invented labels (e.g. "first stanza"), unsupported hints/attributions, dangling antecedents in stems. Guides and validator lints were tightened accordingly.
 
 ## Data durability
 `private/` lives only in this container (never in git, by design). Milestone archives of the authored content are delivered to the user directly as files (not via GitHub). The extraction is reproducible from the PDFs in ~25 s.
