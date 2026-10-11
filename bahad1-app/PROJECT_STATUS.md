@@ -41,6 +41,19 @@ ch11 topography: 243-247 · ch12 communications: 248-260 · ch13 weapons: 261-31
 - Quote validation: every cited quote must be a substring of its source unit after normalisation (whitespace/niqqud/bidi/quote-style).
 - Private data: `private/` (PDFs, extraction, images, venv, content work). Committed: code, schemas, tests with synthetic fixtures, docs.
 
+## Throughput constraint discovered (important for planning)
+Sub-agent work counts toward the account's usage limit: a burst of ~12 parallel agents (8 verifiers + 4 authors) triggered an API rate limit ("session limit",
+HTTP 429) and killed all running agents (no partial edits were left behind). Measured costs: authoring Chapter 1 (11 pages) ≈ 765K tokens / 57 min; one verifier batch
+(≈110 items) ≈ 160-200K tokens / 7-9 min; repair pass ≈ 3 fixers. Extrapolated to the whole book at pilot density this is ≈ 20M+ author tokens plus verification, so the remaining chapters
+are being produced **in controlled waves of ≤3-4 agents**. Work is resumable: every stage writes files (src/, verdicts/, changed-rN-*.json, batches*.json) and the scripts are idempotent.
+
+## Pilot (chapter 1) verification numbers — round 1
+facts 220/228 verified, lessons 23/34, questions 465/588 (79%) after independent verification; 142 items went to a repair round (3 fixers) and will be re-verified (round 2).
+Typical defects found by independent verifiers: hints that reveal the answer, missing natural accepted variants for short answers, open lists presented as complete, invented labels (e.g. "first stanza"), unsupported hints/attributions. Guides were tightened accordingly.
+
+## Data durability
+`private/` lives only in this container (never in git, by design). Milestone archives of the authored content are delivered to the user directly as files (not via GitHub). The extraction is reproducible from the PDFs in ~25 s.
+
 ## Known limitations / pending manual review
 - Vowel-pointed words (e.g. biblical quotations, p.22-23) can contain stray spaces in the text layer; verify against the image if a question depends on them.
 - Pages that are image-only or have text inside images need transcription: p.15 (two infographics), p.23 (anthem), p.207 (map), p.268/274 and other weapon photos. Inventory in `private/work/source/figures.json`.
