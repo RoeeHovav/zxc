@@ -15,17 +15,17 @@ Last updated: 2026-10-11 (session 01E5qPhVjffQDtykJ1owxdae)
 ## Stage checklist
 | Stage | State |
 |---|---|
-| 1. Verify 4 PDFs / 314-page continuity | DONE (see docs/SOURCE_VERIFICATION.md) |
-| 2. Glyph-accurate extraction (PyMuPDF) + Poppler cross-check | DONE, validated on representative pages |
-| 2b. Source index (units, pages, chapters, figures) | DONE: 2,788 units |
-| 2c. Image-borne text (anthem, map, infographics) | TODO: transcribe from original images + double-read |
-| 3. App foundation (Vite/React/TS) | TODO |
-| 4. Pilot chapter 1 | TODO |
-| 5. Remaining chapters | TODO |
-| 6. Learning modes | TODO |
-| 7. QA / e2e | TODO |
-| 8. Final source audit | TODO |
-| 9. Delivery docs | TODO |
+| 1. Verify 4 PDFs / 314-page continuity | DONE (docs/SOURCE_VERIFICATION.md) |
+| 2. Glyph-accurate extraction (PyMuPDF) + Poppler cross-check; source index (2,806 units) | DONE, validated on representative pages |
+| 2c. Image-borne text (anthem, infographics): author reading + blind second reading | ch1 DONE (5 units; 4 agree, 1 adjudicated on 14x zoom); other chapters TODO |
+| 3. App foundation: engines, IndexedDB, backup, UI (all modes), review dashboard | DONE; 61 unit tests + 27 Playwright tests (desktop+mobile, synthetic fixtures) pass |
+| 3b. Content pipeline: author guide, expander, validator, coverage, verdicts, batches, compiler, release packager | DONE |
+| 4. Pilot chapter 1 (13-23) | IN PROGRESS: author agent running -> validate -> independent verification -> evaluate in UI |
+| 5. Remaining chapters ch2..ch13 | TODO (map page 207 and image-heavy weapons chapter need visual transcription) |
+| 6. Learning features | implemented in app; need real content to exercise |
+| 7. QA | automated suites exist; real-content smoke test pending |
+| 8. Final audit | script ready (scripts/final-audit.mjs); run after content |
+| 9. Delivery docs | README written; final numbers pending |
 
 ## Chapter map (global pages)
 ch0 front matter 1-12 (meta) · ch1 gate 1: 13-23 · ch2 gate 2: 24-52 · ch3 gate 3: 53-81 · ch4 gate 4: 82-96 · ch5 gate 5: 97-117 ·
