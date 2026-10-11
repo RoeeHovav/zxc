@@ -1,0 +1,34 @@
+{
+  "name": "bahad1-learning-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Hebrew RTL learning platform for the Bahad 1 officer-preparation book (local-first, no runtime AI)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "content:build": "node scripts/build-content.mjs",
+    "content:validate": "node scripts/validate-content.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource-variable/assistant": "5.3.0",
+    "idb": "8.0.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router-dom": "7.18.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "fake-indexeddb": "6.2.5",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "3.2.7"
+  }
+}

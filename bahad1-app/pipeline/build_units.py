@@ -62,6 +62,8 @@ def units_for_page(d):
             key = ('table', s['table']['id'])
         elif s['frame']:
             key = ('frame', s['frame'])
+        elif s['role'] == 'caption' and s.get('zone') is not None:
+            key = ('zone', s['zone'])
         elif s['role'] == 'footnote':
             key = ('footnote', None)
         else:
@@ -117,6 +119,9 @@ def units_for_page(d):
                 mk('caption', core, ss, extra={'frame': key[1]})
             else:
                 mk('box', core, ss, extra={'frame': key[1]})
+            continue
+        if kind0 == 'zone':
+            mk('caption', core, ss, extra={'zone': key[1]})
             continue
         if kind0 == 'footnote':
             cur = []
@@ -214,8 +219,11 @@ def main():
             pi = pages_index[g - 1]
             lines.append(f'\n===== PAGE {g}  (part{pi["part"]} p.{pi["partIndex"]}, printed {pi["printedPage"]}) =====')
             for im in pi['images']:
-                lines.append(f'[IMAGE bbox={im["bbox"]} px={im["pxW"]}x{im["pxH"]}]')
-            for u in byp[g]:
+                if im.get('figId'):
+                    lines.append(f'[FIGURE {im["figId"]} bbox={im["bbox"]} px={im["pxW"]}x{im["pxH"]} -> private/work/img/figs/{im["figId"]}.png]')
+            # footnotes are placed mid-page by the layout and interrupt paragraphs; list them after the main text
+            ordered = [u for u in byp[g] if u['scope'] != 'excluded_footnote'] + [u for u in byp[g] if u['scope'] == 'excluded_footnote']
+            for u in ordered:
                 tag = f'{u["id"]} | {u["kind"]} | {u["scope"]}'
                 if u['boldTerms']:
                     tag += ' | BOLD: ' + ' ; '.join(u['boldTerms'])[:200]

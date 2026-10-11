@@ -15,16 +15,14 @@ for p, a, b in PARTS:
         page.get_pixmap(matrix=pymupdf.Matrix(150 / 72, 150 / 72)).save(f'{PG}/p{g:03d}.png')
         d = json.load(open(os.path.join(ROOT, f'private/work/pages/p{g:03d}.json'), encoding='utf-8'))
         W, H = d['size']
-        k = 0
         for im in d['images']:
+            if 'figId' not in im:
+                continue                       # icons / bullets
             x0, y0, x1, y1 = im['bbox']
             area = (x1 - x0) * (y1 - y0) / (W * H)
-            if area < 0.02 and im['pxW'] * im['pxH'] < 30000:
-                continue                       # icons / bullets
-            k += 1
             clip = pymupdf.Rect(max(0, x0 - 2), max(0, y0 - 2), min(W, x1 + 2), min(H, y1 + 2))
-            name = f'p{g:03d}-f{k}.png'
+            name = im['figId'] + '.png'
             page.get_pixmap(matrix=pymupdf.Matrix(220 / 72, 220 / 72), clip=clip).save(f'{FG}/{name}')
-            figs.append({'id': f'p{g:03d}-f{k}', 'page': g, 'bbox': im['bbox'], 'pxW': im['pxW'], 'pxH': im['pxH'], 'pageAreaFraction': round(area, 3), 'file': name})
+            figs.append({'id': im['figId'], 'page': g, 'bbox': im['bbox'], 'pxW': im['pxW'], 'pxH': im['pxH'], 'pageAreaFraction': round(area, 3), 'file': name})
 json.dump(figs, open(os.path.join(ROOT, 'private/work/source/figures.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 print('pages rendered: 314; figure crops:', len(figs))

@@ -24,6 +24,7 @@ PARTS = [(1, 1, 80), (2, 81, 160), (3, 161, 240), (4, 241, 314)]
 
 ROW_TOL = 3.2        # pt, baseline clustering
 GAP_SPLIT = 16.0     # pt, horizontal gap that separates two columns/cells in one row
+GAP_NEAR_IMAGE = 5.0  # pt, tighter threshold on rows beside a narrow image (caption column vs body column)
 
 
 def locate(g):
@@ -201,7 +202,7 @@ def split_rows(bases):
     return rows
 
 
-def split_segments(row, vlines=()):
+def split_segments(row, vlines=(), near_image=False):
     """vlines: (x, y0, y1) vertical table borders; text on opposite sides of one is never merged."""
     cs = sorted(row['chars'], key=lambda c: (c['x0'] + c['x1']) / 2)
     segs, cur = [], [cs[0]]
@@ -211,7 +212,8 @@ def split_segments(row, vlines=()):
         ma, mb = (a['x0'] + a['x1']) / 2, (b['x0'] + b['x1']) / 2
         return any(ma < x < mb and y0 - 2 <= oy <= y1 + 2 for x, y0, y1 in vlines)
     for c in cs[1:]:
-        if crosses(cur[-1], c) or (c['x0'] - cur[-1]['x1'] > GAP_SPLIT and not c['c'].isspace() and not cur[-1]['c'].isspace()):
+        gap_limit = GAP_NEAR_IMAGE if near_image else GAP_SPLIT
+        if crosses(cur[-1], c) or (c['x0'] - cur[-1]['x1'] > gap_limit and not c['c'].isspace() and not cur[-1]['c'].isspace()):
             segs.append(cur); cur = [c]
         else:
             cur.append(c)
@@ -291,9 +293,24 @@ def process_page(g):
         g_ = frame_grid(f)
         if g_:
             vlines += [(x, f['bbox'][1], f['bbox'][3]) for x in g_[1]]
+        else:
+            # single-cell frame (photo caption / box): text on opposite sides of its border must never merge into one line
+            vlines += [(f['bbox'][0], f['bbox'][1], f['bbox'][3]), (f['bbox'][2], f['bbox'][1], f['bbox'][3])]
+    # narrow (side) images: text directly under them is their caption - never merge it into the paragraph beside the image
+    img_pre = []
+    for info in page.get_image_info(xrefs=True):
+        b = info['bbox']
+        if is_decor_image(b, info['width'], info['height']) or (b[2] - b[0]) < 6:
+            continue
+        a_ = (b[2] - b[0]) * (b[3] - b[1]) / (W * H)
+        if (a_ >= 0.02 or info['width'] * info['height'] >= 30000) and (b[2] - b[0]) <= 260:
+            img_pre.append(b)
+    zones = [(b[0] - 6, b[1] - 2, b[2] + 6, b[3] + 62) for b in img_pre]
     segments = []
     for row in rows:
-        for chs in split_segments(row, vlines):
+        near = any(z[1] <= row['oy'] <= z[3] for z in zones)
+        row_segs = split_segments(row, vlines, near)
+        for chs in row_segs:
             text, style, fn_refs, ordered = build_segment(chs)
             if not text.strip() and not fn_refs:
                 continue
@@ -320,6 +337,7 @@ def process_page(g):
                             if ti2 + k < len(ul_flags):
                                 ul_flags[ti2 + k] = True
             seg = {
+                '_multi': len(row_segs) >= 2,
                 'bbox': [round(v, 1) for v in bb],
                 'text': text,
                 'size': dom,
@@ -334,6 +352,16 @@ def process_page(g):
             }
             segments.append(seg)
 
+    # --- caption zones (text hugging a narrow image) ------------------------------------------
+    for sg in segments:
+        sg['zone'] = None
+        if not sg.pop('_multi', False):
+            continue                      # one continuous line: body text, never a caption
+        for zi, z in enumerate(zones):
+            bb = sg['bbox']
+            if bb[0] >= z[0] - 1 and bb[2] <= z[2] + 1 and bb[1] >= z[1] and bb[3] <= z[3] + 2 and sg['size'] <= 12.5:
+                sg['zone'] = zi
+                break
     # --- assign frames -----------------------------------------------------------------
     for s in segments:
         s['frame'] = None
@@ -354,6 +382,12 @@ def process_page(g):
         if (b[2] - b[0]) < 6 or (b[3] - b[1]) < 6:
             continue
         images.append({'bbox': [round(v, 1) for v in b], 'pxW': info['width'], 'pxH': info['height'], 'xref': info.get('xref')})
+    k_ = 0
+    for im in images:
+        a_ = (im['bbox'][2] - im['bbox'][0]) * (im['bbox'][3] - im['bbox'][1]) / (W * H)
+        if a_ >= 0.02 or im['pxW'] * im['pxH'] >= 30000:
+            k_ += 1
+            im['figId'] = f'p{g:03d}-f{k_}'
     # --- roles ----------------------------------------------------------------------------
     for s in segments:
         sz, col = s['size'], s['color']
@@ -373,6 +407,10 @@ def process_page(g):
             s['role'] = 'caption'
         elif sz <= 8.4:
             s['role'] = 'caption' if s['frame'] else 'small'
+        elif s.get('zone') is not None and sz <= 12.5 and not s.get('table'):
+            s['role'] = 'caption'
+        elif s['frame'] and sz <= 9.6:
+            s['role'] = 'caption'          # real footnotes are never framed; framed small text is a photo caption
         elif sz <= 9.6:
             s['role'] = 'footnote'
         elif s['frame']:
