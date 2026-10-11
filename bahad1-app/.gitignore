@@ -1,0 +1,12 @@
+private/
+*.pdf
+node_modules/
+dist/
+public/content/
+src/generated/
+*.zip
+.venv/
+__pycache__/
+coverage/
+test-results/
+playwright-report/
