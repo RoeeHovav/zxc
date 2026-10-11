@@ -120,6 +120,12 @@ A blind second reader will re-read every visual unit; disagreements are flagged 
 * Facts in tables: one fact per row/cell relation; the lesson card should use a table block. Check the page image for merged cells.
 * Name/term spellings: write exactly as the book writes them (including the book's own spelling variants).
 
+* **Open vs closed lists (the most common pilot defect).** Words such as "בין השאר", "ועוד", "כגון", "דוגמת", "וכן הלאה", "בין היתר", "מספר" make a list OPEN. Never state, title or number such a list as complete
+  ("שלושה עקרונות", "ארבעה ערכים", "אלה כל…") and never write a question whose key or hint depends on completeness ("which one is NOT among them" is only safe for items the book clearly excludes). Say "בין השאר" / "למשל" in cards, facts, stems and explanations.
+* **Cause words.** Do not turn a description into a cause ("because", "therefore", "ולכן") unless the book itself gives the reason.
+* **Labels you invent.** Do not name or number things the book does not name or number (stanzas, pairs, stages, "the first/second…") — describe them as the book does.
+* **Short answers.** For every `short`/`blank` item list the plain forms a student would naturally write: with/without the article or a preposition, spelling variants (תכנית/תוכנית), numeral vs word (7 / שבע), and the book's own phrase.
+
 ## 7. When finished
 Write `private/content/<ch>/NOTES.md` with: skipped/uncertain passages (unit ids + why), lessons list (id, title, pages, #facts, #questions), anything a human should review.
 Final answer = three lines: counts, validator status (errors/warnings), coverage status.
