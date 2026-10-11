@@ -1,0 +1,38 @@
+{
+  "name": "bahad1-learning-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "בה\"ד 1 — מערכת למידה לשליטה מלאה בחומר הרשמי (עובדות מאומתות מול הספר בלבד, ללא AI בזמן ריצה)",
+  "scripts": {
+    "content:prepare": "node scripts/prepare-content.mjs",
+    "content:validate": "node scripts/validate-content.mjs",
+    "content:coverage": "node scripts/coverage-report.mjs",
+    "dev": "npm run content:prepare && vite",
+    "build": "npm run content:prepare && tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "node scripts/e2e.mjs"
+  },
+  "dependencies": {
+    "idb": "^8.0.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.4",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^26.0.0",
+    "typescript": "~5.9.0",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
+  }
+}

@@ -1,46 +1,31 @@
-# Miscellaneous
-*.class
+# --- Dependencies / build output ---
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
 *.log
-*.pyc
-*.swp
 .DS_Store
-.atom/
-.buildlog/
-.history
-.svn/
+*.tsbuildinfo
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
+# --- Generated at build time from content/ (never edit by hand) ---
+public/content/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-/build/
-
-# Web related
-lib/generated_plugin_registrant.dart
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# --- SOURCE-MATERIAL PROTECTION ---------------------------------------------
+# The official book is potentially restricted material. This repository may be
+# PUBLIC, so the book, its extracted pages/text, and anything derived verbatim
+# from it must never be committed. Remove the "content/book/" line below ONLY
+# after the repository has been made private and the owner has decided to
+# version the book-derived content pack.
+/source/
+/private/
+/content/book/
+*.pdf
+*.docx
+*.doc
+*.xlsx
+*.pptx
+*.epub
+*.zip
+# Allow only the explicit, non-book PDFs you add on purpose (none today):
+# !docs/example.pdf
