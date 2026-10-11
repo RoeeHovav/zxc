@@ -16,6 +16,10 @@ const figures = loadFigures();
 const chapters = chaptersMeta().filter((c) => c.id !== 'ch0' && (!only || c.id === only));
 
 const LIMITS = { stem: 420, option: 160, hint: 230, explanation: 420, fact: 320, explainBlock: 520, explainStep: 1100, copyRunWords: 9 };
+const OPEN_MARKERS = ['בין השאר', 'ועוד', 'כגון', 'דוגמת', 'וכן הלאה', 'בין היתר', 'למשל', 'לדוגמה'];
+const COUNT_WORDS = ['שניים', 'שתיים', 'שני', 'שתי', 'שלושה', 'שלוש', 'ארבעה', 'ארבע', 'חמישה', 'חמש', 'שישה', 'שש', 'שבעה', 'שבע', 'שמונה', 'תשעה', 'תשע', 'עשרה', 'עשר'];
+const CONSTRUCT = { שלושה: 'שלושת', שלוש: 'שלושת', ארבעה: 'ארבעת', ארבע: 'ארבעת', חמישה: 'חמשת', חמש: 'חמשת', שישה: 'ששת', שש: 'ששת', שבעה: 'שבעת', שבע: 'שבעת', תשעה: 'תשעת', תשע: 'תשעת', עשרה: 'עשרת', עשר: 'עשרת', שניים: 'שני', שתיים: 'שתי' };
+const hasWord = (text, w) => new RegExp(`(^|[^\\u05d0-\\u05ea])${w}($|[^\\u05d0-\\u05ea])`).test(text);
 const report = { chapters: {}, totals: { errors: 0, warnings: 0, facts: 0, lessons: 0, questions: 0 } };
 
 function checkRef(ref, where, errs, opts = {}) {
@@ -48,6 +52,11 @@ for (const ch of chapters) {
     if (!f.refs?.length) errs.push(`${w}: no source reference`);
     let allOk = true;
     for (const r of f.refs ?? []) allOk = checkRef(r, w, errs) && allOk;
+    const quoteText = (f.refs ?? []).map((r) => r.quote).join(' ');
+    // open lists must stay open; counts must come from the source
+    const srcOpen = OPEN_MARKERS.filter((m) => quoteText.includes(m));
+    if (srcOpen.length && !OPEN_MARKERS.some((m) => (f.statement ?? '').includes(m)) && !/(לדוגמה|למשל|בין השאר|אחד מ|אחת מ|מן העקרונות|בין היתר)/.test(f.statement ?? '')) warns.push(`${w}: cited quote is open-ended (${srcOpen[0]}) but the statement reads as complete`);
+    for (const cw of COUNT_WORDS) if (hasWord(f.statement ?? '', cw) && !hasWord(quoteText, cw) && !(CONSTRUCT[cw] && hasWord(quoteText, CONSTRUCT[cw])) && !/\d/.test(quoteText)) { warns.push(`${w}: statement counts "${cw}" but the cited quote has no such count`); break; }
     f._programmatic = allOk;
     if (f.verification?.status === 'verified' && !allOk) errs.push(`${w}: marked verified but source check failed`);
   }
@@ -123,11 +132,18 @@ for (const ch of chapters) {
       }
       default: errs.push(`${w}: unknown type ${q.type}`); keyOk = false;
     }
-    // hints must not simply contain the answer
+    // Hebrew letter clue: the answer's first letter is checked on every WORD of the accepted answers (article/prefix included)
+    // hints must not contain the keyed answer (hard error: verifiers reject these) and letter clues must agree with the key
     for (const a of ansTexts) for (const h of q.hints ?? []) {
       const na = normalizeForQuote(a);
-      if (na.length >= 4 && normalizeForQuote(h).includes(na)) warns.push(`${w}: a hint contains the full answer text ("${a.slice(0, 30)}")`);
+      if (na.length >= 3 && normalizeForQuote(h).includes(na)) errs.push(`${w}: a hint contains the keyed answer ("${a.slice(0, 30)}")`);
     }
+    for (const h of q.hints ?? []) {
+      const m = h.match(/מתחיל[הת]? באות\s+["'״׳]?([\u05d0-\u05ea])/);
+      if (m && (q.type === 'short' || q.type === 'blank') && !q.accepted.some((x) => normalizeAnswer(x).split(' ').some((wd) => wd.startsWith(m[1])))) errs.push(`${w}: hint says the answer starts with ${m[1]} but no accepted answer does`);
+    }
+    // tf: a hint must not restate the statement's verdict (cheap check: hint shares a 6+ word verbatim run with the stem)
+    if (q.type === 'tf') for (const h of q.hints ?? []) if (longestVerbatimRun(h, q.stem ?? '') >= 6) warns.push(`${w}: tf hint restates the statement`);
     // originality: no long verbatim runs copied from the source
     const srcText = (q.refs ?? []).map((r) => units.get(r.unit)?.text ?? '').join(' ');
     const stemRun = longestVerbatimRun(q.stem ?? '', srcText);
