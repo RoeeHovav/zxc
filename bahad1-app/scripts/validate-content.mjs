@@ -10,6 +10,7 @@ import {
 
 const args = process.argv.slice(2);
 const only = args.includes('--chapter') ? args[args.indexOf('--chapter') + 1] : null;
+const DIR = args.includes('--dir') ? args[args.indexOf('--dir') + 1] : undefined; // validate a segment output (see author-expand --seg/--out)
 const units = loadUnits();
 const figures = loadFigures();
 const chapters = chaptersMeta().filter((c) => c.id !== 'ch0' && (!only || c.id === only));
@@ -32,7 +33,7 @@ function checkRef(ref, where, errs, opts = {}) {
 }
 
 for (const ch of chapters) {
-  const { facts, lessons, questions } = loadChapterContent(ch.id);
+  const { facts, lessons, questions } = loadChapterContent(ch.id, DIR);
   if (!facts.length && !lessons.length && !questions.length) continue;
   const errs = []; const warns = [];
   const factIds = new Set(); const lessonIds = new Set(); const qIds = new Set();
@@ -190,7 +191,7 @@ for (const ch of chapters) {
 }
 
 fs.mkdirSync(path.join(PRIV, 'work', 'validation'), { recursive: true });
-fs.writeFileSync(path.join(PRIV, 'work', 'validation', 'report.json'), JSON.stringify(report, null, 1));
+if (!DIR) fs.writeFileSync(path.join(PRIV, 'work', 'validation', 'report.json'), JSON.stringify(report, null, 1));
 if (args.includes('--json')) console.log(JSON.stringify(report));
 else {
   for (const [id, r] of Object.entries(report.chapters)) {

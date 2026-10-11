@@ -10,6 +10,7 @@ import path from 'node:path';
 import { CONTENT_SRC, PRIV, ROOT, SOURCE_DIR, chaptersMeta, loadChapterContent, loadUnits, readJson } from './lib/content-lib.mjs';
 
 const args = process.argv.slice(2);
+const PREVIEW = args.includes('--assume-verified'); // UI evaluation ONLY: marks everything verified and flags the manifest as preview
 const outDir = path.resolve(ROOT, args.includes('--out') ? args[args.indexOf('--out') + 1] : 'public/content');
 fs.rmSync(outDir, { recursive: true, force: true });
 for (const d of ['sources', 'figs', 'pages']) fs.mkdirSync(path.join(outDir, d), { recursive: true });
@@ -22,8 +23,12 @@ const review = { generatedAt: new Date().toISOString(), chapters: {}, flagged: [
 const validation = fs.existsSync(path.join(PRIV, 'work/validation/report.json')) ? readJson(path.join(PRIV, 'work/validation/report.json')) : null;
 
 for (const [order, ch] of chapters.entries()) {
-  const { facts, lessons, questions } = loadChapterContent(ch.id);
+  let { facts, lessons, questions } = loadChapterContent(ch.id);
   if (!lessons.length) continue;
+  if (PREVIEW) {
+    const mark = (x) => ({ ...x, verification: { ...x.verification, status: 'verified', note: 'PREVIEW – not independently verified' } });
+    facts = facts.map(mark); lessons = lessons.map(mark); questions = questions.map(mark);
+  }
   lessons.sort((a, b) => a.order - b.order);
   const bundle = {
     chapter: { id: ch.id, title: ch.title, firstPage: ch.firstPage, lastPage: ch.lastPage, order, lessonIds: lessons.map((l) => l.id) },
@@ -75,7 +80,7 @@ fs.writeFileSync(path.join(outDir, 'review.json'), JSON.stringify(review));
 const hash = crypto.createHash('sha256');
 for (const b of bundles) hash.update(JSON.stringify(b));
 const manifest = {
-  contentVersion: hash.digest('hex').slice(0, 12), generatedAt: new Date().toISOString(),
+  contentVersion: (PREVIEW ? 'PREVIEW-' : '') + hash.digest('hex').slice(0, 12), preview: PREVIEW, generatedAt: new Date().toISOString(),
   book: 'official-bahad1-book', totalPages: 314, chapters: emitted,
   stats: {
     chapters: emitted.length,

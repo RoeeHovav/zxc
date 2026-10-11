@@ -4,7 +4,7 @@ export interface ManifestChapter extends Chapter {
   lessons: { id: string; title: string; pages: [number, number]; status: string }[];
   counts: { facts: number; lessons: number; questions: number; verifiedQuestions: number };
 }
-export interface Manifest extends Omit<ContentManifest, 'chapters'> { chapters: ManifestChapter[] }
+export interface Manifest extends Omit<ContentManifest, 'chapters'> { chapters: ManifestChapter[]; preview?: boolean }
 export interface SourceUnit { id: string; page: number; kind: string; text: string; figure?: string; cells?: string[] }
 export interface ReviewData {
   generatedAt: string;

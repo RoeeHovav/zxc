@@ -16,9 +16,24 @@ const units = loadUnits();
 const figures = loadFigures();
 const load = (n) => readJson(path.join(dir, n));
 const facts = load('facts.json'); const lessons = load('lessons.json'); const questions = load('questions.json');
+// Verdict files: <ch>-<name>.json (round 1) or <ch>-r<N>-<name>.json (repair round N). For every id the HIGHEST round that mentions it
+// wins (a repaired item is judged by its re-check); inside one round the WORST verdict wins (fail > uncertain > pass).
 const verdicts = {};
 const vdir = path.join(dir, 'verdicts');
-if (fs.existsSync(vdir)) for (const f of fs.readdirSync(vdir).sort()) if (f.endsWith('.json')) Object.assign(verdicts, readJson(path.join(vdir, f)));
+const RANK = { pass: 0, uncertain: 1, fail: 2 };
+const byId = {};
+if (fs.existsSync(vdir)) {
+  for (const f of fs.readdirSync(vdir).sort()) {
+    if (!f.endsWith('.json')) continue;
+    const round = Number(f.match(/-r(\d+)-/)?.[1] ?? 1);
+    for (const [id, v] of Object.entries(readJson(path.join(vdir, f)))) {
+      const full = id.startsWith(`${ch}.`) ? id : `${ch}.${id}`;
+      const cur = byId[full];
+      if (!cur || round > cur.round || (round === cur.round && RANK[v.v] > RANK[cur.v.v])) byId[full] = { round, v };
+    }
+  }
+}
+for (const [id, x] of Object.entries(byId)) verdicts[id] = { ...x.v, n: x.v.n, round: x.round };
 const P = (id) => (id.startsWith(`${ch}.`) ? id : `${ch}.${id}`);
 const verdictFor = (id) => verdicts[id] ?? verdicts[id.replace(`${ch}.`, '')];
 

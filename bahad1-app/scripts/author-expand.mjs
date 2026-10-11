@@ -8,14 +8,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { CONTENT_SRC, loadUnits, normalizeForQuote, readJson, chaptersMeta } from './lib/content-lib.mjs';
 
-const ch = process.argv[2];
+const ARGS = process.argv.slice(2);
+const argv = (k) => (ARGS.includes(k) ? ARGS[ARGS.indexOf(k) + 1] : null);
+const ch = ARGS.find((a) => !a.startsWith('--') && ARGS.indexOf(a) === 0);
+const SEG = argv('--seg');
 if (!ch) { console.error('usage: author-expand.mjs <chapterId>'); process.exit(2); }
 const meta = chaptersMeta().find((c) => c.id === ch);
 if (!meta) { console.error('unknown chapter'); process.exit(2); }
-const dir = path.join(CONTENT_SRC, ch);
-const srcDir = path.join(dir, 'src');
+const dir = argv('--out') ? path.resolve(argv('--out')) : path.join(CONTENT_SRC, ch);
+const srcDir = path.join(CONTENT_SRC, ch, 'src');
 const units = loadUnits();
-const files = (prefix) => fs.existsSync(srcDir) ? fs.readdirSync(srcDir).filter((f) => f.startsWith(prefix) && f.endsWith('.json')).sort() : [];
+const files = (prefix) => fs.existsSync(srcDir) ? fs.readdirSync(srcDir).filter((f) => f.endsWith('.json') && (SEG ? (f.startsWith(`${prefix}-${SEG}-`) || f === `${prefix}-${SEG}.json`) : f.startsWith(prefix))).sort() : [];
 const loadAll = (prefix) => files(prefix).flatMap((f) => readJson(path.join(srcDir, f)));
 const errors = [];
 const P = (id) => (id.startsWith(`${ch}.`) ? id : `${ch}.${id}`);

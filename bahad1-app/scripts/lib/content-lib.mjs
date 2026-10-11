@@ -21,7 +21,12 @@ export function loadUnits() {
   const map = new Map();
   for (const u of readJsonl(path.join(SOURCE_DIR, 'units.jsonl'))) map.set(u.id, { ...u, visual: false });
   const vfiles = [path.join(CONTENT_SRC, 'visual_units.jsonl')];
-  if (fs.existsSync(CONTENT_SRC)) for (const d of fs.readdirSync(CONTENT_SRC)) vfiles.push(path.join(CONTENT_SRC, d, 'visual_units.jsonl'));
+  if (fs.existsSync(CONTENT_SRC)) {
+    for (const d of fs.readdirSync(CONTENT_SRC)) {
+      const dir = path.join(CONTENT_SRC, d);
+      if (fs.statSync(dir).isDirectory()) for (const f of fs.readdirSync(dir)) if (/^visual_units.*\.jsonl$/.test(f)) vfiles.push(path.join(dir, f));
+    }
+  }
   for (const f of vfiles) for (const u of readJsonl(f)) map.set(u.id, { ...u, kind: u.kind ?? 'figure_text', scope: u.scope ?? 'core', visual: true });
   return map;
 }
@@ -33,8 +38,8 @@ export function loadFigures() {
 }
 export function chaptersMeta() { return readJson(path.join(PRIV, 'chapters.json')); }
 
-export function loadChapterContent(chId) {
-  const dir = path.join(CONTENT_SRC, chId);
+export function loadChapterContent(chId, dirOverride) {
+  const dir = dirOverride ? path.resolve(dirOverride) : path.join(CONTENT_SRC, chId);
   const get = (n) => (fs.existsSync(path.join(dir, n)) ? readJson(path.join(dir, n)) : []);
   return { facts: get('facts.json'), lessons: get('lessons.json'), questions: get('questions.json'), dir };
 }

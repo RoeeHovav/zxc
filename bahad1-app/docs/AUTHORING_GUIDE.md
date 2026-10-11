@@ -26,7 +26,14 @@ node scripts/author-expand.mjs <ch>            # compact -> full schema (derives
 node scripts/validate-content.mjs --chapter <ch>   # must reach 0 errors; reduce warnings
 node scripts/coverage.mjs <ch> --list           # every required source unit must be covered by a fact
 ```
-Look at a unit while working: `node scripts/show-unit.mjs p014.u02`.
+Look at a unit while working: `node scripts/show-unit.mjs p014.u02`; read only your page range: `node scripts/show-pages.mjs <ch> <fromPage> <toPage>`.
+**Segment mode (use this when you are one of several authors of a chapter):**
+```
+node scripts/author-expand.mjs <ch> --seg <seg> --out private/content/<ch>/_seg-<seg>
+node scripts/validate-content.mjs --chapter <ch> --dir private/content/<ch>/_seg-<seg>
+node scripts/coverage.mjs <ch> --dir private/content/<ch>/_seg-<seg> --pages <from>-<to> --list
+```
+(0 errors required; every required unit of YOUR pages must be covered. The final merged expansion is done by the orchestrator.)
 
 ### 1.1 Fact  `{ "id":"f001", "t":"<lesson topic>", "k":"definition|date|name|list|sequence|relation|number|quote|procedure|classification|other", "s":"<statement>", "r":[["p014.u02","<verbatim quote>"], ...] }`
 * `s` = ONE claim (≤ 320 chars) in clear Hebrew, meaning identical to the source. Lists that belong together (e.g. "the three powers") may be one fact of kind `list`,
@@ -38,7 +45,8 @@ Look at a unit while working: `node scripts/show-unit.mjs p014.u02`.
 * Headings and epigraph quotes: cover them when they state something (e.g. a quotation + its source), otherwise they are optional.
 
 ### 1.2 Lesson `{ "id":"l01", "title":"…", "pages":[14,15], "obj":["f001",…], "size":8, "sum":"one-sentence summary (optional)", "steps":[ … ] }`
-* One lesson = one coherent topic (usually a section / sub-section), **4–9 objectives** (never more than 12). Do not cut so finely that context is lost. Lesson order = book order.
+* One lesson = one coherent topic (a section / sub-section), about **one book page of dense text (at most two lessons per page)**, teaching ~8–14 facts. `obj` lists the **key facts** the mastery assessment must cover (4–12 per lesson; facts that are
+  supporting detail are still taught in cards and still get ≥1 practice question, but need not be objectives). Do not cut so finely that context is lost, and do not create dozens of tiny lessons: the learner must pass a 100% assessment on every lesson. Lesson order = book order.
 * `size` = number of questions in a mastery attempt (≥ number of objectives, at most 20, typically 6–12).
 * `steps` alternate short teaching and practice (never a wall of text):
   * `{"x":{"t":"title","b":[ ["p","text"], ["b",["item","item"]], ["k","key term / key sentence"], ["n","note"], ["t",{"h":["col","col"],"r":[["a","b"]]}] ],"f":["f001","f002"],"fig":["p015-f1"]}}`
@@ -67,9 +75,12 @@ Common: `{"id":"q001","l":"l01","ty":"…","d":1|2|3,"f":["f001"],"q":"stem","h"
 * **True/false**: the statement must be unambiguously true or false by the book. Make false statements by swapping in another real detail from the book.
 * **Short/blank answers**: only when the expected form is crisp (a name, term, number, year, one short phrase). List EVERY acceptable variant in `a`
   (spelling variants, with/without quotation marks in acronyms are normalised automatically; word-order variants are NOT). Grading is exact-match after normalisation; there is no fuzzy matching.
-* **Hints** (1–2, each ≤ 1 sentence): progressive and *only from the book*. Hint 1 = a gentle cue (the context/category), hint 2 = more specific (a defining feature, a first letter of the answer…).
+* **Hints** (1–2, each ≤ 1 sentence): progressive and *only from the book*. **Verifiers reject** a question whose hint (a) restates the keyed answer or a keyed option, (b) restates the statement of a true/false question,
+  (c) makes a claim the cited source does not support (e.g. "this opens the section", "the list has four items" when the book says "ועוד"), or (d) conflicts with the stem (e.g. a stem that already prints a letter, or says "two words" for a three-word answer).
+  Good hints point to the *context* or *category* ("think about who appoints judges") or give the *structure* ("the answer is a number of years"), never the answer or a keyed option. Hint 1 = a gentle cue (the context/category), hint 2 = more specific (a defining feature, a first letter of the answer…).
   A hint must never contain the answer itself and must never be wrong.
 * **Explanation** (≤ ~300 chars): states the correct fact in your own short words. It may restate the source but must not add information.
+* **Volume**: aim for about **2–2.3 questions per fact overall** (not more): ≥2 mastery questions per objective, ≥1 question for every other fact, plus at most 1 extra interleaved check per card. Quality and variety matter more than count.
 * **Pools**: per lesson build a *mastery pool* of **≥ 2 questions per objective** (different forms, so a retry can use other questions) and ≥ 1.5 × `size` questions in total;
   mix question types (≥ 30% of the pool should require recall or arrangement: short/blank/order/match/multi where the content allows); `pool:"practice"` questions are for interleaved checks and extra practice.
   Mastery questions must not need hints to be answerable: they test independent recall.
@@ -88,8 +99,11 @@ knowledge? Are hints accurate and non-revealing? Is the explanation faithful and
 Roughly: 1 fact per distinct claim; 1 lesson per 1–2 book pages of dense text (less for list-heavy pages); ~2.5 questions per fact in total (≥ 2 mastery). If a table has many rows,
 each row is a fact (or one list fact + per-row questions) and the lesson uses a `t` table block.
 
-## 5. Files and ids
-Ids are short and unique per chapter (`f001…`, `l01…`, `q001…`); the expander prefixes the chapter. Do not edit `facts.json/lessons.json/questions.json` by hand — edit `src/` and re-expand.
+## 5. Files and ids (several authors may work on one chapter in parallel — each owns a *segment*)
+You are given a **segment letter** (a, b, c…) and a **page range**. Work only on the units of your page range. Name your files `facts-<seg>-<n>.json`, `lessons-<seg>-<n>.json`,
+`questions-<seg>-<n>.json`, `visual_units-<seg>.jsonl` and make ids unique by embedding the segment letter: facts `fa001`, lessons `la01`, questions `qa0001` (segment b: `fb001`, `lb01`, `qb0001`…).
+Lessons are ordered by file name, so segments follow the book order. Never touch other segments' files. The expander prefixes the chapter id. Do not edit `facts.json/lessons.json/questions.json` by hand — edit `src/` and re-expand
+(the expander/validator run on the whole chapter; errors in other segments are not yours — tell the orchestrator in your final answer).
 
 ## 6. Text inside images (maps, infographics, diagrams, photos with text)
 If a figure carries examinable text, transcribe it into `private/content/<ch>/visual_units.jsonl` (one JSON object per line):
@@ -98,6 +112,13 @@ Look at the crop `private/work/img/figs/<figure>.png` (zoom with PyMuPDF if the 
 (side-by-side boxes right→left; stacked top→bottom), then cite the visual unit like any other unit (`["p015.v1","quote"]`). Photos without text need no unit (their caption is already a unit).
 A blind second reader will re-read every visual unit; disagreements are flagged for human review.
 **Maps, tables rendered as images and numeric forms must be read from the image, not from the text layer.**
+
+## 6b. Judgement calls learned in the pilot
+* If two sentences of the book contradict each other, or a pronoun/referent is ambiguous, **skip the fact** and list it in your notes (a human decides). Do not "resolve" it yourself.
+* Attribute quotations only as the book does; do not add a source the unit does not name.
+* Printed misprints/typos: never copy them; if a misprint changes a fact (a number/date/name), skip and note it.
+* Facts in tables: one fact per row/cell relation; the lesson card should use a table block. Check the page image for merged cells.
+* Name/term spellings: write exactly as the book writes them (including the book's own spelling variants).
 
 ## 7. When finished
 Write `private/content/<ch>/NOTES.md` with: skipped/uncertain passages (unit ids + why), lessons list (id, title, pages, #facts, #questions), anything a human should review.

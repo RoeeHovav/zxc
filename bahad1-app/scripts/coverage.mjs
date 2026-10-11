@@ -8,14 +8,17 @@ import { PRIV, chaptersMeta, loadChapterContent, loadUnits } from './lib/content
 const args = process.argv.slice(2);
 const only = args.find((a) => /^ch\d+$/.test(a));
 const list = args.includes('--list');
+const DIR = args.includes('--dir') ? args[args.indexOf('--dir') + 1] : undefined;
+const PAGES = args.includes('--pages') ? args[args.indexOf('--pages') + 1].split('-').map(Number) : null; // restrict required units to a page range (segment check)
+const inPages = (u) => !PAGES || (u.page >= PAGES[0] && u.page <= PAGES[1]);
 const units = loadUnits();
 const REQUIRED = new Set(['paragraph', 'box', 'caption', 'table_row', 'note', 'figure_text']);
 fs.mkdirSync(path.join(PRIV, 'work', 'coverage'), { recursive: true });
 const summary = [];
 for (const ch of chaptersMeta().filter((c) => c.id !== 'ch0' && (!only || c.id === only))) {
-  const { facts, lessons, questions } = loadChapterContent(ch.id);
-  const required = [...units.values()].filter((u) => u.chapter === ch.id && u.scope === 'core' && REQUIRED.has(u.kind));
-  const optional = [...units.values()].filter((u) => u.chapter === ch.id && u.scope === 'core' && !REQUIRED.has(u.kind));
+  const { facts, lessons, questions } = loadChapterContent(ch.id, DIR);
+  const required = [...units.values()].filter((u) => u.chapter === ch.id && u.scope === 'core' && REQUIRED.has(u.kind) && inPages(u));
+  const optional = [...units.values()].filter((u) => u.chapter === ch.id && u.scope === 'core' && !REQUIRED.has(u.kind) && inPages(u));
   const excluded = [...units.values()].filter((u) => u.chapter === ch.id && u.scope === 'excluded_footnote');
   const supp = [...units.values()].filter((u) => u.chapter === ch.id && u.scope === 'supplementary');
   const lessonOfFact = new Map();
@@ -45,7 +48,7 @@ for (const ch of chaptersMeta().filter((c) => c.id !== 'ch0' && (!only || c.id =
     factsWithoutQuestion: facts.filter((f) => !covFacts.has(f.id)).map((f) => f.id),
     matrix: Object.fromEntries(Object.entries(row).map(([k, v]) => [k, { ...v, lessons: [...v.lessons] }])),
   };
-  fs.writeFileSync(path.join(PRIV, 'work', 'coverage', `${ch.id}.json`), JSON.stringify(out, null, 1));
+  if (!DIR && !PAGES) fs.writeFileSync(path.join(PRIV, 'work', 'coverage', `${ch.id}.json`), JSON.stringify(out, null, 1));
   summary.push(out);
   if (facts.length || lessons.length) {
     console.log(`${ch.id} p${ch.firstPage}-${ch.lastPage}: required units ${required.length}, without fact ${uncoveredUnits.length}, without lesson ${noLesson.length}, without question ${noQuestion.length} | facts ${facts.length} (${out.factsVerified} verified), lessons ${lessons.length} (${out.lessonsVerified} verified), questions ${questions.length} (${out.questionsVerified} verified) | facts w/o question ${out.factsWithoutQuestion.length}`);

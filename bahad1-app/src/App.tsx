@@ -36,6 +36,7 @@ export function App() {
           </nav>
         </div>
       </header>
+      {manifest?.preview && <div role="alert" data-testid="preview-banner" style={{ background: 'var(--bad)', color: '#fff', textAlign: 'center', padding: '6px 12px', fontWeight: 800 }}>תצוגה מקדימה לפיתוח – התוכן הזה לא עבר אימות בלתי תלוי ואסור ללמוד ממנו</div>}
       <main className="container">
         {!ready ? <div className="empty">טוען…</div> : error && !manifest ? (
           <div className="card narrow"><h2>אין תוכן לימוד זמין</h2><p>{error}</p><p className="muted small">כדי ליצור את חבילת התוכן מהחוברת הרשמית יש להריץ את שלבי הפיתוח (ראו README).</p></div>
