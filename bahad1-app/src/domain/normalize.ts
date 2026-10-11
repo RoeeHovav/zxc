@@ -25,3 +25,25 @@ export function normalizeAnswer(input: string): string {
 export function normalizeForQuote(input: string): string {
   return normalizeAnswer(input).replace(/\s+/g, '');
 }
+
+// non-global copies of the classes above (a global regex keeps lastIndex state between test() calls)
+const SKIP_RES = [BIDI, NIQQUD, QUOTES, DASHES, PUNCT, /\s/].map((re) => new RegExp(re.source));
+const isSkipped = (ch: string) => SKIP_RES.some((re) => re.test(ch));
+
+/** Finds `quote` inside `text` ignoring exactly the formatting that normalizeForQuote ignores; returns the [start,end) range
+ *  in the ORIGINAL text (for highlighting the supporting passage), or null if the quote is not contained. */
+export function locateQuote(text: string, quote: string): [number, number] | null {
+  const want = normalizeForQuote(quote);
+  if (!want) return null;
+  let norm = '';
+  const map: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (isSkipped(ch)) continue;
+    const low = ch.toLowerCase();
+    for (let k = 0; k < low.length; k++) { norm += low[k]; map.push(i); }
+  }
+  const at = norm.indexOf(want);
+  if (at < 0) return null;
+  return [map[at], map[at + want.length - 1] + 1];
+}

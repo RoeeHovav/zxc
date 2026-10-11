@@ -64,3 +64,17 @@ describe('deterministic grading', () => {
     expect(isAnswerComplete(mcq('q'), { type: 'mcq', value: 'a' })).toBe(true);
   });
 });
+
+import { locateQuote, normalizeForQuote } from '../../src/domain/normalize';
+describe('locateQuote (source highlighting)', () => {
+  it('finds a quote ignoring spacing, punctuation, quote marks and niqqud, and maps back to original offsets', () => {
+    const text = 'אחד, שניים ; "שלושה"  ארבעה';
+    const r = locateQuote(text, 'שניים שלושה');
+    expect(r).not.toBeNull();
+    expect(text.slice(r![0], r![1])).toContain('שניים');
+    expect(text.slice(r![0], r![1])).toContain('שלושה');
+    expect(locateQuote('מִלָּה אחת', 'מלה')).not.toBeNull();
+    expect(locateQuote(text, 'חמישה')).toBeNull();
+    expect(normalizeForQuote('א, ב')).toBe('אב');
+  });
+});
