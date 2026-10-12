@@ -1,0 +1,10 @@
+{
+  "_comment": "Manual corrections of the automatic unit classification. Keys are unit ids (page.unit); values replace kind/scope. No book text here. Each entry was checked against the page image.",
+  "overrides": {
+    "p035.u05": {"kind": "caption", "scope": "core", "reason": "framed photo caption read as footnote (no footnote mark, sits under the photo)"},
+    "p097.u07": {"kind": "caption", "scope": "core", "reason": "photo caption read as footnote (no footnote mark)"},
+    "p181.u06": {"kind": "caption", "scope": "core", "reason": "captions under the three leader photos (roles + names), read as footnote"},
+    "p187.u04": {"kind": "caption", "scope": "core", "reason": "captions under the three leader photos (roles + names), read as footnote"},
+    "p189.u03": {"kind": "caption", "scope": "core", "reason": "captions under the three leader photos (roles + names), read as footnote"}
+  }
+}

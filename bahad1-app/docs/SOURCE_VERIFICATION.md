@@ -34,3 +34,8 @@ No book text appears in this file. Facts below were measured on the files suppli
 
 ## 3. Unified source index (stage 2 output)
 2,788 citable units across 314 pages: scope counts are produced by `pipeline/build_units.py` and re-reported in the dashboard.
+
+## Classification overrides (added during content production)
+The automatic role detection mislabelled a few framed photo captions / leader-name captions as footnotes (no footnote mark, small framed text under a photo).
+`pipeline/unit_overrides.json` lists the unit ids that were corrected after checking the page image (ids and reasons only — no book text); the build also turns lone footnote-mark glyphs (`*`, `**`)
+into non-content `footnote_mark` units. The overrides do not change any unit id or text. Footnotes themselves remain excluded from exam content.

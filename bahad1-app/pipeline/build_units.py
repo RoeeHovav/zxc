@@ -21,6 +21,9 @@ OUT = os.path.join(ROOT, 'private/work/source')
 CH_DIR = os.path.join(OUT, 'chapters')
 PARTS = [(1, 1, 80), (2, 81, 160), (3, 161, 240), (4, 241, 314)]
 
+_OV = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'unit_overrides.json')
+OVERRIDES = json.load(open(_OV, encoding='utf-8'))['overrides'] if os.path.exists(_OV) else {}
+
 CHAPTERS = [(c['id'], c['title'], c['firstPage'], c['lastPage'])
             for c in json.load(open(os.path.join(ROOT, 'private/chapters.json'), encoding='utf-8'))]   # private: chapter map
 
@@ -179,6 +182,13 @@ def units_for_page(d):
     for i, u in enumerate(out):
         u['id'] = f'p{g:03d}.u{i+1:02d}'
         del u['y']
+        # a lone footnote-mark glyph ('*', '**') is not content
+        if u['kind'] == 'note' and u['scope'] == 'core' and re.fullmatch(r'\**', u['text'].strip()):
+            u['kind'], u['scope'] = 'footnote_mark', 'meta'
+        ov = OVERRIDES.get(u['id'])
+        if ov:
+            u['kind'], u['scope'] = ov['kind'], ov['scope']
+            u['classificationOverride'] = ov['reason']
     return out
 
 
