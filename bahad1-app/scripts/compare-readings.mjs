@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Compares the author's transcription of image text with a BLIND second reading (word-level, after normalisation).
-//   node scripts/compare-readings.mjs private/content/readings/ch1_blind.json
+//   node scripts/compare-readings.mjs private/content/readings/ch1_blind.json [chapter=ch1] [visualFile=visual_units.jsonl]
 // Units whose normalised text is identical get transcription.status = 'double_read_agree'; others 'disagree' (manual review).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,7 +8,7 @@ import { CONTENT_SRC, normalizeAnswer, readJson, readJsonl } from './lib/content
 
 const blindFile = process.argv[2];
 const blind = readJson(blindFile);
-const file = path.join(CONTENT_SRC, process.argv[3] ?? 'ch1', 'visual_units.jsonl');
+const file = path.join(CONTENT_SRC, process.argv[3] ?? 'ch1', process.argv[4] ?? 'visual_units.jsonl');
 const units = readJsonl(file);
 let agree = 0, disagree = 0;
 for (const u of units) {

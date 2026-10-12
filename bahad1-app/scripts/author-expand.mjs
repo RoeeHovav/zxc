@@ -18,7 +18,7 @@ if (!meta) { console.error('unknown chapter'); process.exit(2); }
 const dir = argv('--out') ? path.resolve(argv('--out')) : path.join(CONTENT_SRC, ch);
 const srcDir = path.join(CONTENT_SRC, ch, 'src');
 const units = loadUnits();
-const files = (prefix) => fs.existsSync(srcDir) ? fs.readdirSync(srcDir).filter((f) => f.endsWith('.json') && (SEG ? (f.startsWith(`${prefix}-${SEG}-`) || f === `${prefix}-${SEG}.json`) : f.startsWith(prefix))).sort() : [];
+const files = (prefix) => fs.existsSync(srcDir) ? fs.readdirSync(srcDir).filter((f) => f.endsWith('.json') && (SEG ? (f.startsWith(`${prefix}-${SEG}-`) || f === `${prefix}-${SEG}.json`) : f.startsWith(prefix))).sort((a, b) => a.localeCompare(b, 'en', { numeric: true })) : [];
 const loadAll = (prefix) => files(prefix).flatMap((f) => readJson(path.join(srcDir, f)));
 const errors = [];
 const P = (id) => (id.startsWith(`${ch}.`) ? id : `${ch}.${id}`);
