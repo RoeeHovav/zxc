@@ -15,7 +15,7 @@ const units = loadUnits();
 const figures = loadFigures();
 const chapters = chaptersMeta().filter((c) => c.id !== 'ch0' && (!only || c.id === only));
 
-const LIMITS = { stem: 420, option: 160, hint: 230, explanation: 420, fact: 320, explainBlock: 520, explainStep: 1100, copyRunWords: 9 };
+const LIMITS = { stem: 420, option: 160, hint: 230, explanation: 420, fact: 320, explainBlock: 520, explainStep: 1100, copyRunWords: 9, cardCopyWords: 14 };
 const OPEN_MARKERS = ['בין השאר', 'ועוד', 'כגון', 'דוגמת', 'וכן הלאה', 'בין היתר', 'למשל', 'לדוגמה'];
 const COUNT_WORDS = ['שניים', 'שתיים', 'שני', 'שתי', 'שלושה', 'שלוש', 'ארבעה', 'ארבע', 'חמישה', 'חמש', 'שישה', 'שש', 'שבעה', 'שבע', 'שמונה', 'תשעה', 'תשע', 'עשרה', 'עשר'];
 const CONSTRUCT = { שלושה: 'שלושת', שלוש: 'שלושת', ארבעה: 'ארבעת', ארבע: 'ארבעת', חמישה: 'חמשת', חמש: 'חמשת', שישה: 'ששת', שש: 'ששת', שבעה: 'שבעת', שבע: 'שבעת', תשעה: 'תשעת', תשע: 'תשעת', עשרה: 'עשרת', עשר: 'עשרת', שניים: 'שני', שתיים: 'שתי' };
@@ -41,6 +41,7 @@ for (const ch of chapters) {
   if (!facts.length && !lessons.length && !questions.length) continue;
   const errs = []; const warns = [];
   const factIds = new Set(); const lessonIds = new Set(); const qIds = new Set();
+  const factsById = new Map(facts.map((f) => [f.id, f]));
   const factById = new Map();
 
   for (const f of facts) {
@@ -175,6 +176,12 @@ for (const ch of chapters) {
           if (len > LIMITS.explainBlock) errs.push(`${w} step ${i}: block longer than ${LIMITS.explainBlock} chars (keep explanations short)`);
         }
         if (total > LIMITS.explainStep) errs.push(`${w} step ${i}: explain step longer than ${LIMITS.explainStep} chars`);
+        // cards must be written in the author's own words: a long verbatim run from the cited units is a pasted paragraph
+        const cardSrc = (s.factIds ?? []).flatMap((f) => (factsById.get(f)?.refs ?? []).map((r) => units.get(r.unit)?.text ?? '')).join(' ');
+        for (const b of s.blocks ?? []) for (const t of [b.text ?? '', ...(b.items ?? [])]) {
+          const run = longestVerbatimRun(t, cardSrc);
+          if (run >= LIMITS.cardCopyWords) warns.push(`${w} step ${i}: a card block copies ${run} consecutive words from the source (rewrite in your own words)`);
+        }
         if (!s.factIds?.length) errs.push(`${w} step ${i}: explain step must list the factIds it presents`);
         for (const f of s.factIds ?? []) { if (!factIds.has(f)) errs.push(`${w} step ${i}: unknown fact ${f}`); stepsFacts.add(f); }
         for (const g of s.figures ?? []) if (!figures.has(g)) errs.push(`${w} step ${i}: unknown figure ${g}`);

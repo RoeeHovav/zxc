@@ -33,7 +33,7 @@ node scripts/author-expand.mjs <ch> --seg <seg> --out private/content/<ch>/_seg-
 node scripts/validate-content.mjs --chapter <ch> --dir private/content/<ch>/_seg-<seg>
 node scripts/coverage.mjs <ch> --dir private/content/<ch>/_seg-<seg> --pages <from>-<to> --list
 ```
-(**0 errors AND 0 warnings required**: the validator now enforces hint-leak/letter-clue checks and warns on open lists stated as complete and on counts the cited quote does not contain; every required unit of YOUR pages must be covered. The final merged expansion is done by the orchestrator.)
+(**0 errors AND 0 warnings required** — the validator also warns when an explain-card block copies ≥14 consecutive words from its source units: write cards in your own words; the validator now enforces hint-leak/letter-clue checks and warns on open lists stated as complete and on counts the cited quote does not contain; every required unit of YOUR pages must be covered. The final merged expansion is done by the orchestrator.)
 
 ### 1.1 Fact  `{ "id":"f001", "t":"<lesson topic>", "k":"definition|date|name|list|sequence|relation|number|quote|procedure|classification|other", "s":"<statement>", "r":[["p014.u02","<verbatim quote>"], ...] }`
 * `s` = ONE claim (≤ 320 chars) in clear Hebrew, meaning identical to the source. Lists that belong together (e.g. "the three powers") may be one fact of kind `list`,
