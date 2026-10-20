@@ -130,7 +130,8 @@ export function AppProvider({ children, dbName = 'bahad1' }: { children: ReactNo
       const d = state.decisions[id]?.decision;
       return d !== 'rejected' && (status === 'verified' || d === 'approved' || d === 'corrected');
     };
-    return [...state.manifest.chapters].sort((a, b) => a.order - b.order).flatMap((c) => c.lessons.filter((l) => ok(l.id, l.status)).map((l) => l.id));
+    // a lesson joins the guided path only when it is verified AND can actually be assessed (every objective has a verified mastery question)
+    return [...state.manifest.chapters].sort((a, b) => a.order - b.order).flatMap((c) => c.lessons.filter((l) => ok(l.id, l.status) && (l.assessable !== false || state.decisions[l.id]?.decision === 'approved')).map((l) => l.id));
   }, [state.manifest, state.decisions]);
 
   const statuses = useMemo(() => guidedStatuses(orderedLessonIds, state.lessonStates), [orderedLessonIds, state.lessonStates]);

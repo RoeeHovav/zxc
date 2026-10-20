@@ -1,7 +1,7 @@
 import type { Chapter, ContentBundle, ContentManifest } from '../domain/types';
 
 export interface ManifestChapter extends Chapter {
-  lessons: { id: string; title: string; pages: [number, number]; status: string }[];
+  lessons: { id: string; title: string; pages: [number, number]; status: string; assessable?: boolean }[];
   counts: { facts: number; lessons: number; questions: number; verifiedQuestions: number };
 }
 export interface Manifest extends Omit<ContentManifest, 'chapters'> { chapters: ManifestChapter[]; preview?: boolean }

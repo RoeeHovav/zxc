@@ -11,7 +11,10 @@ import { CONTENT_SRC, PRIV, ROOT, SOURCE_DIR, chaptersMeta, loadChapterContent, 
 
 const args = process.argv.slice(2);
 const PREVIEW = args.includes('--assume-verified'); // UI evaluation ONLY: marks everything verified and flags the manifest as preview
-const outDir = path.resolve(ROOT, args.includes('--out') ? args[args.indexOf('--out') + 1] : 'public/content');
+// Atomic build: everything is written to a temporary sibling directory and swapped in only when the whole build succeeded,
+// so an interrupted or failing build (session cut-off, corrupt authoring file) never destroys the last good content bundle.
+const finalDir = path.resolve(ROOT, args.includes('--out') ? args[args.indexOf('--out') + 1] : 'public/content');
+const outDir = `${finalDir}.tmp-build`;
 fs.rmSync(outDir, { recursive: true, force: true });
 for (const d of ['sources', 'figs', 'pages']) fs.mkdirSync(path.join(outDir, d), { recursive: true });
 
@@ -52,7 +55,12 @@ for (const [order, ch] of chapters.entries()) {
     for (const it of arr) if (it.verification.status !== 'verified') review.flagged.push({ kind, chapter: ch.id, id: it.id, status: it.verification.status, item: it });
   }
   for (const u of chUnits.filter((x) => x.visual)) review.visual.push({ id: u.id, page: u.page, figure: u.figure, text: u.text, status: u.transcription?.status ?? 'single_read', readings: u.readings });
-  emitted.push({ ...bundle.chapter, lessons: lessons.map((l) => ({ id: l.id, title: l.title, pages: l.pages, status: l.verification.status })), counts: { facts: facts.length, lessons: lessons.length, questions: questions.length, verifiedQuestions: questions.filter((q) => q.verification.status === 'verified').length } });
+  emitted.push({ ...bundle.chapter, lessons: lessons.map((l) => ({
+    id: l.id, title: l.title, pages: l.pages, status: l.verification.status,
+    // assessable = every objective has >= 1 verified mastery-pool question; the guided path only includes assessable lessons so that
+    // a lesson with a rejected/pending question pool can never block the learner's progress.
+    assessable: l.objectives.every((o) => questions.some((q) => q.lessonId === l.id && q.verification.status === 'verified' && (q.pool === 'mastery' || q.pool === 'both') && q.factIds.includes(o))),
+  })), counts: { facts: facts.length, lessons: lessons.length, questions: questions.length, verifiedQuestions: questions.filter((q) => q.verification.status === 'verified').length } });
 }
 
 // assets
@@ -89,5 +97,7 @@ const manifest = {
   },
 };
 fs.writeFileSync(path.join(outDir, 'manifest.json'), JSON.stringify(manifest, null, 1));
-console.log(`content built -> ${path.relative(ROOT, outDir)} | chapters ${emitted.length}, facts ${manifest.stats.facts}, lessons ${manifest.stats.lessons}, questions ${manifest.stats.questions} (verified ${manifest.stats.verifiedQuestions}) | figs ${neededFigs.size}, pages ${neededPages.size} | version ${manifest.contentVersion}`);
+fs.rmSync(finalDir, { recursive: true, force: true });
+fs.renameSync(outDir, finalDir);
+console.log(`content built -> ${path.relative(ROOT, finalDir)} | chapters ${emitted.length}, facts ${manifest.stats.facts}, lessons ${manifest.stats.lessons}, questions ${manifest.stats.questions} (verified ${manifest.stats.verifiedQuestions}) | figs ${neededFigs.size}, pages ${neededPages.size} | version ${manifest.contentVersion}`);
 void CONTENT_SRC;
