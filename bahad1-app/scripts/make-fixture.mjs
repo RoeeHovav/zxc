@@ -94,4 +94,10 @@ const review = {
   extraction: { pagesProcessed: 5, totalPages: 5, unitsByScope: { core: 5, excluded_footnote: 0, supplementary: 0 }, visualReviewPages: [], allChapters: [{ id: 'x1', title: 'פרק בדיקה סינתטי', firstPage: 1, lastPage: 5, built: true }] },
 };
 fs.writeFileSync(path.join(OUT, 'review.json'), JSON.stringify(review));
+fs.mkdirSync(path.join(OUT, 'coverage'), { recursive: true });
+fs.writeFileSync(path.join(OUT, 'coverage', 'x1.json'), JSON.stringify([
+  { u: 'x1.u01', p: 1, k: 'paragraph', s: 'core', t: 'קטע סינתטי ראשון', f: ['x1.f001'], l: ['x1.l01'], q: 3, qv: 3, fv: 1 },
+  { u: 'x1.u02', p: 2, k: 'paragraph', s: 'core', t: 'קטע סינתטי שני ללא כיסוי', f: [], l: [], q: 0, qv: 0, fv: 0 },
+  { u: 'x1.u03', p: 3, k: 'footnote', s: 'excluded_footnote', t: 'הערת שוליים סינתטית', f: [], l: [], q: 0, qv: 0, fv: 0 },
+]));
 console.log(`fixture written: ${Q.length} questions (1 flagged), ${lessons.length} lessons`);

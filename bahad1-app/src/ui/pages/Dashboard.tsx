@@ -63,9 +63,9 @@ export function Dashboard() {
       <div className="card stack">
         <h3>התקדמות בחומר</h3>
         <div className="stack tight">
-          <div className="row between"><span>שיעורים שהתחלת</span><Num>{started} / {total}</Num></div><Progress value={total ? started / total : 0} />
-          <div className="row between"><span>שאלות שתורגלו (מתוך הבנק המאומת)</span><Num>{seen} / {bankQs.length || manifest?.stats.verifiedQuestions || 0}</Num></div><Progress value={bankQs.length ? seen / bankQs.length : 0} />
-          <div className="row between"><span>שיעורים שנשלטו ב-100%</span><Num>{mastered} / {total}</Num></div><Progress value={total ? mastered / total : 0} gold />
+          <div className="row between"><span>שיעורים שהתחלת</span><span><Num>{started}</Num> מתוך <Num>{total}</Num></span></div><Progress value={total ? started / total : 0} />
+          <div className="row between"><span>שאלות שתורגלו (מתוך הבנק המאומת)</span><span><Num>{seen}</Num> מתוך <Num>{bankQs.length || manifest?.stats.verifiedQuestions || 0}</Num></span></div><Progress value={bankQs.length ? seen / bankQs.length : 0} />
+          <div className="row between"><span>שיעורים שנשלטו ב-100%</span><span><Num>{mastered}</Num> מתוך <Num>{total}</Num></span></div><Progress value={total ? mastered / total : 0} gold />
           <div className="row between"><span>שאלות שנזכרו שוב בהצלחה, באופן עצמאי, בהמשך</span><Num>{recalled}</Num></div><Progress value={seen ? recalled / seen : 0} />
         </div>
         <p className="muted small" style={{ margin: 0 }}>שליטה ב-100% מעידה על הביצועים במבחן השליטה בלבד – היא אינה הוכחה שהחומר לא יישכח, ולכן החזרות היומיות חשובות.</p>

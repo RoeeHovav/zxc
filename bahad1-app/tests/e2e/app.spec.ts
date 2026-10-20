@@ -201,6 +201,20 @@ test('content review dashboard: flagged item shows source + concern; approval ad
   await expect(page.locator('[data-testid="match-count"]')).toContainText(String(before + 1));
 });
 
+test('coverage matrix: per-unit rows, gap filter and non-exam units are explicit', async ({ page }) => {
+  await page.goto('/#/content-review');
+  await page.getByRole('button', { name: 'כיסוי' }).click();
+  await page.click('[data-testid="matrix-toggle-x1"]');
+  const t = page.locator('[data-testid="matrix-x1"]');
+  await expect(t.locator('tbody tr')).toHaveCount(3);
+  await page.getByRole('button', { name: 'פערי כיסוי' }).click();
+  await expect(t.locator('tbody tr')).toHaveCount(1);
+  await expect(t).toContainText('x1.u02');
+  await page.getByRole('button', { name: 'מחוץ לחומר המבחן' }).click();
+  await expect(t.locator('tbody tr')).toHaveCount(1);
+  await expect(t).toContainText('לא חומר למבחן');
+});
+
 test('lesson flow reaches the end screen with a call to the mastery assessment', async ({ page }) => {
   await page.goto('/#/lesson/x1.l1?step=0');
   for (let guard = 0; guard < 14; guard++) {

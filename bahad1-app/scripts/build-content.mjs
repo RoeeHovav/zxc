@@ -44,11 +44,28 @@ for (const [order, ch] of chapters.entries()) {
   fs.writeFileSync(path.join(outDir, 'sources', `${ch.id}.json`), JSON.stringify(chUnits.map((u) => ({ id: u.id, page: u.page, kind: u.kind, text: u.text, ...(u.figure ? { figure: u.figure } : {}), ...(u.cells ? { cells: u.cells } : {}) }))));
   fs.writeFileSync(path.join(outDir, `${ch.id}.json`), JSON.stringify(bundle));
   const count = (arr) => arr.reduce((a, x) => { a[x.verification.status] = (a[x.verification.status] ?? 0) + 1; return a; }, {});
-  const covFile = path.join(PRIV, 'work/coverage', `${ch.id}.json`);
-  const cov = fs.existsSync(covFile) ? readJson(covFile) : null;
+  // ---- coverage matrix: SOURCE UNIT -> FACT -> LESSON -> QUESTION -> VERIFICATION (computed from the compiled items) ----
+  const REQUIRED_KINDS = new Set(['paragraph', 'box', 'caption', 'table_row', 'note', 'figure_text']);
+  const lessonOfFact = new Map();
+  for (const l of lessons) for (const st of l.steps) if (st.type === 'explain') for (const f of st.factIds) { (lessonOfFact.get(f) ?? lessonOfFact.set(f, new Set()).get(f)).add(l.id); }
+  const rowOf = new Map();
+  for (const u of [...units.values()].filter((x) => x.chapter === ch.id && x.scope !== 'meta')) rowOf.set(u.id, { u: u.id, p: u.page, k: u.kind, s: u.scope, t: String(u.text ?? '').slice(0, 110), f: [], l: new Set(), q: 0, qv: 0, fv: 0 });
+  for (const f of facts) for (const r of new Set(f.refs.map((x) => x.unit))) { const row = rowOf.get(r); if (!row) continue; row.f.push(f.id); (lessonOfFact.get(f.id) ?? []).forEach((l) => row.l.add(l)); if (f.verification.status === 'verified') row.fv++; }
+  for (const q of questions) for (const r of new Set(q.refs.map((x) => x.unit))) { const row = rowOf.get(r); if (!row) continue; row.q++; if (q.verification.status === 'verified') row.qv++; }
+  const matrix = [...rowOf.values()].sort((a, b) => a.p - b.p || a.u.localeCompare(b.u)).map((r) => ({ ...r, l: [...r.l] }));
+  fs.mkdirSync(path.join(outDir, 'coverage'), { recursive: true });
+  fs.writeFileSync(path.join(outDir, 'coverage', `${ch.id}.json`), JSON.stringify(matrix));
+  const reqRows = matrix.filter((r) => r.s === 'core' && REQUIRED_KINDS.has(r.k));
+  const cov = {
+    requiredUnits: reqRows.length, unitsWithoutFact: reqRows.filter((r) => !r.f.length).map((r) => r.u),
+    unitsWithoutLesson: reqRows.filter((r) => r.f.length && !r.l.length).map((r) => r.u), unitsWithoutQuestion: reqRows.filter((r) => r.f.length && !r.q).map((r) => r.u),
+    factsWithoutQuestion: facts.filter((f) => !questions.some((q) => q.factIds.includes(f.id))).map((f) => f.id),
+    excludedFootnotes: matrix.filter((r) => r.s === 'excluded_footnote').length, supplementaryBoxes: matrix.filter((r) => r.s === 'supplementary').length,
+    unitsWithoutVerifiedFact: reqRows.filter((r) => r.f.length && !r.fv).map((r) => r.u),
+  };
   review.chapters[ch.id] = {
     title: ch.title, pages: [ch.firstPage, ch.lastPage], facts: count(facts), lessons: count(lessons), questions: count(questions),
-    coverage: cov && { requiredUnits: cov.requiredUnits, unitsWithoutFact: cov.unitsWithoutFact, unitsWithoutLesson: cov.unitsWithoutLesson, unitsWithoutQuestion: cov.unitsWithoutQuestion, factsWithoutQuestion: cov.factsWithoutQuestion, excludedFootnotes: cov.excludedFootnotes, supplementaryBoxes: cov.supplementaryBoxes },
+    coverage: cov,
     validation: validation?.chapters?.[ch.id] ? { errors: validation.chapters[ch.id].errors.length, warnings: validation.chapters[ch.id].warnings } : null,
   };
   for (const [kind, arr] of [['question', questions], ['lesson', lessons], ['fact', facts]]) {

@@ -11,7 +11,7 @@ export interface ReviewData {
   chapters: Record<string, {
     title: string; pages: [number, number];
     facts: Record<string, number>; lessons: Record<string, number>; questions: Record<string, number>;
-    coverage: null | { requiredUnits: number; unitsWithoutFact: string[]; unitsWithoutLesson: string[]; unitsWithoutQuestion: string[]; factsWithoutQuestion: string[]; excludedFootnotes: number; supplementaryBoxes: number };
+    coverage: null | { requiredUnits: number; unitsWithoutFact: string[]; unitsWithoutLesson: string[]; unitsWithoutQuestion: string[]; factsWithoutQuestion: string[]; excludedFootnotes: number; supplementaryBoxes: number; unitsWithoutVerifiedFact?: string[] };
     validation: null | { errors: number; warnings: string[] };
   }>;
   flagged: { kind: 'question' | 'lesson' | 'fact'; chapter: string; id: string; status: string; item: any }[];
@@ -37,6 +37,8 @@ export const loadManifest = () => getJson<Manifest>('manifest.json');
 export const loadChapter = (id: string) => getJson<ContentBundle>(`${id}.json`);
 export const loadSources = (id: string) => getJson<SourceUnit[]>(`sources/${id}.json`);
 export const loadReview = () => getJson<ReviewData>('review.json');
+export interface CoverageRow { u: string; p: number; k: string; s: string; t: string; f: string[]; l: string[]; q: number; qv: number; fv: number }
+export const loadCoverage = (id: string) => getJson<CoverageRow[]>(`coverage/${id}.json`);
 export const figureUrl = (id: string) => `content/figs/${id}.png`;
 export const pageUrl = (page: number) => `content/pages/p${String(page).padStart(3, '0')}.jpg`;
 export function clearContentCache() { cache.clear(); }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { locateQuote } from '../../domain/normalize';
 import type { Question, ReviewDecision, SourceRef } from '../../domain/types';
 import { useApp } from '../../app/store';
-import { figureUrl, loadReview, loadSources, pageUrl, type ReviewData, type SourceUnit } from '../../content/loader';
+import { figureUrl, loadCoverage, loadReview, loadSources, pageUrl, type CoverageRow, type ReviewData, type SourceUnit } from '../../content/loader';
 import { Num } from '../components/common';
 import { Modal } from '../components/SourceModal';
 import { ImageViewer } from '../components/ImageViewer';
@@ -76,10 +76,46 @@ function Coverage({ d }: { d: ReviewData }) {
                 <span className={`chip ${c.coverage.unitsWithoutQuestion.length ? 'warn' : 'ok'}`}>ללא שאלה: <Num>{c.coverage.unitsWithoutQuestion.length}</Num></span>
                 <span className="chip">עובדות ללא שאלה: <Num>{c.coverage.factsWithoutQuestion.length}</Num></span></div>
               {c.coverage.unitsWithoutFact.length > 0 && <details><summary>יחידות שאינן מכוסות (חסר כיסוי)</summary><div className="muted small ltr">{c.coverage.unitsWithoutFact.join(', ')}</div></details>}
+              <Matrix chapterId={id} />
             </>
           )}
           {c.validation && c.validation.warnings.length > 0 && <details><summary>אזהרות ולידציה (<Num>{c.validation.warnings.length}</Num>)</summary><ul>{c.validation.warnings.slice(0, 30).map((w) => <li key={w} className="small">{w}</li>)}</ul></details>}
         </div>
+      ))}
+    </div>
+  );
+}
+
+/** Auditable coverage matrix: source passage -> facts -> lessons -> questions -> verification, one row per source unit. */
+function Matrix({ chapterId }: { chapterId: string }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<CoverageRow[] | null>(null);
+  const [filter, setFilter] = useState<'all' | 'gap' | 'unverified' | 'excluded'>('all');
+  useEffect(() => { if (open && !rows) loadCoverage(chapterId).then(setRows).catch(() => setRows([])); }, [open, rows, chapterId]);
+  const REQ = new Set(['paragraph', 'box', 'caption', 'table_row', 'note', 'figure_text']);
+  const shown = useMemo(() => (rows ?? []).filter((r) => {
+    const required = r.s === 'core' && REQ.has(r.k);
+    if (filter === 'excluded') return r.s !== 'core';
+    if (filter === 'gap') return required && (!r.f.length || !r.l.length || !r.q);
+    if (filter === 'unverified') return required && r.f.length > 0 && (r.fv < r.f.length || r.qv < r.q);
+    return true;
+  }), [rows, filter]);
+  const KIND: Record<string, string> = { paragraph: 'פסקה', heading: 'כותרת', caption: 'כיתוב', box: 'תיבה', note: 'הערה', table_row: 'שורת טבלה', epigraph: 'מוטו', figure_text: 'טקסט מתמונה', footnote: 'הערת שוליים', thought_box: 'שאלות למחשבה' };
+  return (
+    <div className="stack tight">
+      <button className="btn ghost" type="button" data-testid={`matrix-toggle-${chapterId}`} onClick={() => setOpen((o) => !o)}>{open ? 'הסתרת מטריצת הכיסוי' : 'מטריצת כיסוי מלאה: קטע מקור ← עובדות ← שיעורים ← שאלות ← אימות'}</button>
+      {open && (rows === null ? <span className="muted">טוען…</span> : (
+        <>
+          <div className="row">{([['all', 'הכול'], ['gap', 'פערי כיסוי'], ['unverified', 'ממתין לאימות'], ['excluded', 'מחוץ לחומר המבחן']] as const).map(([k, l]) => <button key={k} type="button" className={`chip ${filter === k ? 'accent' : ''}`} onClick={() => setFilter(k)}>{l}</button>)}<span className="muted small"><Num>{shown.length}</Num> שורות</span></div>
+          <div className="scroll-x"><table className="t" data-testid={`matrix-${chapterId}`}><thead><tr><th>עמ׳</th><th>יחידה</th><th>סוג</th><th>קטע מקור</th><th>עובדות (מאומתות)</th><th>שיעורים</th><th>שאלות (מאומתות)</th></tr></thead>
+            <tbody>{shown.slice(0, 600).map((r) => {
+              const required = r.s === 'core' && REQ.has(r.k);
+              const cls = r.s !== 'core' ? 'muted' : required && !r.f.length ? 'bad' : '';
+              return <tr key={r.u} className={cls}><td><Num>{r.p}</Num></td><td className="ltr">{r.u}</td><td>{KIND[r.k] ?? r.k}{r.s === 'excluded_footnote' ? ' (לא חומר למבחן)' : r.s === 'supplementary' ? ' (לא חומר למבחן)' : ''}</td><td className="small">{r.t}</td>
+                <td><Num>{r.f.length}</Num>{r.f.length > 0 && <span className="muted"> (<Num>{r.fv}</Num>)</span>}</td><td className="small ltr">{r.l.join(', ')}</td><td><Num>{r.q}</Num>{r.q > 0 && <span className="muted"> (<Num>{r.qv}</Num>)</span>}</td></tr>;
+            })}</tbody></table></div>
+          {shown.length > 600 && <span className="muted small">מוצגות 600 השורות הראשונות — סננו כדי לצמצם.</span>}
+        </>
       ))}
     </div>
   );
