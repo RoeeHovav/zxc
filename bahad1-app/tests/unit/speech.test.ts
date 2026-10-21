@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  cleanForSpeech, explainSegments, gematria, pickVoice, questionSegments, rankVoices, segmentsFromText, splitIntoSentences, voiceScore, type VoiceInfo,
+  cleanForSpeech, explainSegments, gematria, pickVoice, rankVoices, segmentsFromText, splitIntoSentences, voiceScore, type VoiceInfo,
 } from '../../src/domain/speech';
 import { SpeechEngine, DEFAULT_SPEECH_SETTINGS } from '../../src/app/speechEngine';
 
@@ -60,14 +60,6 @@ describe('segmentation: short sentences with human pauses', () => {
     expect(segs.map((s) => s.blockId)).toEqual(['c:title', 'c:0', 'c:1', 'c:1', 'c:2']);
     expect(segs[4].rate).toBeLessThan(1);
     expect(segs[2].pauseAfterMs).toBeLessThan(segs[3].pauseAfterMs);
-  });
-  it('reads a question as shown (ordinal words, screen positions kept) and never marks an answer', () => {
-    const segs = questionSegments({ type: 'mcq', stem: 'מי חתם?', options: [{ text: 'דוד', idx: 0 }, { text: 'משה', idx: 2 }] }, 'q:1');
-    expect(segs.map((s) => s.text)).toEqual(['מי חתם?', 'אפשרות ראשונה: דוד', 'אפשרות שלישית: משה']);
-    expect(segs.map((s) => s.blockId)).toEqual(['q:1:stem', 'q:1:opt0', 'q:1:opt2']);
-    expect(segs[segs.length - 1].pauseAfterMs).toBe(0);
-    const tf = questionSegments({ type: 'tf', stem: 'נכון או לא נכון: א.' });
-    expect(tf.map((s) => s.text).join(' ')).toContain('אפשרות שנייה: לא נכון');
   });
 });
 

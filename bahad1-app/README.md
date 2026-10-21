@@ -49,7 +49,7 @@ npx playwright test          # desktop + mobile (uses PLAYWRIGHT_BROWSERS_PATH; 
 (Any static server works; the app is plain static files. For a future private online deployment put the `app/` folder behind authentication — never public.)
 
 ## Read aloud (Hebrew text-to-speech)
-Lesson cards, questions, answer explanations and the cited source passages have a 🔊 button; a small player (previous / pause / next sentence / stop / speed) appears while reading,
+Study material only — lesson cards (🔊 per card, 🎧 *listen to the whole lesson*, optional auto-read) and the cited source passages; questions and answers are deliberately **not** read aloud; a small player (previous / pause / next sentence / stop / speed) appears while reading,
 the sentence being read is highlighted, and *Settings → Read aloud* lets you choose the voice, speed and pitch, test the voice and turn on auto-read.
 - It uses the voices of your own device/browser (Web Speech API) — no AI and no cloud service of the app. The best **local** Hebrew voice is chosen automatically.
 - Natural/neural voices (e.g. Microsoft *Natural* voices in Edge/Windows, Google voices on Android) are usually *online* voices: the browser then sends the read text to its provider.

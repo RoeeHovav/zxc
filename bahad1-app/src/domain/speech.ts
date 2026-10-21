@@ -184,41 +184,6 @@ export function explainSegments(title: string | undefined, blocks: ExplainBlock[
   return out;
 }
 
-const ORDINAL = ['ראשונה', 'שנייה', 'שלישית', 'רביעית', 'חמישית', 'שישית'];
-
-export interface SpeakableQuestion {
-  type: string;
-  stem: string;
-  /** idx = position of the option on screen (kept when some options are eliminated) */
-  options?: { text: string; idx?: number }[];
-  right?: { text: string }[];
-  leftTexts?: string[];
-  items?: string[];
-}
-/** A question as it is shown: the stem, then the options in the order on screen. It never says which option is right. */
-export function questionSegments(q: SpeakableQuestion, idPrefix = 'q'): SpeechSegment[] {
-  const out = segmentsFromText(q.stem, { blockId: `${idPrefix}:stem`, after: PAUSE.title });
-  if ((q.type === 'mcq' || q.type === 'compare' || q.type === 'multi') && q.options) {
-    q.options.forEach((o, k) => {
-      const i = o.idx ?? k;
-      out.push(...segmentsFromText(`אפשרות ${ORDINAL[i] ?? i + 1}: ${o.text}`, { blockId: `${idPrefix}:opt${i}`, after: PAUSE.bullet }));
-    });
-  }
-  if (q.type === 'tf') out.push(...segmentsFromText('אפשרות ראשונה: נכון. אפשרות שנייה: לא נכון.', { blockId: `${idPrefix}:tf` }));
-  if (q.type === 'match' && q.leftTexts && q.right) {
-    out.push(...segmentsFromText('יש להתאים בין הפריטים הבאים.', { blockId: `${idPrefix}:mh`, after: PAUSE.sentence }));
-    q.leftTexts.forEach((t, i) => out.push(...segmentsFromText(`פריט ${i + 1}: ${t}`, { blockId: `${idPrefix}:l${i}`, after: PAUSE.bullet })));
-    out.push(...segmentsFromText('האפשרויות להתאמה הן:', { blockId: `${idPrefix}:mr`, after: PAUSE.sentence }));
-    q.right.forEach((r, i) => out.push(...segmentsFromText(r.text, { blockId: `${idPrefix}:r${i}`, after: PAUSE.bullet })));
-  }
-  if (q.type === 'order' && q.items) {
-    out.push(...segmentsFromText('יש לסדר את הפריטים הבאים:', { blockId: `${idPrefix}:oh`, after: PAUSE.sentence }));
-    q.items.forEach((t, i) => out.push(...segmentsFromText(t, { blockId: `${idPrefix}:o${i}`, after: PAUSE.bullet })));
-  }
-  if (out.length) out[out.length - 1] = { ...out[out.length - 1], pauseAfterMs: 0 };
-  return out;
-}
-
 // ---------------------------------------------------------------------------------------------------------------------------------
 // voices
 // ---------------------------------------------------------------------------------------------------------------------------------

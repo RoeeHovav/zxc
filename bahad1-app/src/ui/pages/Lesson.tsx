@@ -86,7 +86,7 @@ export function LessonPage() {
         <Link to="/guided" className="btn ghost">‹ לכל השיעורים</Link>
         <span className="chip">{status === 'mastered' ? 'נשלט 100%' : status === 'locked' ? 'לימוד חופשי (נעול במסלול)' : 'במסלול המודרך'}</span>
       </div>
-      {speech.supported && step < steps.length && (
+      {speech.supported && step < steps.length && steps[step]?.type !== 'check' && (
         <div className="row"><ReadAloud owner={listenOwner} icon="🎧" label="האזנה לכל השיעור" testId="listen-all" build={() => {
           const segs: SpeechSegment[] = [];
           steps.forEach((s, i) => {

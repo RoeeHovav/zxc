@@ -76,28 +76,19 @@ test('on a phone the player sits above the bottom tab bar and never hides the le
   expect(next!.y + next!.height <= bar2!.y || next!.y >= bar2!.y + bar2!.height).toBe(true);
 });
 
-test('a question is read as shown (stem, then the options in screen order) and the correct answer is never announced', async ({ page }) => {
+test('questions and answers are never read aloud: no read buttons in practice, feedback or the mastery test', async ({ page }) => {
   await page.addInitScript(voicesJs(VOICES));
   await page.goto('/#/lesson/x1.l1?step=1');
   await page.waitForSelector('[data-testid="practice-question"]');
-  const stem = (await page.locator('.q-stem').innerText()).trim();
-  await page.click('[data-testid="read-question"]');
-  await expect.poll(async () => (await spoken(page)).length, { timeout: 15000 }).toBeGreaterThan(1);
-  const log = (await spoken(page)).map((u) => u.text);
-  expect(log[0]).toBe(stem);
-  const nOpts = await page.locator('button.opt').count();
-  if (nOpts > 0) expect(log.filter((t) => /^אפשרות /.test(t)).length).toBeGreaterThan(0);
-  expect(log.join(' ')).not.toMatch(/נכונה|הנכונה/);
-});
-
-test('the explanation after an answer can be read, including the correct answer for a revealed question', async ({ page }) => {
-  await page.addInitScript(voicesJs(VOICES));
-  await page.goto('/#/lesson/x1.l1?step=1');
-  await page.waitForSelector('[data-testid="practice-question"]');
+  await expect(page.locator('[data-testid="read-question"], [data-testid="read-feedback"], [data-testid="read-card"], [data-testid="listen-all"]')).toHaveCount(0);
   await page.click('[data-testid="reveal-btn"]');
-  await page.click('[data-testid="read-feedback"]');
-  await expect.poll(async () => (await spoken(page)).length, { timeout: 15000 }).toBeGreaterThan(0);
-  expect((await spoken(page))[0].text).toMatch(/התשובה הנכונה/);
+  await expect(page.locator('[data-testid="feedback"]')).toBeVisible();
+  await expect(page.locator('[data-testid="read-feedback"]')).toHaveCount(0);
+  await page.goto('/#/assess/x1.l1');
+  await page.click('[data-testid="start-assessment"]');
+  await page.waitForSelector('.q-stem');
+  await expect(page.locator('[data-testid="read-question"]')).toHaveCount(0);
+  expect((await spoken(page)).length).toBe(0);
 });
 
 test('settings: voices are listed with local/online labels, online voices need consent, choices persist, rate applies', async ({ page }) => {

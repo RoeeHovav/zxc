@@ -5,8 +5,6 @@ import { canRequestHint, currentHints, requestHint, revealAnswer, startPractice,
 import { presentQuestion } from '../../domain/present';
 import type { Answer, Outcome, Question } from '../../domain/types';
 import { useApp } from '../../app/store';
-import { ReadAloud, Speakable } from '../../app/speech';
-import { segmentsFromText } from '../../domain/speech';
 import { FigureModal, SourceModal } from './SourceModal';
 import { QuestionView } from './QuestionView';
 
@@ -101,9 +99,8 @@ export function PracticeQuestion({ question: q, seed, onResolved, onNext, nextLa
           <h3>{st.status === 'correct' ? '✓ נכון' : 'התשובה הנכונה'}</h3>
           <div className="chip" style={{ marginBottom: 8 }}>{OUTCOME_LABEL[st.outcome ?? 'wrong']}</div>
           {st.status === 'revealed' && <div className="answer-box" data-testid="correct-answer">{correctAnswerText(q)}</div>}
-          <Speakable as="p" id={`fb:${q.id}`} style={{ margin: '6px 0' }}>{q.explanation}</Speakable>
+          <p style={{ margin: '6px 0' }}>{q.explanation}</p>
           <div className="row">
-            <ReadAloud owner={`fb:${q.id}`} label="הקראת ההסבר" testId="read-feedback" build={() => segmentsFromText(`${st.status === 'correct' ? 'נכון.' : `התשובה הנכונה: ${correctAnswerText(q)}.`} ${q.explanation}`, { blockId: `fb:${q.id}` })} />
             <button className="btn" type="button" onClick={() => setSource(true)} data-testid="source-btn">המקור בחוברת</button>
             <button className="btn ghost" type="button" onClick={flag} disabled={flagged}>{flagged ? 'הדיווח נשמר' : 'דיווח על שגיאה בבדיקה'}</button>
             {onNext && <button className="btn primary" type="button" onClick={onNext} data-testid="next">{nextLabel}</button>}

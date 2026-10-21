@@ -143,7 +143,7 @@ export function ReadAloudSettings() {
   return (
     <div className="card stack" data-testid="tts-settings">
       <h2>הקראה בקול</h2>
-      <p className="muted">האפליקציה מקריאה את כרטיסי הלימוד, את השאלות ואת הקטעים מהחוברת בקול עברי של המכשיר שלכם. אין שירות ענן של האפליקציה ואין בינה מלאכותית; איכות הקול תלויה בקולות שמותקנים אצלכם.</p>
+      <p className="muted">האפליקציה מקריאה את חומר הלימוד – כרטיסי השיעורים והקטעים המקוריים מהחוברת – בקול עברי של המכשיר שלכם. שאלות ותשובות אינן מוקראות. אין שירות ענן של האפליקציה ואין בינה מלאכותית; איכות הקול תלויה בקולות שמותקנים אצלכם.</p>
       <div className="row">
         <span className={`chip ${hv.length ? 'ok' : 'warn'}`} data-testid="tts-voice-count">{hv.length ? `נמצאו ${hv.length} קולות עבריים` : 'לא נמצא קול עברי'}</span>
         {sp.activeVoice && <span className="chip" data-testid="tts-active-voice">קול פעיל: {sp.activeVoice.name} ({sp.activeVoice.localService ? 'מקומי' : 'מקוון'})</span>}
@@ -161,7 +161,7 @@ export function ReadAloudSettings() {
       <label className="field">גובה הקול: <span className="num">{s.pitch.toFixed(2)}</span>
         <input type="range" min={0.7} max={1.3} step={0.05} value={s.pitch} onChange={(e) => speechEngine.setSettings({ pitch: Number(e.target.value) })} data-testid="tts-pitch" /></label>
       <label className="check"><input type="checkbox" checked={s.autoRead} onChange={(e) => speechEngine.setSettings({ autoRead: e.target.checked })} data-testid="tts-auto" />
-        <span>הקראה אוטומטית של כרטיסי הלימוד ושל השאלות <span className="muted small">(אפשר לעצור בכל רגע)</span></span></label>
+        <span>הקראה אוטומטית של כרטיסי הלימוד <span className="muted small">(אפשר לעצור בכל רגע)</span></span></label>
       <div className="row">
         <button className="btn primary" type="button" onClick={() => (playing ? speechEngine.stop() : test())} data-testid="tts-test">{playing ? 'עצירה' : 'בדיקת קול'}</button>
         <button className="btn ghost" type="button" onClick={() => setShowHelp((x) => !x)}>איך מתקינים קול עברי טבעי?</button>
