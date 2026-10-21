@@ -11,6 +11,7 @@ import { Library } from './ui/pages/Library';
 import { Stats } from './ui/pages/Stats';
 import { Settings } from './ui/pages/Settings';
 import { ContentReview } from './ui/pages/ContentReview';
+import { SpeechBar } from './app/speech';
 
 const NAV: { to: string; label: string; ico: string }[] = [
   { to: '/', label: 'בית', ico: '⌂' },
@@ -63,6 +64,7 @@ export function App() {
           <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => (isActive ? 'active' : '')}><span className="ico" aria-hidden>{n.ico}</span><span>{n.label}</span></NavLink>
         ))}
       </nav>
+      <SpeechBar />
     </div>
   );
 }

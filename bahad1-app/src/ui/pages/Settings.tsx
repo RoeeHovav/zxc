@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../app/store';
 import { buildBackup, restoreBackup, validateBackup, type BackupCheck, type BackupFile } from '../../storage/backup';
 import type { BackupSnapshot } from '../../storage/db';
+import { ReadAloudSettings } from '../../app/speech';
 import { Num } from '../components/common';
 
 export function Settings() {
@@ -58,6 +59,8 @@ export function Settings() {
         <label className="field">גודל טקסט<select className="text-in" value={prefs.fontScale} onChange={(e) => app.setPrefs({ ...prefs, fontScale: Number(e.target.value) })}><option value={0.9}>קטן</option><option value={1}>רגיל</option><option value={1.12}>גדול</option><option value={1.25}>גדול מאוד</option></select></label>
         <label className="field">גודל חזרה יומית (שאלות)<select className="text-in" value={prefs.dailyReviewSize} onChange={(e) => app.setPrefs({ ...prefs, dailyReviewSize: Number(e.target.value) })}>{[10, 15, 20, 30, 40].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
       </div>
+
+      <ReadAloudSettings />
 
       <div className="card stack" data-testid="backup-card"><h2>גיבוי ושחזור התקדמות</h2>
         <p className="muted">ההתקדמות נשמרת רק בדפדפן הזה, במכשיר הזה (אין סנכרון בין מכשירים). כדי לא לאבד אותה — או כדי להעביר אותה למחשב/טלפון אחר — ייצאו קובץ גיבוי ושחזרו אותו שם.</p>

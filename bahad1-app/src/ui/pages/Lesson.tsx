@@ -4,19 +4,21 @@ import type { ExplainBlock, Fact, LessonStep, SourceRef } from '../../domain/typ
 import { useApp } from '../../app/store';
 import { figureUrl } from '../../content/loader';
 import { Num, Progress, useChapters } from '../components/common';
+import { ReadAloud, Speakable, useSpeech } from '../../app/speech';
+import { explainSegments, PAUSE, segmentsFromText, type SpeechSegment } from '../../domain/speech';
 import { PracticeQuestion } from '../components/PracticeQuestion';
 import { FigureModal, SourceModal } from '../components/SourceModal';
 import { useToast } from '../toast';
 
-function Block({ b }: { b: ExplainBlock }) {
+function Block({ b, id }: { b: ExplainBlock; id: string }) {
   switch (b.kind) {
-    case 'p': return <p className="block-p">{b.text}</p>;
-    case 'bullets': return <ul>{b.items!.map((x, i) => <li key={i}>{x}</li>)}</ul>;
-    case 'key': return <div className="key">{b.text}</div>;
-    case 'note': return <div className="note">{b.text}</div>;
+    case 'p': return <Speakable as="p" id={id} className="block-p">{b.text}</Speakable>;
+    case 'bullets': return <ul>{b.items!.map((x, i) => <Speakable as="li" id={id} key={i}>{x}</Speakable>)}</ul>;
+    case 'key': return <Speakable as="div" id={id} className="key">{b.text}</Speakable>;
+    case 'note': return <Speakable as="div" id={id} className="note">{b.text}</Speakable>;
     case 'table': return (
-      <div style={{ overflowX: 'auto' }}><table className="t"><thead><tr>{b.table!.headers.map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
-        <tbody>{b.table!.rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table></div>
+      <Speakable as="div" id={id} style={{ overflowX: 'auto' }}><table className="t"><thead><tr>{b.table!.headers.map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
+        <tbody>{b.table!.rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody></table></Speakable>
     );
   }
 }
@@ -47,6 +49,22 @@ export function LessonPage() {
 
   useEffect(() => { if (lesson && !loading) app.saveLessonProgress(lesson.id, step, step > 0 ? [step - 1] : []).catch(() => {}); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [lesson?.id, step, loading]);
 
+  // ---- listen to the whole lesson (hands-free): reads every card from the current one on, moving the screen along ----
+  const speech = useSpeech();
+  const sp0 = sp;
+  const listenOwner = `lessonall:${id}`;
+  const listening = speech.ownerId === listenOwner && speech.status !== 'idle';
+  useEffect(() => {
+    const b = speech.activeBlockId;
+    if (listening && b) {
+      const m = /^lesson:[^:]+:(\d+):/.exec(b);
+      if (m && Number(m[1]) !== step) { const p = new URLSearchParams(sp0.toString()); p.set('step', m[1]); setSp(p, { replace: true }); window.scrollTo({ top: 0 }); }
+    }
+    // the whole lesson was heard to the end → show the "ready for the mastery test" screen (a manual stop leaves the learner where they are)
+    if (speech.finishedOwner === listenOwner) { const p = new URLSearchParams(sp0.toString()); p.set('step', String(steps.length)); setSp(p, { replace: true }); window.scrollTo({ top: 0 }); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listening, speech.activeBlockId, speech.finishedOwner]);
+
   if (loading && !bundle) return <div className="empty">טוען שיעור…</div>;
   if (!lesson) return <div className="card"><h2>השיעור לא נמצא</h2><Link to="/guided" className="btn">חזרה למסלול</Link></div>;
   if (lesson.verification.status !== 'verified' && !['approved', 'corrected'].includes(app.decisions[lesson.id]?.decision ?? '')) {
@@ -68,6 +86,17 @@ export function LessonPage() {
         <Link to="/guided" className="btn ghost">‹ לכל השיעורים</Link>
         <span className="chip">{status === 'mastered' ? 'נשלט 100%' : status === 'locked' ? 'לימוד חופשי (נעול במסלול)' : 'במסלול המודרך'}</span>
       </div>
+      {speech.supported && step < steps.length && (
+        <div className="row"><ReadAloud owner={listenOwner} icon="🎧" label="האזנה לכל השיעור" testId="listen-all" build={() => {
+          const segs: SpeechSegment[] = [];
+          steps.forEach((s, i) => {
+            if (i < step) return;
+            if (s.type === 'explain') { const c = explainSegments(s.title, s.blocks, `lesson:${id}:${i}`); if (c.length) c[c.length - 1] = { ...c[c.length - 1], pauseAfterMs: PAUSE.block + 450 }; segs.push(...c); }
+            else if (s.type === 'figure' && s.caption) segs.push(...segmentsFromText(s.caption, { blockId: `lesson:${id}:${i}:fig`, after: PAUSE.block + 450 }));
+          });
+          return segs;
+        }} /></div>
+      )}
       <div>
         <span className="muted small">שיעור <Num>{idx + 1}</Num> · עמודים <Num>{lesson.pages[0]}–{lesson.pages[1]}</Num></span>
         <h1>{lesson.title}</h1>
@@ -77,11 +106,14 @@ export function LessonPage() {
 
       {cur?.type === 'explain' && (
         <div className="card explain stack" data-testid="explain-step" key={`s${step}`}>
-          {cur.title && <h2>{cur.title}</h2>}
+          <div className="row between card-head">
+            {cur.title ? <Speakable as="h2" id={`lesson:${id}:${step}:title`}>{cur.title}</Speakable> : <span />}
+            <ReadAloud owner={`lesson:${id}:${step}`} auto label="הקראת הכרטיס" build={() => explainSegments(cur.title, cur.blocks, `lesson:${id}:${step}`)} testId="read-card" />
+          </div>
           {(cur.figures ?? []).map((f) => (
             <figure className="fig" key={f}><img src={figureUrl(f)} alt="איור מקורי מהחוברת" onClick={() => setFig(f)} /><figcaption>איור מקורי מהחוברת (לחצו להגדלה)</figcaption></figure>
           ))}
-          {cur.blocks.map((b, i) => <Block b={b} key={i} />)}
+          {cur.blocks.map((b, i) => <Block b={b} id={`lesson:${id}:${step}:${i}`} key={i} />)}
           <div className="row between">
             <button className="btn ghost" type="button" onClick={() => setSource(refsOf(cur.factIds))} data-testid="step-source">המקור בחוברת</button>
             <div className="row">

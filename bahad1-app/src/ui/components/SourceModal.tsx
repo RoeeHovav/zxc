@@ -3,26 +3,11 @@ import { locateQuote } from '../../domain/normalize';
 import type { SourceRef } from '../../domain/types';
 import { figureUrl, loadSources, pageUrl, type SourceUnit } from '../../content/loader';
 import { useApp } from '../../app/store';
+import { ReadAloud, textSegments } from '../../app/speech';
 import { ImageViewer } from './ImageViewer';
+import { Modal } from './Modal';
 
-export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', k);
-    return () => window.removeEventListener('keydown', k);
-  }, [onClose]);
-  return (
-    <div className="modal-back" onClick={onClose} role="presentation">
-      <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()} data-testid="modal">
-        <div className="row between" style={{ marginBottom: 12 }}>
-          <h2 style={{ margin: 0 }}>{title}</h2>
-          <button className="btn" type="button" onClick={onClose} aria-label="סגירה">✕</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
+export { Modal };
 
 /** Shows the EXACT supporting passage (not the whole page) with the cited quote highlighted; the original page is one click away. */
 export function SourceModal({ refs, onClose }: { refs: SourceRef[]; onClose: () => void }) {
@@ -64,6 +49,7 @@ export function SourceModal({ refs, onClose }: { refs: SourceRef[]; onClose: () 
                 {u && range ? (<>{u.text.slice(0, range[0])}<mark className="q">{u.text.slice(range[0], range[1])}</mark>{u.text.slice(range[1])}</>) : (u?.text ?? r.quote)}
               </div>
               <div className="row">
+                {u && <ReadAloud owner={`src:${r.unit}:${i}`} label="הקראת הקטע" build={() => textSegments(u.text, `src:${r.unit}`)} testId="read-source" />}
                 <button className="btn" type="button" onClick={() => setView({ kind: 'page', src: pageUrl(r.page), label: `עמוד ${r.page} במקור` })}>הצגת העמוד המקורי</button>
                 {r.figure && <button className="btn" type="button" onClick={() => setView({ kind: 'figure', src: figureUrl(r.figure!), label: 'האיור המקורי' })}>הצגת האיור המקורי</button>}
               </div>

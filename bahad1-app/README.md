@@ -48,6 +48,16 @@ npx playwright test          # desktop + mobile (uses PLAYWRIGHT_BROWSERS_PATH; 
 1. Install Node.js (LTS) once. 2. Unzip. 3. Double-click `start.bat`. 4. The browser opens `http://localhost:4173`.
 (Any static server works; the app is plain static files. For a future private online deployment put the `app/` folder behind authentication — never public.)
 
+## Read aloud (Hebrew text-to-speech)
+Lesson cards, questions, answer explanations and the cited source passages have a 🔊 button; a small player (previous / pause / next sentence / stop / speed) appears while reading,
+the sentence being read is highlighted, and *Settings → Read aloud* lets you choose the voice, speed and pitch, test the voice and turn on auto-read.
+- It uses the voices of your own device/browser (Web Speech API) — no AI and no cloud service of the app. The best **local** Hebrew voice is chosen automatically.
+- Natural/neural voices (e.g. Microsoft *Natural* voices in Edge/Windows, Google voices on Android) are usually *online* voices: the browser then sends the read text to its provider.
+  That is **off by default**; enable *Allow online voices* in the settings (or in the dialog that offers it) if you accept that.
+- To make the voice sound as human as possible the text is cut into short sentences with natural pauses; vowel points, quotation marks and brackets are removed; Hebrew-letter numerals and years (ט״ו, תש״ח),
+  ranges (1936-1939), percentages and a few abbreviations are spelled out. This only changes how text is *spoken*, never what is displayed or graded.
+- If the device has no Hebrew voice, the button explains how to install one (Windows, Android, iPhone/iPad, Mac). Pause/resume restart at the current sentence, which works in every browser.
+
 ## Progress, backup and restore
 * Progress (lessons, assessments, answers, XP, streaks, preferences) is saved automatically in the browser's IndexedDB — **per browser/device; there is no sync**.
 * Settings → **ייצוא גיבוי** downloads a JSON file with a SHA-256 checksum. Settings → **ייבוא מקובץ** validates the file (format, schema version, checksum,

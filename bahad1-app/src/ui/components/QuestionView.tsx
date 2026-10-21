@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { Presented } from '../../domain/present';
 import type { Answer } from '../../domain/types';
 import { figureUrl } from '../../content/loader';
+import { ReadAloud, Speakable } from '../../app/speech';
+import { questionSegments } from '../../domain/speech';
 
 const LETTERS = ['א', 'ב', 'ג', 'ד', 'ה'];
 
@@ -56,7 +58,16 @@ export function QuestionView({ presented, answer, onChange, onSubmit, disabled, 
           <figcaption>איור מקורי מהחוברת (לחצו להגדלה)</figcaption>
         </figure>
       )}
-      <div className="q-stem" role="heading" aria-level={2}>{q.stem}</div>
+      <div className="q-head">
+        <div className="q-stem" role="heading" aria-level={2}><Speakable id={`q:${q.id}:stem`}>{q.stem}</Speakable></div>
+        <ReadAloud owner={`q:${q.id}`} compact auto label="הקראת השאלה" testId="read-question" build={() => questionSegments({
+          type: q.type, stem: q.stem,
+          options: presented.options?.map((o, i) => ({ text: o.text, idx: i })).filter((o) => !eliminated.includes(presented.options![o.idx].id)),
+          right: presented.right?.map((r) => ({ text: r.text })),
+          leftTexts: q.type === 'match' ? q.left.map((l) => l.text) : undefined,
+          items: q.type === 'order' ? (answer as Extract<Answer, { type: 'order' }>).value.map((id) => q.items.find((x) => x.id === id)?.text ?? '') : undefined,
+        }, `q:${q.id}`)} />
+      </div>
       {(q.type === 'mcq' || q.type === 'compare') && (
         <div className="opts" role="radiogroup" aria-label="אפשרויות תשובה">
           {presented.options!.map((o, i) => {
@@ -68,7 +79,7 @@ export function QuestionView({ presented, answer, onChange, onSubmit, disabled, 
               <button key={o.id} type="button" role="radio" aria-checked={selected} disabled={disabled || elim}
                 className={`opt${selected ? ' sel' : ''}${isRight ? ' right' : ''}${isWrong ? ' wrong' : ''}${elim ? ' elim' : ''}`}
                 onClick={() => onChange({ type: q.type, value: o.id })} data-testid={`opt-${i}`}>
-                <span className="k">{LETTERS[i]}</span><span>{o.text}</span>
+                <span className="k">{LETTERS[i]}</span><Speakable id={`q:${q.id}:opt${i}`}>{o.text}</Speakable>
               </button>
             );
           })}
@@ -85,7 +96,7 @@ export function QuestionView({ presented, answer, onChange, onSubmit, disabled, 
               <button key={o.id} type="button" role="checkbox" aria-checked={selected} disabled={disabled}
                 className={`opt${selected ? ' sel' : ''}${isRight ? ' right' : ''}${isWrong ? ' wrong' : ''}`}
                 onClick={() => onChange({ type: 'multi', value: selected ? cur.filter((x) => x !== o.id) : [...cur, o.id] })} data-testid={`opt-${i}`}>
-                <span className="k">{selected ? '✓' : LETTERS[i]}</span><span>{o.text}</span>
+                <span className="k">{selected ? '✓' : LETTERS[i]}</span><Speakable id={`q:${q.id}:opt${i}`}>{o.text}</Speakable>
               </button>
             );
           })}
