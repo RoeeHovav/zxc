@@ -1,10 +1,50 @@
 {
   "_comment": "Manual corrections of the automatic unit classification. Keys are unit ids (page.unit); values replace kind/scope. No book text here. Each entry was checked against the page image.",
   "overrides": {
-    "p035.u05": {"kind": "caption", "scope": "core", "reason": "framed photo caption read as footnote (no footnote mark, sits under the photo)"},
-    "p097.u07": {"kind": "caption", "scope": "core", "reason": "photo caption read as footnote (no footnote mark)"},
-    "p181.u06": {"kind": "caption", "scope": "core", "reason": "captions under the three leader photos (roles + names), read as footnote"},
-    "p187.u04": {"kind": "caption", "scope": "core", "reason": "captions under the three leader photos (roles + names), read as footnote"},
-    "p189.u03": {"kind": "caption", "scope": "core", "reason": "captions under the three leader photos (roles + names), read as footnote"}
+    "p035.u05": {
+      "kind": "caption",
+      "scope": "core",
+      "reason": "framed photo caption read as footnote (no footnote mark, sits under the photo)"
+    },
+    "p097.u07": {
+      "kind": "caption",
+      "scope": "core",
+      "reason": "photo caption read as footnote (no footnote mark)"
+    },
+    "p181.u06": {
+      "kind": "caption",
+      "scope": "core",
+      "reason": "captions under the three leader photos (roles + names), read as footnote"
+    },
+    "p187.u04": {
+      "kind": "caption",
+      "scope": "core",
+      "reason": "captions under the three leader photos (roles + names), read as footnote"
+    },
+    "p189.u03": {
+      "kind": "caption",
+      "scope": "core",
+      "reason": "captions under the three leader photos (roles + names), read as footnote"
+    },
+    "p032.u04": {
+      "kind": "thought_box",
+      "scope": "supplementary",
+      "reason": "thought box (label \"למחשבה\" at the end of the framed text) read as a core box"
+    },
+    "p067.u09": {
+      "kind": "thought_box",
+      "scope": "supplementary",
+      "reason": "thought box (a discussion question in a framed box, label drawn as an icon) read as a core box"
+    },
+    "p174.u10": {
+      "kind": "thought_box",
+      "scope": "supplementary",
+      "reason": "thought box drawn as a two-row table (text row + label row)"
+    },
+    "p174.u11": {
+      "kind": "thought_box",
+      "scope": "supplementary",
+      "reason": "label row \"למחשבה\" of the thought box table"
+    }
   }
 }
