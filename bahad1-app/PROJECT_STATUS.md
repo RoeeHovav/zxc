@@ -21,9 +21,9 @@ Last updated: 2026-10-11 (session 01E5qPhVjffQDtykJ1owxdae)
 | 3. App foundation: engines, IndexedDB, backup, UI (all modes), review dashboard | DONE; 61 unit tests + 27 Playwright tests (desktop+mobile, synthetic fixtures) pass |
 | 3b. Content pipeline: author guide, expander, validator, coverage, verdicts, batches, compiler, release packager | DONE |
 | 4. Pilot chapter 1 (13-23) | DONE except 1 pending question (q2425) awaiting round-4 re-check; 229 facts / 34 lessons / 592 questions |
-| 5. Remaining chapters ch2..ch13 | IN PROGRESS: wave 1 authors (ch2 pp24-35, ch3 pp53-64) running; map page 207 and image-heavy weapons chapter need visual transcription |
+| 5. Remaining chapters ch2..ch13 | IN PROGRESS: ch2 seg a nearly done; ch3 seg a / ch5 seg a in verification; other segments not started (see docs/SEGMENTS.md); map page 207 and the image-heavy weapons chapter need visual transcription |
 | 6. Learning features | implemented in app; need real content to exercise |
-| 7. QA | automated suites exist; real-content smoke test pending |
+| 7. QA | automated suites: 80 unit tests, 50+ synthetic e2e (desktop+mobile), real-content e2e (10) — all green |
 | 8. Final audit | script ready (scripts/final-audit.mjs); run after content |
 | 9. Delivery docs | README written; final numbers pending |
 
@@ -47,12 +47,16 @@ HTTP 429) and killed all running agents (no partial edits were left behind). Mea
 (≈110 items) ≈ 160-200K tokens / 7-9 min; repair pass ≈ 3 fixers. Extrapolated to the whole book at pilot density this is ≈ 20M+ author tokens plus verification, so the remaining chapters
 are being produced **in controlled waves of ≤3-4 agents**. Work is resumable: every stage writes files (src/, verdicts/, changed-rN-*.json, batches*.json) and the scripts are idempotent.
 
-## Pilot (chapter 1) verification numbers
-Round 1 (independent verification of the first full authoring): facts 220/228, lessons 23/34, questions 465/588 verified; 142 items went to a repair round (3 fixers).
-Round 2 (re-check of the repaired items): facts 227/228, lessons 33/34, questions 574/588 verified. The 16 remaining items were repaired by the orchestrator (one fact was split in two,
-four new questions added for it) and re-checked in round 3 (28 items: 27 pass, 1 fail). **Current chapter-1 state: facts 229/229, lessons 34/34, questions 591/592 verified**;
-the one remaining question (q2425, hint rewritten after the round-3 failure) is `pending` until a round-4 re-check. Nothing counts as verified without an independent `pass` verdict.
-Typical defects found by independent verifiers: hints that reveal the answer, missing natural accepted variants for short answers, open lists presented as complete, invented labels (e.g. "first stanza"), unsupported hints/attributions, dangling antecedents in stems. Guides and validator lints were tightened accordingly.
+## Verification numbers so far (nothing counts as verified without an independent `pass` verdict)
+| Segment | Authored | Round-1 independent verification | After repair rounds |
+|---|---|---|---|
+| ch1 (pp13-23) | 229 facts / 34 lessons / 592 questions | facts 220/228, lessons 23/34, questions 465/588 | facts 229/229, lessons 33/34 (l04 card re-check pending), questions 592/592 |
+| ch2 seg a (pp24-35) | 285 facts / 35 lessons / 617 questions (after audit + removal of a study-box fact) | 8 batches: about 70% of questions passed first time | facts 285/285, lessons 33/35, questions 610/617; the last 9 items await a final re-check |
+| ch3 seg a (pp53-64) | 241 facts / 31 lessons / 515 questions | batches 1-5 and 7 verified (65-90% of items pass; every failure has a note); batch 6 in progress | repair round pending |
+| ch5 seg a (pp97-107) | 216 facts / 22 lessons / 441 questions | batches 1-3 in progress | pending |
+Recurring defects found by the independent verifiers (and now lint-checked or written into the guides): hints that give the answer away or rely on outside/footnote knowledge, missing natural accepted variants (year forms "בשנת N", with/without article or preposition),
+open lists stated as complete, qualifiers dropped in lesson summaries, distractors that do not occur in the chapter, printed misprints silently corrected.
+Classification fixes made along the way (pipeline/unit_overrides.json): photo captions and leader-name captions read as footnotes, thought boxes read as core boxes/tables; lone footnote marks are ignored.
 
 ## Data durability
 `private/` lives only in this container (never in git, by design). Milestone archives of the authored content are delivered to the user directly as files (not via GitHub). The extraction is reproducible from the PDFs in ~25 s.

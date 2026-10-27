@@ -9,16 +9,16 @@ until every item is `verified` (or explicitly `flagged` for human review). State
 
 | Chapter | Segment | Pages | State |
 |---|---|---|---|
-| ch1 | (single) | 13–23 | OK except 1 pending question (q2425, re-check due) |
-| ch2 | a | 24–35 | in progress (authoring continuation) |
+| ch1 | (single) | 13–23 | OK except lesson l04 (card reworded, re-check due) |
+| ch2 | a | 24–35 | A V R1 R2; 9 items await the final re-check |
 | ch2 | b | 36–46 | — |
 | ch2 | c | 47–52 | — |
-| ch3 | a | 53–64 | in progress (authoring continuation) |
+| ch3 | a | 53–64 | A V; verification R1 almost complete, repairs next |
 | ch3 | b | 65–75 | — |
 | ch3 | c | 76–81 | — |
 | ch4 | a | 82–89 | — |
 | ch4 | b | 90–96 | — |
-| ch5 | a | 97–107 | in progress (authoring continuation) |
+| ch5 | a | 97–107 | A V; verification R1 in progress |
 | ch5 | b | 108–117 | — |
 | ch6 | a | 118–128 | — |
 | ch6 | b | 129–139 | — |
