@@ -37,7 +37,7 @@ export function Library() {
   }
   return (
     <div className="stack fade-in">
-      <div className="row between"><Link to="/library" className="btn ghost">‹ לכל הפרקים</Link><div className="row"><Link to={`/practice?chapter=${chapterId}`} className="btn" data-testid="chapter-practice">תרגול על הפרק</Link><Link to={`/exam?chapter=${chapterId}`} className="btn primary" data-testid="chapter-exam">מבחן על הפרק</Link></div></div>
+      <div className="row between"><Link to="/library" className="btn ghost">‹ לכל הפרקים</Link><div className="row"><Link to={`/read/${chapterId}`} className="btn" data-testid="chapter-read">📖 קריאת הפרק (הטקסט המקורי)</Link><Link to={`/practice?chapter=${chapterId}`} className="btn" data-testid="chapter-practice">תרגול על הפרק</Link><Link to={`/exam?chapter=${chapterId}`} className="btn primary" data-testid="chapter-exam">מבחן על הפרק</Link></div></div>
       <h1>{chapter?.title}</h1>
       {chapter && <PartialNote chapter={chapter} />}
       <input className="text-in" placeholder="חיפוש בקביעות המאומתות של הפרק…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש" data-testid="lib-search" />

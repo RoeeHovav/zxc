@@ -9,6 +9,7 @@ import { ExamPage } from './ui/pages/Exam';
 import { ReviewHub } from './ui/pages/ReviewHub';
 import { GamesPage } from './ui/pages/Games';
 import { Library } from './ui/pages/Library';
+import { ReadChapter } from './ui/pages/ReadChapter';
 import { Stats } from './ui/pages/Stats';
 import { Settings } from './ui/pages/Settings';
 import { ContentReview } from './ui/pages/ContentReview';
@@ -55,6 +56,7 @@ export function App() {
             <Route path="/games" element={<GamesPage />} />
             <Route path="/library" element={<Library />} />
             <Route path="/library/:chapterId" element={<Library />} />
+            <Route path="/read/:chapterId" element={<ReadChapter />} />
             <Route path="/stats" element={<Stats />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/content-review" element={<ContentReview />} />

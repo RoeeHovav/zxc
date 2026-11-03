@@ -9,7 +9,7 @@ export interface ManifestChapter extends Chapter {
   counts: { facts: number; lessons: number; questions: number; verifiedQuestions: number };
 }
 export interface Manifest extends Omit<ContentManifest, 'chapters'> { chapters: ManifestChapter[]; /** chapters shown as "עובדים על זה" – locked, no content bundle */ upcoming?: UpcomingChapter[]; preview?: boolean }
-export interface SourceUnit { id: string; page: number; kind: string; text: string; figure?: string; cells?: string[] }
+export interface SourceUnit { id: string; page: number; kind: string; text: string; figure?: string; cells?: string[]; h?: number; table?: string; row?: number; bold?: string[]; tr?: string }
 export interface ReviewData {
   generatedAt: string;
   chapters: Record<string, {

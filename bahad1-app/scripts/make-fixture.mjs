@@ -17,8 +17,14 @@ for (let p = 1; p <= 9; p++) fs.writeFileSync(path.join(OUT, `pages/p${String(p)
 
 const V = (status = 'verified', verdict = 'pass') => ({ status, generatedBy: 'fixture', programmatic: { quotesFound: true, answerKeyValid: true, noExcludedSource: true }, independent: { verdict, by: 'fixture' } });
 const units = [
-  { id: 'p001.u01', page: 1, kind: 'paragraph', text: 'בממלכת הצבעים הדמיונית יש שלושה פסים בדגל: אדום, כחול וירוק. הממלכה הוקמה בשנת 1200 לפי ספר הבדיקות.' },
+  { id: 'p001.u00', page: 1, kind: 'heading', h: 2, text: 'דגל הממלכה' },
+  { id: 'p001.u01', page: 1, kind: 'paragraph', text: 'בממלכת הצבעים הדמיונית יש שלושה פסים בדגל: אדום, כחול וירוק. הממלכה הוקמה בשנת 1200 לפי ספר הבדיקות.', bold: ['שלושה פסים'] },
+  { id: 'p001.v1', page: 1, kind: 'figure_text', figure: 'x1-f1', text: 'טקסט מדומה מתוך אינפוגרפיקה', tr: 'double_read_agree' },
+  { id: 'p001.v2', page: 1, kind: 'figure_text', figure: 'x1-f1', text: 'טקסט לא מאומת שאסור להציג', tr: 'none' },
+  { id: 'p001.u02', page: 1, kind: 'thought_box', text: 'שאלה למחשבה: האם הצבעים מסמלים משהו?' },
   { id: 'p002.u01', page: 2, kind: 'paragraph', text: 'מלך הצבעים הראשון נקרא אורן, והוא שלט שלושים שנה. אחריו שלט המלך נועם עשרים שנה.' },
+  { id: 'p002.u02', page: 2, kind: 'table_row', table: 'T1', row: 1, cells: ['המלך', 'תקופת השלטון'], text: 'המלך תקופת השלטון' },
+  { id: 'p002.u03', page: 2, kind: 'table_row', table: 'T1', row: 2, cells: ['אורן', 'שלושים שנה'], text: 'אורן שלושים שנה' },
   { id: 'p003.u01', page: 3, kind: 'paragraph', text: 'העיר הבירה של הממלכה נקראת צבעונית. בעיר שלוש שכונות: צפונית, דרומית ומזרחית.' },
   { id: 'p004.u01', page: 4, kind: 'paragraph', text: 'שלבי הכנת הצבע: ראשית טוחנים את הפיגמנט, אחר כך מערבבים עם מים ולבסוף מסננים.' },
   { id: 'p005.u01', page: 5, kind: 'paragraph', text: 'ארבעת הגילדות: הצבעים, האורגים, הצורפים והסופרים.' },
@@ -75,11 +81,11 @@ Q.push({ ...Q.find((x) => x.type === 'match'), id: 'x1.q901', lessonId: 'x1.l2',
 const el = (t, f) => ({ type: 'explain', title: t, blocks: [{ kind: 'p', text: `הסבר קצר על ${t}.` }, { kind: 'key', text: `לזכור: ${t}` }], factIds: f.map((x) => `x1.${x}`) });
 const chk = (i) => ({ type: 'check', questionId: `x1.q${String(i).padStart(3, '0')}` });
 const lessons = [
-  { id: 'x1.l1', chapter: 'x1', order: 1, title: 'דגל הממלכה', pages: [1, 1], objectives: ['x1.f1', 'x1.f2'], assessmentSize: 3, summary: 'סיכום שיעור הדגל.', verification: V(),
+  { id: 'x1.l1', chapter: 'x1', order: 1, title: 'דגל הממלכה', pages: [1, 1], readingUnits: ['p001.u00', 'p001.u01', 'p001.v1', 'p001.v2', 'p001.u02'], objectives: ['x1.f1', 'x1.f2'], assessmentSize: 3, summary: 'סיכום שיעור הדגל.', verification: V(),
     steps: [el('פסי הדגל', ['f1']), chk(1), { type: 'figure', figureId: 'x1-f1', caption: 'איור לדוגמה' }, el('שנת ההקמה', ['f2']), chk(5)] },
-  { id: 'x1.l2', chapter: 'x1', order: 2, title: 'מלכי הממלכה', pages: [2, 2], objectives: ['x1.f3', 'x1.f4'], assessmentSize: 3, verification: V(),
+  { id: 'x1.l2', chapter: 'x1', order: 2, title: 'מלכי הממלכה', pages: [2, 2], readingUnits: ['p002.u01', 'p002.u02', 'p002.u03'], objectives: ['x1.f3', 'x1.f4'], assessmentSize: 3, verification: V(),
     steps: [el('המלך הראשון', ['f3']), chk(8), el('המלך השני', ['f4']), chk(11)] },
-  { id: 'x1.l3', chapter: 'x1', order: 3, title: 'העיר והגילדות', pages: [3, 5], objectives: ['x1.f5', 'x1.f6', 'x1.f7', 'x1.f8'], assessmentSize: 5, verification: V(),
+  { id: 'x1.l3', chapter: 'x1', order: 3, title: 'העיר והגילדות', pages: [3, 5], readingUnits: ['p003.u01', 'p004.u01', 'p005.u01'], objectives: ['x1.f5', 'x1.f6', 'x1.f7', 'x1.f8'], assessmentSize: 5, verification: V(),
     steps: [el('הבירה', ['f5', 'f6']), chk(14), el('הכנת צבע', ['f7']), chk(18), el('הגילדות', ['f8']), chk(21)] },
 ];
 const bundle = { chapter: { id: 'x1', title: 'פרק בדיקה סינתטי', firstPage: 1, lastPage: 5, order: 0, lessonIds: lessons.map((l) => l.id) }, facts, lessons, questions: Q };

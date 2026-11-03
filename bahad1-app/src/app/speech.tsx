@@ -7,7 +7,7 @@ export function useSpeech(): SpeechState {
   return useSyncExternalStore(speechEngine.subscribe, speechEngine.getState, speechEngine.getState);
 }
 /** Wraps on-screen text so that it is highlighted (and kept in view) while it is being read aloud. */
-export function Speakable({ id, as: Tag = 'span', className = '', children, ...rest }: { id: string; as?: 'span' | 'div' | 'p' | 'li' | 'h2' | 'figcaption'; className?: string; children: React.ReactNode } & React.HTMLAttributes<HTMLElement>) {
+export function Speakable({ id, as: Tag = 'span', className = '', children, ...rest }: { id: string; as?: 'span' | 'div' | 'p' | 'li' | 'h2' | 'h3' | 'h4' | 'figcaption' | 'blockquote'; className?: string; children: React.ReactNode } & React.HTMLAttributes<HTMLElement>) {
   const on = useReadingBlock(id);
   const ref = useRef<HTMLElement>(null);
   useEffect(() => { if (on) ref.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, [on]);

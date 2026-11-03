@@ -19,7 +19,12 @@ fs.rmSync(outDir, { recursive: true, force: true });
 for (const d of ['sources', 'figs', 'pages']) fs.mkdirSync(path.join(outDir, d), { recursive: true });
 
 const units = loadUnits();
-const figIds = new Set(readJson(path.join(SOURCE_DIR, 'figures.json')).map((f) => f.id));
+const figList = readJson(path.join(SOURCE_DIR, 'figures.json'));
+const figIds = new Set(figList.map((f) => f.id));
+const figById = new Map(figList.map((f) => [f.id, f]));
+const figsByPage = new Map();
+for (const f of figList) (figsByPage.get(f.page) ?? figsByPage.set(f.page, []).get(f.page)).push(f);
+const unitNum = (id) => Number(/\.[uv](\d+)$/.exec(id)?.[1] ?? 0);
 const AVAIL = fs.existsSync(path.join(ROOT, 'pipeline/availability.json')) ? readJson(path.join(ROOT, 'pipeline/availability.json')) : { open: null, groups: {} };
 // Only chapters listed as open are published to learners; every other chapter (even with authored work in private/) is shown as "עובדים על זה" and has no bundle.
 const isOpen = (id) => !AVAIL.open || AVAIL.open.includes(id);
@@ -45,7 +50,61 @@ for (const [order, ch] of chapters.entries()) {
   for (const l of lessons) for (const s of l.steps) { if (s.type === 'figure') neededFigs.add(s.figureId); if (s.type === 'explain') (s.figures ?? []).forEach((f) => neededFigs.add(f)); }
   for (const arr of [facts, questions]) for (const it of arr) { (it.refs ?? []).forEach((r) => { neededPages.add(r.page); if (r.figure) neededFigs.add(r.figure); }); if (it.figure) neededFigs.add(it.figure); }
   const chUnits = [...units.values()].filter((u) => u.chapter === ch.id && (u.scope === 'core' || u.scope === 'supplementary'));
-  fs.writeFileSync(path.join(outDir, 'sources', `${ch.id}.json`), JSON.stringify(chUnits.map((u) => ({ id: u.id, page: u.page, kind: u.kind, text: u.text, ...(u.figure ? { figure: u.figure } : {}), ...(u.cells ? { cells: u.cells } : {}) }))));
+  // ---- reading order of the ORIGINAL book text (study material): text units by extraction order, figures merged in by their position on the page ----
+  const rowOf0 = (u) => ({
+    id: u.id, page: u.page, kind: u.kind, text: u.text,
+    ...(u.figure ? { figure: u.figure } : {}), ...(u.cells ? { cells: u.cells } : {}), ...(u.table ? { table: u.table, row: u.row } : {}),
+    ...(u.kind === 'heading' && u.headingLevel ? { h: u.headingLevel } : {}),
+    ...(u.boldTerms?.length && u.kind !== 'heading' ? { bold: u.boldTerms.filter((t) => t.length >= 3 && t.length <= 160) } : {}),
+    // a transcribed image text is shown only when two independent readings agreed (or an adjudicator decided); otherwise the image alone is shown
+    ...(u.visual ? { tr: u.transcription?.status ?? 'none' } : {}),
+  });
+  const ordered = [];
+  for (let pg = ch.firstPage; pg <= ch.lastPage; pg++) {
+    const txt = chUnits.filter((u) => u.page === pg && !u.visual).sort((a, b) => unitNum(a.id) - unitNum(b.id));
+    const vis = chUnits.filter((u) => u.page === pg && u.visual);
+    const visFig = new Set(vis.map((v) => v.figure));
+    const figEntries = [
+      ...vis.map((v) => ({ bbox: figById.get(v.figure)?.bbox ?? null, row: rowOf0(v) })),
+      ...(figsByPage.get(pg) ?? []).filter((f) => !visFig.has(f.id) && (f.pageAreaFraction ?? 1) >= 0.012).map((f) => ({ bbox: f.bbox, row: { id: `fig:${f.id}`, page: pg, kind: 'figure', text: '', figure: f.id } })),
+    ];
+    // a picture is shown right above its caption when a caption sits directly under it (the book floats pictures beside the text); otherwise by its vertical position
+    const isCaption = (u) => u.kind === 'caption' || (u.kind === 'table_row' && (u.cells?.length ?? 1) <= 1);
+    const anchored = new Map();
+    const loose = [];
+    for (const fe of figEntries) {
+      const cap = fe.bbox && txt.find((u) => isCaption(u) && u.bbox && Math.min(u.bbox[2], fe.bbox[2]) - Math.max(u.bbox[0], fe.bbox[0]) > 0 && u.bbox[1] >= fe.bbox[3] - 8 && u.bbox[1] <= fe.bbox[3] + 80);
+      if (cap) (anchored.get(cap.id) ?? anchored.set(cap.id, []).get(cap.id)).push(fe.row); else loose.push({ y: fe.bbox?.[1] ?? 1e9, row: fe.row });
+    }
+    loose.sort((x, y) => x.y - y.y);
+    let fi = 0;
+    for (const u of txt) {
+      while (fi < loose.length && loose[fi].y <= (u.bbox?.[1] ?? 0)) ordered.push(loose[fi++].row);
+      for (const r of anchored.get(u.id) ?? []) ordered.push(r);
+      ordered.push(rowOf0(u));
+    }
+    while (fi < loose.length) ordered.push(loose[fi++].row);
+  }
+  for (const r of ordered) if (r.figure) neededFigs.add(r.figure);
+  for (let pg = ch.firstPage; pg <= ch.lastPage; pg++) neededPages.add(pg);
+  // the part of the original text that belongs to each lesson: from the first to the last source unit cited by the lesson's facts (plus headings directly above)
+  {
+    const idxOf = new Map(ordered.map((r, i) => [r.id, i]));
+    const factById0 = new Map(facts.map((f) => [f.id, f]));
+    const inLesson = new Set(); let empty = 0; let widest = 0;
+    for (const l of lessons) {
+      const fids = new Set(l.objectives); for (const st of l.steps) if (st.type === 'explain') st.factIds.forEach((f) => fids.add(f));
+      const cited = []; for (const f of fids) for (const r of factById0.get(f)?.refs ?? []) if (idxOf.has(r.unit)) cited.push(idxOf.get(r.unit));
+      if (!cited.length) { l.readingUnits = []; empty++; continue; }
+      let a = Math.min(...cited); const b = Math.max(...cited);
+      while (a > 0 && ordered[a - 1].kind === 'heading') a--;
+      l.readingUnits = ordered.slice(a, b + 1).map((r) => r.id);
+      widest = Math.max(widest, l.readingUnits.length); l.readingUnits.forEach((id) => inLesson.add(id));
+    }
+    const coreText = ordered.filter((r) => r.kind !== 'figure' && r.kind !== 'figure_text' && chUnits.find((u) => u.id === r.id)?.scope === 'core');
+    console.log(`  ${ch.id}: reading text — ${ordered.length} blocks, ${lessons.length - empty}/${lessons.length} lessons with text (widest ${widest}), ${coreText.filter((r) => !inLesson.has(r.id)).length}/${coreText.length} core units outside every lesson range`);
+  }
+  fs.writeFileSync(path.join(outDir, 'sources', `${ch.id}.json`), JSON.stringify(ordered));
   fs.writeFileSync(path.join(outDir, `${ch.id}.json`), JSON.stringify(bundle));
   const count = (arr) => arr.reduce((a, x) => { a[x.verification.status] = (a[x.verification.status] ?? 0) + 1; return a; }, {});
   // ---- coverage matrix: SOURCE UNIT -> FACT -> LESSON -> QUESTION -> VERIFICATION (computed from the compiled items) ----

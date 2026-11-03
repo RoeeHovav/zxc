@@ -20,7 +20,7 @@ test('file:// release: dashboard, guided path, a lesson and practice work, with 
   await expect(page.locator('[data-testid="upcoming-ch5"]')).toContainText('עובדים על זה');
   await page.goto(`${url}#/lesson/ch1.l03`);
   await expect(page.locator('[data-testid="lesson-reading"]')).toBeVisible({ timeout: 20000 });
-  await expect(page.locator('[data-testid="explain-card"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid="original-text"]')).toBeVisible();
   await page.goto(`${url}#/practice?lesson=ch1.l03`);
   await page.waitForSelector('[data-testid="start-practice"]');
   await page.click('[data-testid="start-practice"]');

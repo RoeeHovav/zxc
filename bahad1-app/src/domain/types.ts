@@ -64,6 +64,8 @@ export interface Lesson {
   /** how many questions a mastery attempt contains (<= pool size) */
   assessmentSize: number;
   summary?: string;
+  /** ids (in sources/<chapter>.json, reading order) of the original book text that belongs to this lesson */
+  readingUnits?: string[];
   verification: Verification; // lesson explanations are verified like every other educational item
 }
 
@@ -223,7 +225,7 @@ export interface Preferences {
   theme: 'system' | 'light' | 'dark';
   dailyReviewSize: number;
   fontScale: number;
-  /** 'read' = read the whole lesson in one page, then the mastery test (default); 'steps' = card by card with practice questions in between */
-  lessonFlow: 'read' | 'steps';
+  /** 'original' = the book's own text of the lesson, then the mastery test (default); 'summary' = rewritten cards on one page; 'steps' = card by card with practice questions in between */
+  lessonFlow: 'original' | 'summary' | 'steps';
 }
-export const DEFAULT_PREFERENCES: Preferences = { theme: 'system', dailyReviewSize: 20, fontScale: 1, lessonFlow: 'read' };
+export const DEFAULT_PREFERENCES: Preferences = { theme: 'system', dailyReviewSize: 20, fontScale: 1, lessonFlow: 'original' };

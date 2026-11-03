@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { ExplainBlock, Fact, LessonStep, SourceRef } from '../../domain/types';
 import { useApp } from '../../app/store';
-import { figureUrl } from '../../content/loader';
+import { figureUrl, loadSources, pageUrl } from '../../content/loader';
+import { bookSegments, groupBookBlocks, type BookUnit } from '../../domain/bookText';
+import { OriginalText } from '../components/OriginalText';
 import { Num, Progress, useChapters } from '../components/common';
 import { ReadAloud, Speakable, useSpeech } from '../../app/speech';
 import { explainSegments, PAUSE, segmentsFromText, type SpeechSegment } from '../../domain/speech';
@@ -46,9 +48,25 @@ export function LessonPage() {
   const steps: LessonStep[] = useMemo(() => (lesson?.steps ?? []).filter((s) => s.type !== 'check' || bankIds.has(s.questionId)), [lesson, bankIds]);
   const step = Math.min(Math.max(0, Number(sp.get('step') ?? 0) || 0), steps.length);
   const status = app.statuses[id];
-  // 'read' (default): the whole lesson on one page, then the test; 'steps': card by card with practice questions in between (?flow=steps overrides the setting)
+  // 'original' (default): the book's own text of the lesson, then the test; 'summary': rewritten cards on one page; 'steps': card by card with practice questions in between
+  // (?flow=… overrides the setting; a stored legacy value 'read' means the old default and is treated as 'original')
   const flowParam = sp.get('flow');
-  const flow: 'read' | 'steps' = flowParam === 'steps' || flowParam === 'read' ? flowParam : app.prefs.lessonFlow;
+  const flow: 'original' | 'summary' | 'steps' = flowParam === 'steps' || flowParam === 'summary' || flowParam === 'original' ? flowParam : app.prefs.lessonFlow === 'steps' || app.prefs.lessonFlow === 'summary' ? app.prefs.lessonFlow : 'original';
+  const [rows, setRows] = useState<BookUnit[] | null>(null);
+  const [view, setView] = useState<'text' | 'pages'>('text');
+  useEffect(() => {
+    let alive = true;
+    loadSources(chapterId).then((r) => { if (alive) setRows(r as BookUnit[]); }).catch(() => { if (alive) setRows([]); });
+    return () => { alive = false; };
+  }, [chapterId]);
+  const units = useMemo(() => {
+    const by = new Map((rows ?? []).map((r) => [r.id, r] as const));
+    return (lesson?.readingUnits ?? []).map((u) => by.get(u)).filter((u): u is BookUnit => !!u);
+  }, [rows, lesson]);
+  const lessonPages = useMemo(() => [...new Set(units.map((u) => u.page))].sort((a, b) => a - b), [units]);
+  const blocks = useMemo(() => groupBookBlocks(units, { pageMarkers: lessonPages.length > 1 }), [units, lessonPages.length]);
+  // the original text needs the lesson's reading range and the chapter's source file; otherwise the rewritten summary page is shown
+  const effFlow: 'original' | 'summary' | 'steps' = flow === 'original' && rows !== null && units.length === 0 ? 'summary' : flow;
 
   useEffect(() => { if (lesson && !loading) app.saveLessonProgress(lesson.id, step, step > 0 ? [step - 1] : []).catch(() => {}); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [lesson?.id, step, loading]);
 
@@ -58,7 +76,7 @@ export function LessonPage() {
   const listenOwner = `lessonall:${id}`;
   const listening = speech.ownerId === listenOwner && speech.status !== 'idle';
   useEffect(() => {
-    if (flow === 'read') { if (speech.finishedOwner === listenOwner) document.querySelector('[data-testid="lesson-end"]')?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }); return; }
+    if (flow !== 'steps') { if (speech.finishedOwner === listenOwner) document.querySelector('[data-testid="lesson-end"]')?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }); return; }
     const b = speech.activeBlockId;
     if (listening && b) {
       const m = /^lesson:[^:]+:(\d+):/.exec(b);
@@ -75,7 +93,7 @@ export function LessonPage() {
   useEffect(() => {
     markedRead.current = false;
     const el = endRef.current;
-    if (flow !== 'read' || !lesson || !el || typeof IntersectionObserver === 'undefined') return;
+    if (effFlow === 'steps' || !lesson || !el || typeof IntersectionObserver === 'undefined') return;
     const io = new IntersectionObserver((es) => {
       if (es.some((e) => e.isIntersecting) && !markedRead.current) {
         markedRead.current = true;
@@ -85,9 +103,10 @@ export function LessonPage() {
     io.observe(el);
     return () => io.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flow, lesson?.id, steps.length, loading]);
+  }, [effFlow, lesson?.id, steps.length, loading, rows]);
 
   if (loading && !bundle) return <div className="empty">טוען שיעור…</div>;
+  if (flow === 'original' && rows === null) return <div className="empty">טוען את הטקסט המקורי…</div>;
   if (!lesson) return <div className="card"><h2>השיעור לא נמצא</h2><Link to="/guided" className="btn">חזרה למסלול</Link></div>;
   if (lesson.verification.status !== 'verified' && !['approved', 'corrected'].includes(app.decisions[lesson.id]?.decision ?? '')) {
     return <div className="card stack"><h2>השיעור טרם אומת</h2><p>תוכן שלא עבר אימות מול החוברת אינו מוצג ללימוד. ניתן לבדוק אותו בלוח בקרת המקורות.</p><Link to="/content-review" className="btn">לוח בקרת מקורות</Link></div>;
@@ -111,9 +130,10 @@ export function LessonPage() {
     return segs;
   };
 
-  if (flow === 'read') {
+  if (effFlow !== 'steps') {
+    const original = effFlow === 'original';
     return (
-      <div className="narrow stack fade-in" data-testid="lesson-reading">
+      <div className="narrow stack fade-in" data-testid="lesson-reading" data-flow={effFlow}>
         <div className="row between">
           <Link to="/guided" className="btn ghost">‹ לכל השיעורים</Link>
           <span className="chip">{status === 'mastered' ? 'נשלט 100%' : status === 'locked' ? 'לימוד חופשי (נעול במסלול)' : 'במסלול המודרך'}</span>
@@ -121,13 +141,16 @@ export function LessonPage() {
         <div>
           <span className="muted small">שיעור <Num>{idx + 1}</Num> · עמודים <Num>{lesson.pages[0]}–{lesson.pages[1]}</Num></span>
           <h1>{lesson.title}</h1>
-          <p className="muted small" style={{ margin: 0 }}>קוראים את כל השיעור, ואחר כך ניגשים למבחן עליו.</p>
+          <p className="muted small" style={{ margin: 0 }}>{original ? 'הטקסט המקורי מהחוברת: קוראים (או מאזינים) ואחר כך ניגשים למבחן עליו.' : 'סיכום השיעור בניסוח מחדש: קוראים ואחר כך ניגשים למבחן עליו.'}</p>
         </div>
         <div className="row">
-          {speech.supported && <ReadAloud owner={listenOwner} icon="🎧" label="האזנה לכל השיעור" testId="listen-all" build={buildAll} />}
+          {speech.supported && <ReadAloud owner={listenOwner} icon="🎧" label="האזנה לכל השיעור" testId="listen-all" build={original ? () => bookSegments(blocks, `orig:${id}`) : buildAll} />}
+          {original && <div className="seg" role="group" aria-label="תצוגה"><button type="button" className={view === 'text' ? 'on' : ''} onClick={() => setView('text')} data-testid="view-text">טקסט</button><button type="button" className={view === 'pages' ? 'on' : ''} onClick={() => setView('pages')} data-testid="view-pages">עמוד מקורי (תמונה)</button></div>}
           {status !== 'locked' && <Link to={`/assess/${id}`} className="btn ghost" data-testid="skip-to-test">ישר למבחן</Link>}
         </div>
-        {steps.map((s, i) => {
+        {original && view === 'text' && <div className="card"><OriginalText blocks={blocks} prefix={`orig:${id}`} onFigure={setFig} /></div>}
+        {original && view === 'pages' && <div className="stack" data-testid="page-images">{lessonPages.map((p) => <img key={p} className="page-img" src={pageUrl(p)} alt={`עמוד ${p} בחוברת`} loading="lazy" />)}<p className="muted small" style={{ margin: 0 }}>זהו הצילום המקורי של העמוד/ים. הקראה בקול זמינה בתצוגת הטקסט.</p></div>}
+        {!original && steps.map((s, i) => {
           if (s.type === 'explain') return (
             <section className="card explain stack" key={i} data-testid="explain-card" aria-label={s.title ?? `חלק ${i + 1}`}>
               <div className="row between card-head">
@@ -150,7 +173,7 @@ export function LessonPage() {
         })}
         <div className="card accent stack" data-testid="lesson-end" ref={endRef}>
           <h2>סיימת לקרוא 🎯</h2>
-          {lesson.summary && <p>{lesson.summary}</p>}
+          {!original && lesson.summary && <p>{lesson.summary}</p>}
           <p>עכשיו ניגשים למבחן השליטה: שאלות מייצגות על כל יעדי השיעור. כדי לשלוט בשיעור נדרשות <b>כל</b> התשובות נכונות, ללא רמזים וללא ניסיון שני.</p>
           <div className="row">
             {status !== 'locked' ? <Link to={`/assess/${id}`} className="btn primary big" data-testid="to-assessment">למבחן השליטה</Link>
