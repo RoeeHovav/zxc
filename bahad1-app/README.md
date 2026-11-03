@@ -44,6 +44,9 @@ npx playwright test          # desktop + mobile (uses PLAYWRIGHT_BROWSERS_PATH; 
    node scripts/package-release.mjs   # -> release/bahad1-app-release.zip (private!)
    ```
 
+### Which chapters learners see (`pipeline/availability.json`)
+Only the chapters listed under `open` are published to learners (their bundles go into `public/content`). Every other chapter – even one with authored work in `private/content` – is shown on the dashboard, in the guided path and in the library as **"עובדים על זה"**: visible, locked, and without any content in the app. An open chapter whose authored content does not yet reach the end of its book pages shows a note saying how far it reaches, and shows only items that independent verifiers passed. To open a chapter, add it to `open` and rebuild.
+
 ## Running locally on Windows (from the release zip)
 1. Install Node.js (LTS) once. 2. Unzip. 3. Double-click `start.bat`. 4. The browser opens `http://localhost:4173`.
 (Any static server works; the app is plain static files. For a future private online deployment put the `app/` folder behind authentication — never public.)
