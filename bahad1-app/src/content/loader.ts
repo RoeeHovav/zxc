@@ -27,12 +27,33 @@ export interface ReviewData {
 }
 
 const cache = new Map<string, Promise<unknown>>();
+/**
+ * Two ways to read the content files:
+ *  - served over http(s) (dev server, vite preview, the optional local server): fetch() of the .json files;
+ *  - opened straight from disk (file://, the "double-click index.html" release): browsers block fetch() of local files, so the release
+ *    contains each file as <path>.js that registers its data in window.__BAHAD__ (loaded with an ordinary <script> element). That build
+ *    also carries <meta name="bahad-content" content="script">, so it works the same when the optional local server serves it.
+ */
+const fromDisk = typeof location !== 'undefined' && (location.protocol === 'file:' || (typeof document !== 'undefined' && !!document.querySelector('meta[name="bahad-content"][content="script"]')));
+function loadScriptData<T>(path: string): Promise<T> {
+  const registry = ((window as unknown as { __BAHAD__?: Record<string, unknown> }).__BAHAD__ ??= {});
+  if (path in registry) return Promise.resolve(registry[path] as T);
+  return new Promise<T>((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = `content/${path}.js`;
+    el.onload = () => { el.remove(); path in registry ? resolve(registry[path] as T) : reject(new Error(`${path}: missing data`)); };
+    el.onerror = () => { el.remove(); reject(new Error(`${path}: not found`)); };
+    document.head.appendChild(el);
+  });
+}
 function getJson<T>(path: string): Promise<T> {
   if (!cache.has(path)) {
-    cache.set(path, fetch(`content/${path}`, { cache: 'no-cache' }).then((r) => {
+    cache.set(path, fromDisk ? loadScriptData<T>(path) : fetch(`content/${path}`, { cache: 'no-cache' }).then((r) => {
       if (!r.ok) throw new Error(`${path}: ${r.status}`);
       return r.json();
     }));
+    // a failed load must not be cached forever (e.g. a temporary network/disk error)
+    (cache.get(path) as Promise<unknown>).catch(() => cache.delete(path));
   }
   return cache.get(path) as Promise<T>;
 }

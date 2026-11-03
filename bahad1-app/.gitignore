@@ -13,3 +13,4 @@ playwright-report/
 test-results/
 dist-fixture/
 release/
+dist-file/
