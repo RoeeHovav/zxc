@@ -1,0 +1,114 @@
+# Built-in Hebrew pronunciation lexicon.
+# written<TAB>spoken<TAB>context<TAB>note
+# context: any | after_number | not_after_number
+# Spoken forms are vowelised (niqqud) so the speech engine has no ambiguity.
+# Prefixes (ו ה ב כ ל מ ש and combinations) are handled automatically.
+# Users can override or add entries from the app (Pronunciation dictionary).
+צה"ל	צַהַל	any	IDF
+ארה"ב	אַרְצוֹת הַבְּרִית	any
+ד"ר	דּוֹקְטוֹר	any
+עו"ד	עוֹרֵךְ דִּין	any
+רו"ח	רוֹאֵה חֶשְׁבּוֹן	any
+וכו'	וְכוּלֵי	any
+וכד'	וְכַדּוֹמֶה	any
+וגו'	וְגוֹמֵר	any
+כנ"ל	כַּנַּל	any
+ע"י	עַל יְדֵי	any
+עפ"י	עַל פִּי	any
+ע"פ	עַל פִּי	any
+ז"א	זֹאת אוֹמֶרֶת	any
+ז"ל	זִכְרוֹנוֹ לִבְרָכָה	any
+מס'	מִסְפָּר	any
+עמ'	עַמּוּד	any
+פרופ'	פְּרוֹפֶסוֹר	any
+גב'	גְּבֶרֶת	any
+רח'	רְחוֹב	any
+ת"א	תֵּל אָבִיב	any
+בע"מ	בְּעֵרָבוֹן מֻגְבָּל	any
+חו"ל	חוּל	any
+סה"כ	סַךְ הַכֹּל	any
+בד"כ	בְּדֶרֶךְ כְּלָל	any
+אח"כ	אַחַר כָּךְ	any
+כ"כ	כָּל כָּךְ	any
+תנ"ך	תַּנַךְ	any	Tanakh
+רמב"ם	רַמְבַּם	any
+רש"י	רַשִׁי	any
+חז"ל	חֲזַל	any
+ביל"ו	בִּילוּ	any
+אצ"ל	אֶצֶל	any	Irgun
+לח"י	לֶחִי	any	Lehi
+פלמ"ח	פַּלְמָח	any
+או"ם	אוּם	any	UN
+נאט"ו	נָאטוֹ	any
+ש"ח	שְׁקָלִים	after_number
+ק"מ	קִילוֹמֶטֶר	after_number
+ס"מ	סֶנְטִימֶטֶר	after_number
+מ"מ	מִילִימֶטֶר	after_number
+מ"מ	מֶם מֶם	not_after_number	platoon commander
+מ"ר	מֶטֶר רְבוּעַ	after_number
+ק"ג	קִילוֹגְרָם	after_number
+קמ"ש	קַמָּשׁ	any
+שב"כ	שַׁבָּק	any	Shin Bet
+מד"א	מָדָא	any
+רמטכ"ל	רַמַטְכָּל	any	Chief of Staff
+תא"ל	תַּת אַלּוּף	any
+אל"ם	אַלּוּף מִשְׁנֶה	any
+סא"ל	סְגַן אַלּוּף	any
+רס"ן	רַב סֶרֶן	any
+סג"ם	סֶגֶן מִשְׁנֶה	any
+רס"ר	רַסָּר	any
+רס"ל	רַב סַמָּל	any
+סמ"ר	סַמָּר	any
+רב"ט	רַבָּט	any
+מ"פ	מֶם פֵּא	any	company commander
+מ"כ	מֶם כָּף	any	squad commander
+מג"ד	מַגָּד	any	battalion commander
+מח"ט	מַחַט	any	brigade commander
+בה"ד	בַּהַד	any	training base
+חי"ר	חִיר	any	infantry
+אמ"ן	אַמָּן	any	military intelligence
+אכ"א	אַכָּא	any
+אג"ם	אַגָּם	any
+נ"ט	נוּן טֵית	any	anti-tank
+נ"מ	נוּן מֵם	any	anti-aircraft
+ש"ג	שִׁין גִּימֶל	any
+מש"ק	מַשָּׁק	any
+קמב"ץ	קַמְבָּץ	any
+קב"ט	קַבָּט	any
+ממ"ד	מַמָּד	any
+גדנ"ע	גַּדְנָע	any
+נח"ל	נַחַל	any
+שב"ס	שַׁבָּס	any
+בג"ץ	בָּגָץ	any
+בימ"ש	בֵּית מִשְׁפָּט	any
+יו"ר	יוֹשֵׁב רֹאשׁ	any
+ח"כ	חֲבֵר כְּנֶסֶת	any
+חה"כ	חֲבֵר הַכְּנֶסֶת	any
+ראה"מ	רֹאשׁ הַמֶּמְשָׁלָה	any
+רוה"מ	רֹאשׁ הַמֶּמְשָׁלָה	any
+אש"ף	אַשָּׁף	any
+ש"ס	שַׁס	any
+מפא"י	מַפַּאי	any
+מפ"ם	מַפָּם	any
+קק"ל	קֶרֶן קַיֶּמֶת לְיִשְׂרָאֵל	any
+תש"ח	תַּשַּׁח	any
+ע"ש	עַל שֵׁם	any
+בי"ס	בֵּית סֵפֶר	any
+ביה"ס	בֵּית הַסֵּפֶר	any
+ביה"ח	בֵּית הַחוֹלִים	any
+ת"ז	תְּעוּדַת זֶהוּת	any
+לפנה"ס	לִפְנֵי הַסְּפִירָה	any
+לסה"נ	לַסְּפִירָה הַנּוֹצְרִית	any
+לספה"נ	לַסְּפִירָה הַנּוֹצְרִית	any
+מנכ"ל	מַנְכָּל	any
+סמנכ"ל	סְמַנְכָּל	any
+מע"מ	מַעַם	any
+ת"ד	תֵּבַת דֹּאַר	any
+דו"ח	דּוּחַ	any
+ד"ח	דּוּחַ	any
+סע'	סָעִיף	any
+פס'	פָּסוּק	any
+א"י	אֶרֶץ יִשְׂרָאֵל	any
+שו"ת	שׁוּת	any
+אוה"ע	אֻמּוֹת הָעוֹלָם	any
+בס"ד	בְּסִיַּעְתָּא דִּשְׁמַיָּא	any

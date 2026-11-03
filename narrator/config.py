@@ -1,0 +1,65 @@
+"""Paths and default settings."""
+from __future__ import annotations
+
+import copy
+import os
+import sys
+
+APP_NAME = "PDF Narrator"
+VERSION = "0.9.0"
+
+
+def data_dir() -> str:
+    env = os.environ.get("NARRATOR_DATA_DIR")
+    if env:
+        path = env
+    elif sys.platform == "win32":
+        path = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "PDFNarrator")
+    elif sys.platform == "darwin":
+        path = os.path.expanduser("~/Library/Application Support/PDFNarrator")
+    else:
+        path = os.path.join(os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")), "pdf-narrator")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def test_mode() -> bool:
+    return os.environ.get("NARRATOR_TEST_MODE") == "1"
+
+
+DEFAULT_SETTINGS = {
+    # voice per language (provider:voice).  Other languages fall back to the
+    # first voice of the active provider that matches the language.
+    "voices": {
+        "he": "edge:he-IL-HilaNeural",
+        "en": "edge:en-US-AvaMultilingualNeural",
+    },
+    "provider": "edge",
+    "speed": 1.0,
+    "pause_scale": 1.0,
+    "skip_seconds": 10,
+    "read_kinds": {
+        "heading": True, "paragraph": True, "list_item": True, "note": True, "caption": True, "footnote": True,
+        "header": False, "footer": False, "page_number": False, "toc": False, "figure_text": False, "artifact": False,
+    },
+    "auto_scroll": True,
+    "highlight": "word",  # word | sentence
+    "switch_voice_for_foreign": True,
+    "max_chunk_chars": 900,
+    "skip_citations": True,
+    "skip_footnote_marks": True,
+    "verbalize_math": True,
+    "theme": "system",
+    "ui_lang": "auto",
+    "zoom": 1.25,
+    "cloud_consent": {},  # provider id -> timestamp of consent
+    "azure_region": "",
+    "prefetch_chunks": 3,
+    "sleep_minutes": 0,
+}
+
+SECRET_KEYS = {"azure_key"}
+
+
+def default_settings() -> dict:
+    return copy.deepcopy(DEFAULT_SETTINGS)

@@ -1,0 +1,27 @@
+# Built-in English abbreviation lexicon.
+# written<TAB>spoken<TAB>context<TAB>note
+# context: any | before_number
+e.g.	for example	any
+i.e.	that is	any
+etc.	et cetera	any
+vs.	versus	any
+cf.	compare	any
+approx.	approximately	any
+Fig.	Figure	any
+Figs.	Figures	any
+fig.	figure	any
+Eq.	Equation	any
+Eqs.	Equations	any
+eq.	equation	any
+Ch.	Chapter	before_number
+Sec.	Section	before_number
+No.	Number	before_number
+pp.	pages	before_number
+p.	page	before_number
+vol.	volume	before_number
+Vol.	Volume	before_number
+incl.	including	any
+w.r.t.	with respect to	any
+resp.	respectively	any
+Dept.	Department	any
+Univ.	University	any
