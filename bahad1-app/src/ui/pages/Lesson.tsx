@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { ExplainBlock, Fact, LessonStep, SourceRef } from '../../domain/types';
 import { useApp } from '../../app/store';
@@ -46,6 +46,9 @@ export function LessonPage() {
   const steps: LessonStep[] = useMemo(() => (lesson?.steps ?? []).filter((s) => s.type !== 'check' || bankIds.has(s.questionId)), [lesson, bankIds]);
   const step = Math.min(Math.max(0, Number(sp.get('step') ?? 0) || 0), steps.length);
   const status = app.statuses[id];
+  // 'read' (default): the whole lesson on one page, then the test; 'steps': card by card with practice questions in between (?flow=steps overrides the setting)
+  const flowParam = sp.get('flow');
+  const flow: 'read' | 'steps' = flowParam === 'steps' || flowParam === 'read' ? flowParam : app.prefs.lessonFlow;
 
   useEffect(() => { if (lesson && !loading) app.saveLessonProgress(lesson.id, step, step > 0 ? [step - 1] : []).catch(() => {}); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [lesson?.id, step, loading]);
 
@@ -55,6 +58,7 @@ export function LessonPage() {
   const listenOwner = `lessonall:${id}`;
   const listening = speech.ownerId === listenOwner && speech.status !== 'idle';
   useEffect(() => {
+    if (flow === 'read') { if (speech.finishedOwner === listenOwner) document.querySelector('[data-testid="lesson-end"]')?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }); return; }
     const b = speech.activeBlockId;
     if (listening && b) {
       const m = /^lesson:[^:]+:(\d+):/.exec(b);
@@ -64,6 +68,24 @@ export function LessonPage() {
     if (speech.finishedOwner === listenOwner) { const p = new URLSearchParams(sp0.toString()); p.set('step', String(steps.length)); setSp(p, { replace: true }); window.scrollTo({ top: 0 }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listening, speech.activeBlockId, speech.finishedOwner]);
+
+  const endRef = useRef<HTMLDivElement>(null);
+  const markedRead = useRef(false);
+  // reading view: reaching the end of the page counts as having read the lesson
+  useEffect(() => {
+    markedRead.current = false;
+    const el = endRef.current;
+    if (flow !== 'read' || !lesson || !el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((es) => {
+      if (es.some((e) => e.isIntersecting) && !markedRead.current) {
+        markedRead.current = true;
+        app.saveLessonProgress(lesson.id, steps.length, steps.map((_, i) => i)).catch(() => {});
+      }
+    });
+    io.observe(el);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow, lesson?.id, steps.length, loading]);
 
   if (loading && !bundle) return <div className="empty">טוען שיעור…</div>;
   if (!lesson) return <div className="card"><h2>השיעור לא נמצא</h2><Link to="/guided" className="btn">חזרה למסלול</Link></div>;
@@ -79,6 +101,71 @@ export function LessonPage() {
   };
   const cur = steps[step];
   const idx = app.orderedLessonIds.indexOf(id);
+
+  const buildAll = () => {
+    const segs: SpeechSegment[] = [];
+    steps.forEach((s, i) => {
+      if (s.type === 'explain') { const c = explainSegments(s.title, s.blocks, `lesson:${id}:${i}`); if (c.length) c[c.length - 1] = { ...c[c.length - 1], pauseAfterMs: PAUSE.block + 450 }; segs.push(...c); }
+      else if (s.type === 'figure' && s.caption) segs.push(...segmentsFromText(s.caption, { blockId: `lesson:${id}:${i}:fig`, after: PAUSE.block + 450 }));
+    });
+    return segs;
+  };
+
+  if (flow === 'read') {
+    return (
+      <div className="narrow stack fade-in" data-testid="lesson-reading">
+        <div className="row between">
+          <Link to="/guided" className="btn ghost">‹ לכל השיעורים</Link>
+          <span className="chip">{status === 'mastered' ? 'נשלט 100%' : status === 'locked' ? 'לימוד חופשי (נעול במסלול)' : 'במסלול המודרך'}</span>
+        </div>
+        <div>
+          <span className="muted small">שיעור <Num>{idx + 1}</Num> · עמודים <Num>{lesson.pages[0]}–{lesson.pages[1]}</Num></span>
+          <h1>{lesson.title}</h1>
+          <p className="muted small" style={{ margin: 0 }}>קוראים את כל השיעור, ואחר כך ניגשים למבחן עליו.</p>
+        </div>
+        <div className="row">
+          {speech.supported && <ReadAloud owner={listenOwner} icon="🎧" label="האזנה לכל השיעור" testId="listen-all" build={buildAll} />}
+          {status !== 'locked' && <Link to={`/assess/${id}`} className="btn ghost" data-testid="skip-to-test">ישר למבחן</Link>}
+        </div>
+        {steps.map((s, i) => {
+          if (s.type === 'explain') return (
+            <section className="card explain stack" key={i} data-testid="explain-card" aria-label={s.title ?? `חלק ${i + 1}`}>
+              <div className="row between card-head">
+                {s.title ? <Speakable as="h2" id={`lesson:${id}:${i}:title`}>{s.title}</Speakable> : <span />}
+                <ReadAloud owner={`lesson:${id}:${i}`} label="הקראת הכרטיס" build={() => explainSegments(s.title, s.blocks, `lesson:${id}:${i}`)} testId={`read-card-${i}`} />
+              </div>
+              {(s.figures ?? []).map((f) => (
+                <figure className="fig" key={f}><img src={figureUrl(f)} alt="איור מקורי מהחוברת" onClick={() => setFig(f)} /><figcaption>איור מקורי מהחוברת (לחצו להגדלה)</figcaption></figure>
+              ))}
+              {s.blocks.map((b, j) => <Block b={b} id={`lesson:${id}:${i}:${j}`} key={j} />)}
+              <div><button className="btn ghost" type="button" onClick={() => setSource(refsOf(s.factIds))} data-testid="step-source">המקור בחוברת</button></div>
+            </section>
+          );
+          if (s.type === 'figure') return (
+            <div className="card stack" key={i} data-testid="figure-step">
+              <figure className="fig"><img src={figureUrl(s.figureId)} alt="איור מקורי" onClick={() => setFig(s.figureId)} /><figcaption>{s.caption ?? 'איור מקורי מהחוברת'}</figcaption></figure>
+            </div>
+          );
+          return null; // practice questions are not shown while reading
+        })}
+        <div className="card accent stack" data-testid="lesson-end" ref={endRef}>
+          <h2>סיימת לקרוא 🎯</h2>
+          {lesson.summary && <p>{lesson.summary}</p>}
+          <p>עכשיו ניגשים למבחן השליטה: שאלות מייצגות על כל יעדי השיעור. כדי לשלוט בשיעור נדרשות <b>כל</b> התשובות נכונות, ללא רמזים וללא ניסיון שני.</p>
+          <div className="row">
+            {status !== 'locked' ? <Link to={`/assess/${id}`} className="btn primary big" data-testid="to-assessment">למבחן השליטה</Link>
+              : <span className="chip warn">מבחן השליטה ייפתח אחרי שליטה בשיעורים הקודמים במסלול</span>}
+            <Link to={`/practice?lesson=${encodeURIComponent(id)}`} className="btn">תרגול חופשי בשיעור</Link>
+            <button className="btn ghost" type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>לחזור לתחילת השיעור</button>
+            <button className="btn ghost" type="button" onClick={() => nav('/guided')}>למסלול</button>
+          </div>
+        </div>
+        {source && <SourceModal refs={source} onClose={() => setSource(null)} />}
+        {fig && <FigureModal figureId={fig} onClose={() => setFig(null)} />}
+      </div>
+    );
+  }
+
 
   return (
     <div className="narrow stack fade-in">

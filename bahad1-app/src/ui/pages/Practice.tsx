@@ -14,7 +14,7 @@ export function PracticePage() {
   const { manifest, bank, lessonTitle } = app;
   useChapters(null);
   const lessonParam = sp.get('lesson');
-  const [chapters, setChapters] = useState<string[]>([]);
+  const [chapters, setChapters] = useState<string[]>(() => (sp.get('chapter') ? [sp.get('chapter')!] : []));
   const [topics, setTopics] = useState<string[]>([]);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');

@@ -57,6 +57,7 @@ export function Settings() {
       <div className="card stack"><h2>תצוגה</h2>
         <label className="field">ערכת נושא<select className="text-in" value={prefs.theme} onChange={(e) => app.setPrefs({ ...prefs, theme: e.target.value as typeof prefs.theme })}><option value="system">לפי המערכת</option><option value="light">בהירה</option><option value="dark">כהה</option></select></label>
         <label className="field">גודל טקסט<select className="text-in" value={prefs.fontScale} onChange={(e) => app.setPrefs({ ...prefs, fontScale: Number(e.target.value) })}><option value={0.9}>קטן</option><option value={1}>רגיל</option><option value={1.12}>גדול</option><option value={1.25}>גדול מאוד</option></select></label>
+        <label className="field">אופן הלימוד בשיעור<select className="text-in" value={prefs.lessonFlow} onChange={(e) => app.setPrefs({ ...prefs, lessonFlow: e.target.value as typeof prefs.lessonFlow })} data-testid="pref-flow"><option value="read">קריאה רציפה של השיעור, ואחר כך מבחן (מומלץ)</option><option value="steps">כרטיס אחר כרטיס, עם שאלות תרגול באמצע</option></select></label>
         <label className="field">גודל חזרה יומית (שאלות)<select className="text-in" value={prefs.dailyReviewSize} onChange={(e) => app.setPrefs({ ...prefs, dailyReviewSize: Number(e.target.value) })}>{[10, 15, 20, 30, 40].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
       </div>
 

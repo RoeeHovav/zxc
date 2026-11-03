@@ -24,7 +24,7 @@ const spoken = (page: Page) => page.evaluate(() => (window as unknown as { __spo
 
 test('a lesson card is read sentence by sentence in a Hebrew voice, highlighted, with a mini player that disappears at the end', async ({ page }) => {
   await page.addInitScript(voicesJs(VOICES));
-  await page.goto('/#/lesson/x1.l1?step=0');
+  await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
   await page.waitForSelector('[data-testid="explain-step"]');
   await expect(page.locator('[data-testid="speech-bar"]')).toHaveCount(0);
   await page.click('[data-testid="read-card"]');
@@ -42,7 +42,7 @@ test('a lesson card is read sentence by sentence in a Hebrew voice, highlighted,
 
 test('pause, resume, previous/next sentence, speed and stop work from the mini player', async ({ page }) => {
   await page.addInitScript(voicesJs(VOICES));
-  await page.goto('/#/lesson/x1.l1?step=0');
+  await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
   await page.click('[data-testid="read-card"]');
   const bar = page.locator('[data-testid="speech-bar"]');
   await expect(bar).toBeVisible();
@@ -65,7 +65,7 @@ test('pause, resume, previous/next sentence, speed and stop work from the mini p
 test('on a phone the player sits above the bottom tab bar and never hides the lesson buttons', async ({ page }, info) => {
   test.skip(info.project.name !== 'mobile', 'mobile layout only');
   await page.addInitScript(voicesJs(VOICES));
-  await page.goto('/#/lesson/x1.l1?step=0');
+  await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
   await page.click('[data-testid="read-card"]');
   const bar = await page.locator('[data-testid="speech-bar"]').boundingBox();
   const tab = await page.locator('.tabbar').boundingBox();
@@ -78,7 +78,7 @@ test('on a phone the player sits above the bottom tab bar and never hides the le
 
 test('questions and answers are never read aloud: no read buttons in practice, feedback or the mastery test', async ({ page }) => {
   await page.addInitScript(voicesJs(VOICES));
-  await page.goto('/#/lesson/x1.l1?step=1');
+  await page.goto('/#/lesson/x1.l1?step=1&flow=steps');
   await page.waitForSelector('[data-testid="practice-question"]');
   await expect(page.locator('[data-testid="read-question"], [data-testid="read-feedback"], [data-testid="read-card"], [data-testid="listen-all"]')).toHaveCount(0);
   await page.click('[data-testid="reveal-btn"]');
@@ -118,7 +118,7 @@ test('auto-read: when enabled, a new lesson card starts reading by itself; navig
   await page.addInitScript(voicesJs(VOICES));
   await page.goto('/#/settings');
   await page.check('[data-testid="tts-auto"]');
-  await page.goto('/#/lesson/x1.l1?step=0');
+  await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
   await page.waitForSelector('[data-testid="explain-step"]');
   await expect.poll(async () => (await spoken(page)).length, { timeout: 8000 }).toBeGreaterThan(0);
   await page.goto('/#/guided');
@@ -127,7 +127,7 @@ test('auto-read: when enabled, a new lesson card starts reading by itself; navig
 
 test('no Hebrew voice installed: the button explains how to install one instead of staying silent', async ({ page }) => {
   await page.addInitScript(voicesJs([{ voiceURI: 'en', name: 'Samantha', lang: 'en-US', localService: true, default: true }]));
-  await page.goto('/#/lesson/x1.l1?step=0');
+  await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
   await page.waitForTimeout(800); // voice polling finishes
   await page.click('[data-testid="read-card"]');
   await expect(page.locator('[data-testid="voice-help"]')).toContainText('לא נמצא');
@@ -137,7 +137,7 @@ test('no Hebrew voice installed: the button explains how to install one instead 
 
 test('only an online Hebrew voice exists: the player offers to enable online voices (explicit consent)', async ({ page }) => {
   await page.addInitScript(voicesJs([{ voiceURI: 'on', name: 'Microsoft Hila Online (Natural) - Hebrew (Israel)', lang: 'he-IL', localService: false, default: true }]));
-  await page.goto('/#/lesson/x1.l1?step=0');
+  await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
   await page.waitForTimeout(800);
   await page.click('[data-testid="read-card"]');
   await expect(page.locator('[data-testid="voice-help"]')).toContainText('מקוון');
@@ -150,7 +150,7 @@ test('only an online Hebrew voice exists: the player offers to enable online voi
 
 test('browsers without speech synthesis: no read buttons, the settings page says so, nothing breaks', async ({ page }) => {
   await page.addInitScript(() => { try { delete (window as unknown as Record<string, unknown>).speechSynthesis; Object.defineProperty(window, 'speechSynthesis', { value: undefined, configurable: true }); } catch { /* ignore */ } });
-  await page.goto('/#/lesson/x1.l1?step=0');
+  await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
   await page.waitForSelector('[data-testid="explain-step"]');
   await expect(page.locator('[data-testid="read-card"]')).toHaveCount(0);
   await page.goto('/#/settings');
@@ -159,7 +159,7 @@ test('browsers without speech synthesis: no read buttons, the settings page says
 
 test('listen to the whole lesson: cards are read one after the other, the screen follows, and it ends on the mastery-test screen', async ({ page }) => {
   await page.addInitScript(voicesJs(VOICES));
-  await page.goto('/#/lesson/x1.l1?step=0');
+  await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
   await page.click('[data-testid="listen-all"]');
   await expect(page.locator('[data-testid="speech-bar"]')).toBeVisible();
   await expect(page.locator('[data-testid="lesson-end"]')).toBeVisible({ timeout: 90000 });
@@ -170,11 +170,37 @@ test('listen to the whole lesson: cards are read one after the other, the screen
 
 test('stopping the lesson listening midway leaves the learner where they are', async ({ page }) => {
   await page.addInitScript(voicesJs(VOICES));
-  await page.goto('/#/lesson/x1.l1?step=0');
+  await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
   await page.click('[data-testid="listen-all"]');
   await expect(page.locator('[data-testid="speech-bar"]')).toBeVisible();
   await page.click('[data-testid="speech-stop"]');
   await page.waitForTimeout(1500);
   await expect(page.locator('[data-testid="lesson-end"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="listen-all"]')).toBeVisible();
+});
+
+test('Windows + Chrome without a Hebrew voice: the help recommends Microsoft Edge first; in Edge itself that tip is not shown', async ({ browser }) => {
+  const noHebrew = [{ voiceURI: 'en', name: 'Samantha', lang: 'en-US', localService: true, default: true }];
+  const chrome = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+  const edge = `${chrome} Edg/130.0.0.0`;
+  for (const [ua, expectTip] of [[chrome, true], [edge, false]] as const) {
+    const ctx = await browser.newContext({ userAgent: ua });
+    const page = await ctx.newPage();
+    await page.addInitScript(voicesJs(noHebrew));
+    await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
+    await page.waitForTimeout(800);
+    await page.click('[data-testid="read-card"]');
+    await expect(page.locator('[data-testid="voice-help"]')).toBeVisible();
+    await expect(page.locator('[data-testid="voice-edge-tip"]')).toHaveCount(expectTip ? 1 : 0);
+    if (expectTip) await expect(page.locator('[data-testid="voice-edge-tip"]')).toContainText('Edge');
+    await ctx.close();
+  }
+});
+
+test('settings list every voice the browser reports, for diagnosis', async ({ page }) => {
+  await page.addInitScript(voicesJs(VOICES));
+  await page.goto('/#/settings');
+  await page.locator('[data-testid="tts-all-voices"] summary').click();
+  await expect(page.locator('[data-testid="tts-all-voices"]')).toContainText('Samantha');
+  await expect(page.locator('[data-testid="tts-all-voices"]')).toContainText('Carmit');
 });

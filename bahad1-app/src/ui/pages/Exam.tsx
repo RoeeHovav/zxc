@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { answerToText, defaultAnswer } from '../../domain/answers';
 import { buildExam, scoreExam, type ExamScore } from '../../domain/exam';
 import { correctAnswerText, isAnswerComplete } from '../../domain/grade';
@@ -18,7 +18,8 @@ export function ExamPage() {
   const { achieved } = useToast();
   const { manifest, bank } = app;
   useChapters(null);
-  const [chapters, setChapters] = useState<string[]>([]);
+  const [sp] = useSearchParams();
+  const [chapters, setChapters] = useState<string[]>(() => (sp.get('chapter') ? [sp.get('chapter')!] : []));
   const [count, setCount] = useState(20);
   const [limit, setLimit] = useState<number>(0);
   const [allTypes, setAllTypes] = useState(false);

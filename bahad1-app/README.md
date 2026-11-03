@@ -51,6 +51,12 @@ Only the chapters listed under `open` are published to learners (their bundles g
 1. Install Node.js (LTS) once. 2. Unzip. 3. Double-click `start.bat`. 4. The browser opens `http://localhost:4173`.
 (Any static server works; the app is plain static files. For a future private online deployment put the `app/` folder behind authentication — never public.)
 
+## How a lesson works
+By default a lesson is **one reading page**: all its cards (and original figures) one after the other with no questions in between; at the end comes the mastery test (100% rule). The narrator is optional (a 🎧 button reads the whole lesson, or any single card). Settings → "אופן הלימוד בשיעור" switches to the older card-by-card flow with practice questions in between. On a chapter's library page "מבחן על הפרק" / "תרגול על הפרק" test the whole chapter after you have read it.
+
+## Games (all built only on verified questions)
+Daily challenge (10 questions per date, explanations after each), Blitz (tap answers, combo multiplier, clock runs only while a question is open), Survival (3 lives, difficulty rises with the streak), Memory (flip pairs taken from verified matching questions, source after each pair), Flashcards (self-check, no grading/XP). Answers in Blitz/Survival/Daily are graded strictly like exams, mistakes feed the daily review, and records are kept in the progress store.
+
 ## Read aloud (Hebrew text-to-speech)
 Study material only — lesson cards (🔊 per card, 🎧 *listen to the whole lesson*, optional auto-read) and the cited source passages; questions and answers are deliberately **not** read aloud; a small player (previous / pause / next sentence / stop / speed) appears while reading,
 the sentence being read is highlighted, and *Settings → Read aloud* lets you choose the voice, speed and pitch, test the voice and turn on auto-read.

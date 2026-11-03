@@ -223,5 +223,7 @@ export interface Preferences {
   theme: 'system' | 'light' | 'dark';
   dailyReviewSize: number;
   fontScale: number;
+  /** 'read' = read the whole lesson in one page, then the mastery test (default); 'steps' = card by card with practice questions in between */
+  lessonFlow: 'read' | 'steps';
 }
-export const DEFAULT_PREFERENCES: Preferences = { theme: 'system', dailyReviewSize: 20, fontScale: 1 };
+export const DEFAULT_PREFERENCES: Preferences = { theme: 'system', dailyReviewSize: 20, fontScale: 1, lessonFlow: 'read' };

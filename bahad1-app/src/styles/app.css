@@ -242,3 +242,19 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 /* chapters still being prepared: visible but clearly not available */
 .card.upcoming { display: flex; align-items: center; gap: 12px; flex-direction: row; border-style: dashed; opacity: 0.8; cursor: not-allowed; }
 .card.upcoming .ico { font-size: 1.3rem; }
+
+/* ---- games ---- */
+.game-run { gap: 14px; }
+.game-hud { flex-wrap: wrap; gap: 10px; align-items: center; }
+.game-hud .lives { font-size: 1.3rem; letter-spacing: 2px; }
+.game-card h2 { margin: 0; }
+.memory-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 560px) { .memory-grid { grid-template-columns: repeat(3, 1fr); } }
+.mem-card { min-height: 86px; padding: 8px; border-radius: 14px; border: 2px solid var(--border); background: var(--accent-soft); color: var(--accent-strong); font-weight: 800; font-size: 1.1rem; cursor: pointer; display: grid; place-items: center; text-align: center; overflow-wrap: anywhere; transition: transform 0.15s, background 0.15s; }
+.mem-card:hover:not([disabled]) { transform: translateY(-2px); border-color: var(--accent); }
+.mem-card.up { background: var(--surface); color: var(--text); font-size: 0.95rem; font-weight: 700; border-color: var(--accent); }
+.mem-card.done { background: var(--ok-soft); border-color: var(--ok); color: var(--text); cursor: default; }
+.flash-card { min-height: 180px; border: 2px solid var(--border); border-radius: 16px; padding: 22px; background: var(--surface); display: flex; flex-direction: column; gap: 14px; justify-content: center; font-size: 1.15rem; font-weight: 700; }
+.flash-card.flipped { border-color: var(--accent); }
+.flash-card .back { font-weight: 500; font-size: 1rem; }
+@media (prefers-reduced-motion: reduce) { .mem-card { transition: none; } }

@@ -30,7 +30,7 @@ test('guided lock: next lessons locked for the assessment but free to study', as
   await expect(page.locator('[data-testid="locked-assessment"]')).toBeVisible();
   await expect(page.locator('[data-testid="start-assessment"]')).toHaveCount(0);
   // free study of a locked lesson is allowed
-  await page.goto('/#/lesson/x1.l2?step=0');
+  await page.goto('/#/lesson/x1.l2?step=0&flow=steps');
   await expect(page.locator('[data-testid="explain-step"]')).toBeVisible();
   // library is free too
   await page.goto('/#/library/x1');
@@ -38,7 +38,7 @@ test('guided lock: next lessons locked for the assessment but free to study', as
 });
 
 test('practice: wrong -> hint -> retry -> more specific hint -> reveal; outcomes are distinct', async ({ page }) => {
-  await page.goto('/#/lesson/x1.l1?step=1');
+  await page.goto('/#/lesson/x1.l1?step=1&flow=steps');
   await page.waitForSelector('[data-testid="practice-question"]');
   await fill(page, true); await page.click('[data-testid="submit"]');
   await expect(page.locator('[data-testid="wrong-feedback"]')).toBeVisible();
@@ -61,7 +61,7 @@ test('practice: wrong -> hint -> retry -> more specific hint -> reveal; outcomes
 });
 
 test('hint requested before answering counts as hinted, not independent', async ({ page }) => {
-  await page.goto('/#/lesson/x1.l1?step=1');
+  await page.goto('/#/lesson/x1.l1?step=1&flow=steps');
   await page.click('[data-testid="hint-btn"]');
   await expect(page.locator('[data-testid="hint"]')).toHaveCount(1);
   await fill(page); await page.click('[data-testid="submit"]');
@@ -146,7 +146,7 @@ test('wrong assessment answers feed the daily review', async ({ page }) => {
 });
 
 test('source viewer shows the exact passage with the highlighted quote, and the original page', async ({ page }) => {
-  await page.goto('/#/lesson/x1.l1?step=1');
+  await page.goto('/#/lesson/x1.l1?step=1&flow=steps');
   await fill(page); await page.click('[data-testid="submit"]');
   await page.click('[data-testid="source-btn"]');
   await expect(page.locator('[data-testid="source-ref"]').first()).toBeVisible();
@@ -216,7 +216,7 @@ test('coverage matrix: per-unit rows, gap filter and non-exam units are explicit
 });
 
 test('lesson flow reaches the end screen with a call to the mastery assessment', async ({ page }) => {
-  await page.goto('/#/lesson/x1.l1?step=0');
+  await page.goto('/#/lesson/x1.l1?step=0&flow=steps');
   for (let guard = 0; guard < 14; guard++) {
     await page.waitForSelector('[data-testid$="-step"], [data-testid="lesson-end"]');
     const kind = await page.evaluate(() => (document.querySelector('[data-testid$="-step"], [data-testid="lesson-end"]') as HTMLElement).dataset.testid);

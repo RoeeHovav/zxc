@@ -68,6 +68,9 @@ q('l3', ['f8'], 'tf', 1, 'יש בממלכה גילדה של האורגים.', { 
 // one FLAGGED question (not verified) for the review dashboard test
 const flaggedQ = { ...Q[0], id: 'x1.q900', stem: 'שאלה לבדיקה ידנית: מהו הצבע הראשון בדגל?', verification: { ...V('flagged', 'uncertain'), independent: { verdict: 'uncertain', notes: 'ניסוח עלול להיות דו-משמעי', by: 'fixture' } } };
 Q.push(flaggedQ);
+// a second matching question (practice pool only) so the memory game has enough pairs
+Q.push({ ...Q.find((x) => x.type === 'match'), id: 'x1.q901', lessonId: 'x1.l2', topic: 'המלכים', factIds: ['x1.f3', 'x1.f4'], difficulty: 2, pool: 'practice', stem: 'התאימו כל מלך לתיאור שלו.',
+  left: [{ id: 'l1', text: 'אורן' }, { id: 'l2', text: 'נועם' }, { id: 'l3', text: 'גל' }], right: [{ id: 'r1', text: 'המלך הראשון' }, { id: 'r2', text: 'המלך השני' }, { id: 'r3', text: 'המלך השלישי' }], correct: { l1: 'r1', l2: 'r2', l3: 'r3' } });
 
 const el = (t, f) => ({ type: 'explain', title: t, blocks: [{ kind: 'p', text: `הסבר קצר על ${t}.` }, { kind: 'key', text: `לזכור: ${t}` }], factIds: f.map((x) => `x1.${x}`) });
 const chk = (i) => ({ type: 'check', questionId: `x1.q${String(i).padStart(3, '0')}` });

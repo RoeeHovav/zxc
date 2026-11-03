@@ -13,7 +13,7 @@ test('real chapter: lesson card and settings with read-aloud', async ({ page }, 
   const tag = info.project.name;
   const shot = async (n: string) => { await page.waitForTimeout(400); await page.screenshot({ path: `test-results/real/${tag}-speech-${n}.png` }); };
   await page.addInitScript(FAKE);
-  await page.goto('/#/lesson/ch1.l03?step=0'); await page.waitForSelector('[data-testid="explain-step"]');
+  await page.goto('/#/lesson/ch1.l03?step=0&flow=steps'); await page.waitForSelector('[data-testid="explain-step"]');
   await shot('1-card-idle');
   await page.click('[data-testid="read-card"]');
   await expect(page.locator('[data-testid="speech-bar"]')).toBeVisible();

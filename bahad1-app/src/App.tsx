@@ -7,6 +7,7 @@ import { AssessmentPage } from './ui/pages/Assessment';
 import { PracticePage } from './ui/pages/Practice';
 import { ExamPage } from './ui/pages/Exam';
 import { ReviewHub } from './ui/pages/ReviewHub';
+import { GamesPage } from './ui/pages/Games';
 import { Library } from './ui/pages/Library';
 import { Stats } from './ui/pages/Stats';
 import { Settings } from './ui/pages/Settings';
@@ -18,12 +19,13 @@ const NAV: { to: string; label: string; ico: string }[] = [
   { to: '/guided', label: 'לימוד מודרך', ico: '▶' },
   { to: '/practice', label: 'תרגול', ico: '✎' },
   { to: '/review', label: 'חזרה ואתגרים', ico: '↻' },
+  { to: '/games', label: 'משחקים', ico: '🎮' },
   { to: '/exam', label: 'מבחן', ico: '⏱' },
   { to: '/library', label: 'ספרייה', ico: '☰' },
   { to: '/stats', label: 'סטטיסטיקה', ico: '▤' },
   { to: '/settings', label: 'הגדרות', ico: '⚙' },
 ];
-const TABS = ['/', '/guided', '/practice', '/review', '/settings'];
+const TABS = ['/', '/guided', '/practice', '/games', '/review', '/settings'];
 
 export function App() {
   const { ready, error, manifest } = useApp();
@@ -50,6 +52,7 @@ export function App() {
             <Route path="/practice" element={<PracticePage />} />
             <Route path="/exam" element={<ExamPage />} />
             <Route path="/review" element={<ReviewHub />} />
+            <Route path="/games" element={<GamesPage />} />
             <Route path="/library" element={<Library />} />
             <Route path="/library/:chapterId" element={<Library />} />
             <Route path="/stats" element={<Stats />} />

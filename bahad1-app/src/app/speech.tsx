@@ -20,9 +20,11 @@ export function useReadingBlock(blockId: string): boolean {
   return useSyncExternalStore(speechEngine.subscribe, () => speechEngine.getState().activeBlockId === blockId, () => false);
 }
 
+const WINDOWS_NOT_EDGE = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent) && !/Edg\//.test(navigator.userAgent);
+
 const INSTALL_HELP = (
   <ul className="small">
-    <li><b>Windows 11 / Edge:</b> הגדרות ← זמן ושפה ← דיבור ← ״הוספת קולות״ ← עברית (הקולות ״Natural״ נשמעים טבעיים במיוחד).</li>
+    <li><b>Windows 11:</b> הגדרות ← זמן ושפה ← שפה ואזור ← ״הוספת שפה״ ← עברית, ובמסך ההתקנה לסמן ״המרת טקסט לדיבור״; אחר כך הגדרות ← זמן ושפה ← דיבור ← ״הוספת קולות״. לא לכל חבילת שפה יש קול – אם אין, הדרך הקלה היא Microsoft Edge (למעלה).</li>
     <li><b>Android / Chrome:</b> הגדרות ← מערכת ← שפות ← פלט טקסט לדיבור ← Google ← התקנת נתוני קול ← עברית.</li>
     <li><b>iPhone / iPad:</b> הגדרות ← נגישות ← תוכן מדובר ← קולות ← עברית (Carmit) והורדת הגרסה המשופרת.</li>
     <li><b>Mac:</b> הגדרות המערכת ← נגישות ← תוכן מדובר ← קול מערכת ← ניהול קולות ← עברית.</li>
@@ -40,6 +42,12 @@ export function VoiceHelp({ onClose }: { onClose: () => void }) {
           <>
             <p>{online ? 'במכשיר הזה יש קול עברי מקוון בלבד. קולות מקוונים נשמעים לרוב טבעיים יותר, אבל הטקסט המוקרא נשלח לספק הקול של הדפדפן או של מערכת ההפעלה.' : 'לא נמצא במכשיר הזה קול עברי להקראה.'}</p>
             {online && <div className="row"><button className="btn primary" type="button" data-testid="enable-online" onClick={() => { speechEngine.setSettings({ allowOnline: true }); onClose(); }}>להפעיל קולות מקוונים</button></div>}
+            {WINDOWS_NOT_EDGE && (
+              <div className="note" data-testid="voice-edge-tip">
+                <b>הדרך הקלה ב-Windows: Microsoft Edge.</b> הוא כבר מותקן, וכולל קולות עבריים טבעיים (Hila ו-Avri) בלי התקנה. נדרש חיבור לאינטרנט בזמן ההקראה, והדפדפן שולח את הטקסט המוקרא למיקרוסופט – לכן הקולות האלה פועלים רק באישורכם (הגדרות ← הקראה בקול ← ״לאפשר קולות מקוונים״).
+                <br />איך: קליק ימני על הקובץ index.html ← ״פתיחה באמצעות״ ← Microsoft Edge. ההתקדמות נשמרת בכל דפדפן בנפרד: ב-Chrome הגדרות ← ייצוא גיבוי, וב-Edge הגדרות ← ייבוא גיבוי.
+              </div>
+            )}
             <p>התקנת קול עברי (חד־פעמי):</p>
             {INSTALL_HELP}
             <p className="muted small">אחרי ההתקנה יש לרענן את הדף. אפשר לשנות את הקול, המהירות והגובה בהגדרות ← הקראה בקול.</p>
@@ -148,6 +156,11 @@ export function ReadAloudSettings() {
         <span className={`chip ${hv.length ? 'ok' : 'warn'}`} data-testid="tts-voice-count">{hv.length ? `נמצאו ${hv.length} קולות עבריים` : 'לא נמצא קול עברי'}</span>
         {sp.activeVoice && <span className="chip" data-testid="tts-active-voice">קול פעיל: {sp.activeVoice.name} ({sp.activeVoice.localService ? 'מקומי' : 'מקוון'})</span>}
       </div>
+      <details className="small" data-testid="tts-all-voices">
+        <summary>כל הקולות שהדפדפן מדווח עליהם ({sp.voices.length}) – לאבחון</summary>
+        {sp.voices.length === 0 ? <p className="muted">הדפדפן לא מדווח על אף קול (ב-Chrome ב-Windows אין קול עברי מובנה; ב-Edge יש קולות Natural מקוונים).</p>
+          : <ul>{sp.voices.map((v) => <li key={v.voiceURI}>{v.name} · {v.lang} · {v.localService ? 'מקומי' : 'מקוון'}</li>)}</ul>}
+      </details>
       <label className="field">קול
         <select className="text-in" value={s.voiceURI ?? ''} onChange={(e) => { speechEngine.setSettings({ voiceURI: e.target.value || null }); speechEngine.restartCurrent(); }} data-testid="tts-voice">
           <option value="">אוטומטי – הקול הטבעי ביותר שמותר להשתמש בו</option>
