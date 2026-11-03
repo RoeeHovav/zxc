@@ -14,11 +14,11 @@ import { Settings } from './ui/pages/Settings';
 import { ContentReview } from './ui/pages/ContentReview';
 import { SpeechBar } from './app/speech';
 
-const NAV: { to: string; label: string; ico: string }[] = [
+const NAV: { to: string; label: string; ico: string; short?: string }[] = [
   { to: '/', label: 'בית', ico: '⌂' },
-  { to: '/guided', label: 'לימוד מודרך', ico: '▶' },
+  { to: '/guided', label: 'לימוד מודרך', ico: '▶', short: 'לימוד' },
   { to: '/practice', label: 'תרגול', ico: '✎' },
-  { to: '/review', label: 'חזרה ואתגרים', ico: '↻' },
+  { to: '/review', label: 'חזרה ואתגרים', ico: '↻', short: 'חזרה' },
   { to: '/games', label: 'משחקים', ico: '🎮' },
   { to: '/exam', label: 'מבחן', ico: '⏱' },
   { to: '/library', label: 'ספרייה', ico: '☰' },
@@ -64,7 +64,7 @@ export function App() {
       </main>
       <nav className="tabbar" aria-label="ניווט תחתון">
         {NAV.filter((n) => TABS.includes(n.to)).map((n) => (
-          <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => (isActive ? 'active' : '')}><span className="ico" aria-hidden>{n.ico}</span><span>{n.label}</span></NavLink>
+          <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => (isActive ? 'active' : '')}><span className="ico" aria-hidden>{n.ico}</span><span>{n.short ?? n.label}</span></NavLink>
         ))}
       </nav>
       <SpeechBar />

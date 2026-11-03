@@ -61,6 +61,11 @@ export function Dashboard() {
         </div>
       </div>
 
+      <div className="card row between" data-testid="games-cta">
+        <div className="stack tight"><h3>משחקים</h3><span className="muted">אתגר יומי, ברק, הישרדות, זיכרון וכרטיסיות – תרגול בכיף על שאלות מאומתות.</span></div>
+        <Link to="/games" className="btn primary">למשחקים</Link>
+      </div>
+
       <div className="card stack">
         <h3>התקדמות בחומר</h3>
         <div className="stack tight">

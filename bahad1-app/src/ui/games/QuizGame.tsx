@@ -45,7 +45,7 @@ export function QuizGame({ mode, deck, seed, seconds = 60, lives = 3, onEnd, onQ
     const q = deck[index.current % deck.length]; index.current++; return q;
   }, [deck, mode]);
 
-  const [ans, setAns] = useState<Answer | null>(null);
+  const [typed, setTyped] = useState<{ round: number; a: Answer } | null>(null);
   const [verdict, setVerdict] = useState<null | boolean>(null);
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
@@ -62,7 +62,8 @@ export function QuizGame({ mode, deck, seed, seconds = 60, lives = 3, onEnd, onQ
   verdictRef.current = verdict;
 
   const pres = useMemo(() => (q ? presentQuestion(q, `${seed}|${round}`) : null), [q, seed, round]);
-  useEffect(() => { if (pres) setAns(defaultAnswer(pres)); }, [pres]);
+  // the answer belongs to the current question: derived (not reset in an effect), so a fast typist can never lose input to a late reset
+  const ans: Answer | null = typed && typed.round === round ? typed.a : pres ? defaultAnswer(pres) : null;
 
   const finish = useCallback(async (timedOut = false) => {
     if (finished.current) return;
@@ -113,7 +114,7 @@ export function QuizGame({ mode, deck, seed, seconds = 60, lives = 3, onEnd, onQ
   };
 
   const onChange = (a: Answer) => {
-    setAns(a);
+    setTyped({ round, a });
     if (tapMode && q && isTapQuestion(q)) submit(a);
   };
 

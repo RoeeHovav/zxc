@@ -78,8 +78,8 @@ bdi, .ltr { unicode-bidi: isolate; }
 .tabbar { display: none; }
 @media (max-width: 760px) {
   .nav { display: none; }
-  .tabbar { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; bottom: 0; inset-inline: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); }
-  .tabbar a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; font-size: 0.74rem; color: var(--muted); font-weight: 600; }
+  .tabbar { display: grid; grid-template-columns: repeat(6, 1fr); position: fixed; bottom: 0; inset-inline: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); }
+  .tabbar a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; font-size: 0.7rem; white-space: nowrap; color: var(--muted); font-weight: 600; }
   .tabbar a.active { color: var(--accent-strong); }
   .tabbar a span.ico { font-size: 1.25rem; line-height: 1; }
   .tabbar a:hover { text-decoration: none; }

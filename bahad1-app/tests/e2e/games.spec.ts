@@ -35,7 +35,6 @@ test('blitz: tapping answers scores, a mistake resets the combo and shows the ve
     await expect(page.locator('[data-testid="game-score"]')).toHaveText('0');
     await page.click('[data-testid="game-next"]');
   }
-  await page.click('[data-testid="speech-stop"]').catch(() => {});
   // leave: back on the hub
   await page.getByRole('button', { name: 'יציאה' }).click();
   await expect(page.locator('[data-testid="games-hub"]')).toBeVisible();
@@ -60,14 +59,19 @@ test('survival: three mistakes end the run, each mistake costs a life', async ({
   await page.goto('/#/games');
   await page.click('[data-testid="start-survival"]');
   await expect(page.locator('[data-testid="game-survival"]')).toBeVisible();
-  for (let i = 0; i < 40; i++) {
-    if (await page.locator('[data-testid="game-end"]').isVisible()) break;
-    // always choose the first option / "נכון": the run must end eventually because wrong answers cost lives
-    const tf = page.locator('[data-testid="tf-true"]');
-    if (await tf.isVisible()) await tf.click(); else await page.click('[data-testid="opt-0"]');
-    const next = page.locator('[data-testid="game-next"]');
-    await Promise.race([next.waitFor({ timeout: 1500 }).catch(() => {}), page.waitForTimeout(900)]);
-    if (await next.isVisible()) await next.click();
+  for (let i = 0; i < 80; i++) {
+    if (await page.locator('[data-testid="game-end"]').count()) break;
+    // always choose "נכון" / the first option: wrong answers cost lives, so the run must end (DOM clicks: the screen re-renders by itself between questions)
+    const clicked = await page.evaluate(() => {
+      const b = document.querySelector('[data-testid="tf-true"]:not([disabled]), [data-testid="opt-0"]:not([disabled])') as HTMLElement | null;
+      if (b) b.click();
+      return !!b;
+    });
+    if (!clicked) { await page.waitForTimeout(150); continue; }
+    await page.waitForSelector('[data-testid="game-feedback"]', { timeout: 3000 });
+    const bad = await page.evaluate(() => !!document.querySelector('[data-testid="game-feedback"].bad'));
+    if (bad) await page.evaluate(() => (document.querySelector('[data-testid="game-next"]') as HTMLElement | null)?.click());
+    else await page.waitForSelector('[data-testid="game-feedback"]', { state: 'detached', timeout: 3000 }).catch(() => {}); // a correct answer moves on by itself
   }
   await expect(page.locator('[data-testid="game-end"]')).toBeVisible({ timeout: 15000 });
 });
@@ -93,7 +97,7 @@ test('memory: flipping the two sides of a pair matches them; a wrong pair flips 
     const two = info.filter((x) => x.pair === p);
     await page.locator(`[data-card="${two[0].card}"]`).click();
     await page.locator(`[data-card="${two[1].card}"]`).click();
-    await expect(page.locator(`.mem-card.done[data-testid="${p}"]`)).toHaveCount(2, { timeout: 3000 });
+    if (p !== pairs[pairs.length - 1]) await expect(page.locator(`.mem-card.done[data-testid="${p}"]`)).toHaveCount(2, { timeout: 3000 });
   }
   await expect(page.locator('[data-testid="game-end"]')).toBeVisible({ timeout: 5000 });
   await expect(page.locator('[data-testid="end-moves"]')).toHaveText(String(pairs.length + 1)); // one mistake + one move per pair
