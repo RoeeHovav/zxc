@@ -20,12 +20,16 @@ for (const d of ['sources', 'figs', 'pages']) fs.mkdirSync(path.join(outDir, d),
 
 const units = loadUnits();
 const figIds = new Set(readJson(path.join(SOURCE_DIR, 'figures.json')).map((f) => f.id));
+const AVAIL = fs.existsSync(path.join(ROOT, 'pipeline/availability.json')) ? readJson(path.join(ROOT, 'pipeline/availability.json')) : { open: null, groups: {} };
+// Only chapters listed as open are published to learners; every other chapter (even with authored work in private/) is shown as "עובדים על זה" and has no bundle.
+const isOpen = (id) => !AVAIL.open || AVAIL.open.includes(id);
 const chapters = chaptersMeta().filter((c) => c.id !== 'ch0');
 const emitted = []; const bundles = []; const neededFigs = new Set(); const neededPages = new Set();
 const review = { generatedAt: new Date().toISOString(), chapters: {}, flagged: [], visual: [], extraction: {} };
 const validation = fs.existsSync(path.join(PRIV, 'work/validation/report.json')) ? readJson(path.join(PRIV, 'work/validation/report.json')) : null;
 
 for (const [order, ch] of chapters.entries()) {
+  if (!isOpen(ch.id)) continue;
   let { facts, lessons, questions } = loadChapterContent(ch.id);
   if (!lessons.length) continue;
   if (PREVIEW) {
@@ -72,7 +76,14 @@ for (const [order, ch] of chapters.entries()) {
     for (const it of arr) if (it.verification.status !== 'verified') review.flagged.push({ kind, chapter: ch.id, id: it.id, status: it.verification.status, item: it });
   }
   for (const u of chUnits.filter((x) => x.visual)) review.visual.push({ id: u.id, page: u.page, figure: u.figure, text: u.text, status: u.transcription?.status ?? 'single_read', readings: u.readings });
-  emitted.push({ ...bundle.chapter, lessons: lessons.map((l) => ({
+  // progress of the chapter against the book: share of required core units that have at least one fact, and the last page reached
+  const coveredReq = reqRows.filter((r) => r.f.length);
+  const progress = {
+    requiredUnits: reqRows.length, coveredUnits: coveredReq.length,
+    coveredThroughPage: coveredReq.length ? Math.max(...coveredReq.map((r) => r.p)) : null,
+    complete: reqRows.length > 0 && coveredReq.length === reqRows.length && lessons.every((l) => l.verification.status === 'verified') && questions.every((q) => q.verification.status === 'verified') && facts.every((f) => f.verification.status === 'verified'),
+  };
+  emitted.push({ ...bundle.chapter, progress, lessons: lessons.map((l) => ({
     id: l.id, title: l.title, pages: l.pages, status: l.verification.status,
     // assessable = every objective has >= 1 verified mastery-pool question; the guided path only includes assessable lessons so that
     // a lesson with a rejected/pending question pool can never block the learner's progress.
@@ -102,11 +113,26 @@ review.extraction = {
 };
 fs.writeFileSync(path.join(outDir, 'review.json'), JSON.stringify(review));
 
+// chapters shown as "עובדים על זה": not open, or open but no authored lessons yet. Appendix-like chapters can be grouped into one card.
+const upcoming = [];
+const grouped = new Set(Object.values(AVAIL.groups ?? {}).flat());
+for (const ch of chapters) {
+  if (emitted.some((e) => e.id === ch.id) || grouped.has(ch.id)) continue;
+  upcoming.push({ id: ch.id, title: ch.title, firstPage: ch.firstPage, lastPage: ch.lastPage });
+}
+for (const [gid, ids] of Object.entries(AVAIL.groups ?? {})) {
+  const members = chapters.filter((c) => ids.includes(c.id) && !emitted.some((e) => e.id === c.id));
+  if (!members.length) continue;
+  upcoming.push({ id: `group-${gid}`, title: `המשך הספר: ${members.map((m) => m.title).join(', ')}`, firstPage: Math.min(...members.map((m) => m.firstPage)), lastPage: Math.max(...members.map((m) => m.lastPage)) });
+}
+upcoming.sort((a, b) => a.firstPage - b.firstPage);
+
 const hash = crypto.createHash('sha256');
 for (const b of bundles) hash.update(JSON.stringify(b));
+hash.update(JSON.stringify(upcoming));
 const manifest = {
   contentVersion: (PREVIEW ? 'PREVIEW-' : '') + hash.digest('hex').slice(0, 12), preview: PREVIEW, generatedAt: new Date().toISOString(),
-  book: 'official-bahad1-book', totalPages: 314, chapters: emitted,
+  book: 'official-bahad1-book', totalPages: 314, chapters: emitted, upcoming,
   stats: {
     chapters: emitted.length,
     facts: emitted.reduce((s, c) => s + c.counts.facts, 0), lessons: emitted.reduce((s, c) => s + c.counts.lessons, 0),

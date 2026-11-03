@@ -1,10 +1,14 @@
 import type { Chapter, ContentBundle, ContentManifest } from '../domain/types';
 
+export interface ChapterProgress { requiredUnits: number; coveredUnits: number; coveredThroughPage: number | null; complete: boolean }
+export interface UpcomingChapter { id: string; title: string; firstPage: number; lastPage: number }
 export interface ManifestChapter extends Chapter {
+  /** how much of the chapter's book pages the authored content reaches (absent in older bundles) */
+  progress?: ChapterProgress;
   lessons: { id: string; title: string; pages: [number, number]; status: string; assessable?: boolean }[];
   counts: { facts: number; lessons: number; questions: number; verifiedQuestions: number };
 }
-export interface Manifest extends Omit<ContentManifest, 'chapters'> { chapters: ManifestChapter[]; preview?: boolean }
+export interface Manifest extends Omit<ContentManifest, 'chapters'> { chapters: ManifestChapter[]; /** chapters shown as "עובדים על זה" – locked, no content bundle */ upcoming?: UpcomingChapter[]; preview?: boolean }
 export interface SourceUnit { id: string; page: number; kind: string; text: string; figure?: string; cells?: string[] }
 export interface ReviewData {
   generatedAt: string;

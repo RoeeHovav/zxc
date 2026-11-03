@@ -236,3 +236,13 @@ test('mobile: bottom tab bar replaces the top nav', async ({ page }, info) => {
   await expect(page.locator('nav.tabbar')).toBeVisible();
   await expect(page.locator('nav.nav')).toBeHidden();
 });
+
+test('chapters in preparation are shown locked as "עובדים על זה", and a partly covered open chapter says how far it reaches', async ({ page }) => {
+  await page.goto('/#/guided');
+  const up = page.locator('[data-testid="upcoming-x2"]');
+  await expect(up).toContainText('עובדים על זה');
+  expect(await page.locator('[data-testid="upcoming"] a, [data-testid="upcoming"] button').count()).toBe(0);
+  await expect(page.locator('[data-testid="partial-x1"]')).toContainText('עד עמוד');
+  await page.goto('/#/');
+  await expect(page.locator('[data-testid="book-map"]')).toContainText('פרק בדיקה שני');
+});

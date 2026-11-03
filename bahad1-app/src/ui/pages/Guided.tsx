@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../app/store';
 import { Num, Progress } from '../components/common';
+import { PartialNote, UpcomingChapters } from '../components/Upcoming';
 
 export function Guided() {
   const { manifest, statuses, lessonStates, orderedLessonIds } = useApp();
@@ -30,6 +31,7 @@ export function Guided() {
               <span aria-hidden>{isOpen ? '▾' : '◂'}</span>
             </div>
             <Progress value={ids.length ? done / ids.length : 0} gold />
+            <PartialNote chapter={c} />
             {isOpen && (
               <div className="stack tight">
                 {c.lessons.filter((l) => orderedLessonIds.includes(l.id)).map((l, i) => {
@@ -54,6 +56,7 @@ export function Guided() {
           </section>
         );
       })}
+      <UpcomingChapters />
       {hasHidden && <p className="muted small">חלק מהשיעורים עדיין אינם מוצגים במסלול המודרך כי טרם עברו אימות מול החוברת. ניתן לעיין בהם בלוח בקרת המקורות.</p>}
     </div>
   );

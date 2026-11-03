@@ -5,6 +5,7 @@ import { nextGuidedLesson } from '../../domain/mastery';
 import { ACHIEVEMENTS } from '../../domain/xp';
 import { useApp } from '../../app/store';
 import { Num, Progress, pct, useChapters } from '../components/common';
+import { ChapterMap } from '../components/Upcoming';
 
 export function Dashboard() {
   const app = useApp();
@@ -15,7 +16,7 @@ export function Dashboard() {
   const next = nextGuidedLesson(orderedLessonIds, statuses);
   const resume = lastPosition && orderedLessonIds.includes(lastPosition.lessonId) && !lessonStates[lastPosition.lessonId]?.masteredAt ? lastPosition : null;
   const target = resume?.lessonId ?? next;
-  const chaptersDone = (manifest?.chapters ?? []).filter((c) => { const ids = c.lessons.map((l) => l.id).filter((id) => orderedLessonIds.includes(id)); return ids.length > 0 && ids.every((id) => lessonStates[id]?.masteredAt); }).length;
+  const chaptersDone = (manifest?.chapters ?? []).filter((c) => { const ids = c.lessons.map((l) => l.id).filter((id) => orderedLessonIds.includes(id)); return c.progress?.complete !== false && ids.length > 0 && ids.every((id) => lessonStates[id]?.masteredAt); }).length;
   const bankQs = app.bank;
   const seen = Object.values(stats).filter((s) => s.seen > 0).length;
   const recalled = Object.values(stats).filter((s) => s.box >= 2 && s.seen >= 2).length;
@@ -40,7 +41,7 @@ export function Dashboard() {
 
       <div className="grid cols-4">
         <div className="card kpi"><span className="v"><Num>{mastered}</Num><span className="muted small"> / <Num>{total}</Num></span></span><span className="l">שיעורים שנשלטו ב-100%</span></div>
-        <div className="card kpi"><span className="v"><Num>{chaptersDone}</Num><span className="muted small"> / <Num>{manifest?.chapters.length ?? 0}</Num></span></span><span className="l">פרקים שהושלמו</span></div>
+        <div className="card kpi"><span className="v"><Num>{chaptersDone}</Num><span className="muted small"> / <Num>{(manifest?.chapters.length ?? 0) + (manifest?.upcoming?.length ?? 0)}</Num></span></span><span className="l">פרקים שהושלמו</span></div>
         <div className="card kpi"><span className="v"><Num>{streak.current}</Num></span><span className="l">ימים ברצף (שיא: <Num>{streak.longest}</Num>)</span></div>
         <div className="card kpi"><span className="v"><Num>{xp}</Num></span><span className="l">נקודות ניסיון · דרגה: {rank.name}</span></div>
       </div>
@@ -86,6 +87,7 @@ export function Dashboard() {
           <Progress value={rank.progress} gold />
         </div>
       </div>
+      <ChapterMap />
       <div className="row" style={{ justifyContent: 'center' }}>
         <Link to="/library" className="btn ghost">עיון חופשי בכל החומר</Link>
         <Link to="/content-review" className="btn ghost">לוח בקרת מקורות</Link>

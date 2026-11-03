@@ -238,3 +238,7 @@ pre.json { direction: ltr; text-align: left; background: var(--surface-2); paddi
 @media (prefers-reduced-motion: reduce) { .speaking { transition: none; } }
 .read-aloud.compact { min-width: 44px; padding: 6px 10px; }
 input[type='range'] { width: 100%; accent-color: var(--accent); }
+
+/* chapters still being prepared: visible but clearly not available */
+.card.upcoming { display: flex; align-items: center; gap: 12px; flex-direction: row; border-style: dashed; opacity: 0.8; cursor: not-allowed; }
+.card.upcoming .ico { font-size: 1.3rem; }

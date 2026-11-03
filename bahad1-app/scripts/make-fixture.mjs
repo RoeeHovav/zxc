@@ -84,7 +84,8 @@ fs.writeFileSync(path.join(OUT, 'x1.json'), JSON.stringify(bundle));
 fs.writeFileSync(path.join(OUT, 'sources/x1.json'), JSON.stringify(units));
 const manifest = {
   contentVersion: 'fixture01', generatedAt: '2026-01-01T00:00:00Z', book: 'synthetic', totalPages: 5,
-  chapters: [{ ...bundle.chapter, lessons: lessons.map((l) => ({ id: l.id, title: l.title, pages: l.pages, status: 'verified' })), counts: { facts: facts.length, lessons: lessons.length, questions: Q.length, verifiedQuestions: Q.length - 1 } }],
+  chapters: [{ ...bundle.chapter, lessons: lessons.map((l) => ({ id: l.id, title: l.title, pages: l.pages, status: 'verified' })), progress: { requiredUnits: 5, coveredUnits: 3, coveredThroughPage: 3, complete: false }, counts: { facts: facts.length, lessons: lessons.length, questions: Q.length, verifiedQuestions: Q.length - 1 } }],
+  upcoming: [{ id: 'x2', title: 'פרק בדיקה שני (סינתטי)', firstPage: 6, lastPage: 9 }],
   stats: { chapters: 1, facts: facts.length, lessons: lessons.length, questions: Q.length, verifiedQuestions: Q.length - 1 },
 };
 fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest));

@@ -5,6 +5,7 @@ import { useApp } from '../../app/store';
 import { figureUrl } from '../../content/loader';
 import { Num, useChapters } from '../components/common';
 import { FigureModal, SourceModal } from '../components/SourceModal';
+import { PartialNote, UpcomingChapters } from '../components/Upcoming';
 
 /** Free browsing: every verified lesson is readable at any time (guided locks never block content). */
 export function Library() {
@@ -28,8 +29,9 @@ export function Library() {
       <div className="stack fade-in">
         <div><h1>ספרייה – עיון חופשי</h1><p className="muted">כל החומר המאומת פתוח לעיון בכל עת, ללא קשר למסלול המודרך. לכל קביעה יש מקור מדויק בחוברת.</p></div>
         <div className="grid cols-2">{manifest.chapters.map((c) => (
-          <Link key={c.id} to={`/library/${c.id}`} className="card stack tight" style={{ color: 'inherit' }}><h3>{c.title}</h3><span className="muted small">עמודים <Num>{c.firstPage}–{c.lastPage}</Num> · <Num>{c.lessons.length}</Num> שיעורים</span></Link>
+          <Link key={c.id} to={`/library/${c.id}`} className="card stack tight" style={{ color: 'inherit' }}><h3>{c.title}</h3><span className="muted small">עמודים <Num>{c.firstPage}–{c.lastPage}</Num> · <Num>{c.lessons.length}</Num> שיעורים</span><PartialNote chapter={c} /></Link>
         ))}</div>
+        <UpcomingChapters />
       </div>
     );
   }
@@ -37,6 +39,7 @@ export function Library() {
     <div className="stack fade-in">
       <div className="row between"><Link to="/library" className="btn ghost">‹ לכל הפרקים</Link><Link to={`/practice`} className="btn">לתרגול</Link></div>
       <h1>{chapter?.title}</h1>
+      {chapter && <PartialNote chapter={chapter} />}
       <input className="text-in" placeholder="חיפוש בקביעות המאומתות של הפרק…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש" data-testid="lib-search" />
       {loading && !bundle && <div className="empty">טוען…</div>}
       {q.trim() && <div className="card stack"><b>תוצאות (<Num>{results.length}</Num>)</b>{results.map((f) => <FactRow key={f.id} f={f} onSrc={setSrc} />)}</div>}
