@@ -83,8 +83,11 @@ export default function PlayerBar({ narrator, status, error, pos, rate, onRate, 
         </span>
         <div className="speed" title={`${t.speed} ( , / . )`}>
           <span className="muted small">{t.speed}</span>
-          <input type="range" min={0.5} max={3} step={0.05} value={rate} onChange={(e) => onRate(Number(e.target.value))} aria-label={t.speed} data-testid="speed" />
-          <select value={SPEEDS.includes(rate) ? String(rate) : ""} onChange={(e) => e.target.value && onRate(Number(e.target.value))} aria-label={t.speed} style={{ padding: "3px 4px" }}>
+          <input type="range" min={0.5} max={3} step={0.05} value={rate} onChange={(e) => onRate(Number(e.target.value))} onMouseUp={(e) => (e.target as HTMLInputElement).blur()} aria-label={t.speed} data-testid="speed" />
+          <select value={SPEEDS.includes(rate) ? String(rate) : ""} onChange={(e) => {
+              if (e.target.value) onRate(Number(e.target.value));
+              e.target.blur(); // give keyboard shortcuts back to the player
+            }} aria-label={t.speed} style={{ padding: "3px 4px" }}>
             {!SPEEDS.includes(rate) && <option value="">{rate.toFixed(2)}×</option>}
             {SPEEDS.map((s) => (
               <option key={s} value={s}>
@@ -93,7 +96,10 @@ export default function PlayerBar({ narrator, status, error, pos, rate, onRate, 
             ))}
           </select>
         </div>
-        <select value={sleepUntil ? "on" : "0"} onChange={(e) => onSleep(Number(e.target.value))} title={t.sleep} aria-label={t.sleep} style={{ padding: "3px 4px", marginInlineStart: 6 }}>
+        <select value={sleepUntil ? "on" : "0"} onChange={(e) => {
+            onSleep(Number(e.target.value));
+            e.target.blur();
+          }} title={t.sleep} aria-label={t.sleep} style={{ padding: "3px 4px", marginInlineStart: 6 }}>
           {sleepUntil ? <option value="on">⏾ {sleepLeft} {t.minutes}</option> : null}
           <option value="0">⏾ {t.off}</option>
           {[10, 20, 30, 45, 60, 90].map((m) => (

@@ -29,7 +29,7 @@ from .ocr import OcrEngine
 
 log = logging.getLogger(__name__)
 
-EXTRACTOR_VERSION = 8
+EXTRACTOR_VERSION = 10
 
 # word flags
 F_RTL = 1
@@ -351,6 +351,8 @@ class PdfDocument:
                 kind = "page_number"
             elif band and (int(b.y0 // 6), _norm_sig_text(text)) in stats.header_sigs or (
                     band and any((int(b.y0 // 6) + d, _norm_sig_text(text)) in stats.header_sigs for d in (-1, 1))):
+                kind = "header" if band == "top" else "footer"
+            elif band and b.size <= 0.8 * body and len(text) <= 120 and len(b.lines) <= 2:
                 kind = "header" if band == "top" else "footer"
             elif sum(1 for l in b.lines if L.is_leader_line(l.text)) >= max(1, len(b.lines) // 2):
                 kind = "toc"

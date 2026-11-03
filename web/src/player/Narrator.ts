@@ -409,6 +409,7 @@ export class Narrator extends EventTarget {
     const tok = ++this.token;
     clearTimeout(this.gapTimer);
     a.pause();
+    this.setStatus("loading");
     if (t < 0) {
       const p = await this.prevChunkPos(cur.unit, cur.chunk);
       if (tok !== this.token) return;

@@ -100,6 +100,7 @@ class Line:
     spaces: List[Space] = field(default_factory=list)
     words: List[Word] = field(default_factory=list)
     rtl: bool = False
+    bullet: bool = False  # a vector-drawn bullet precedes the line
 
     @property
     def x0(self) -> float:
@@ -201,8 +202,7 @@ def collect_glyphs(page: pymupdf.Page, textpage=None) -> Tuple[List[Glyph], List
     flags = pymupdf.TEXT_PRESERVE_WHITESPACE | pymupdf.TEXT_MEDIABOX_CLIP
     raw = page.get_text("rawdict", flags=flags, textpage=textpage)
     mat = page.rotation_matrix if page.rotation else None
-    glyphs: List[Glyph] = []
-    spaces: List[Space] = []
+    items: list = []
     rotated = 0
     warnings: List[str] = []
     seq = 0
@@ -234,47 +234,86 @@ def collect_glyphs(page: pymupdf.Page, textpage=None) -> Tuple[List[Glyph], List
                         o = pymupdf.Point(ox, oy) * mat
                         ox, oy = o.x, o.y
                     seq += 1
-                    if c in _INVISIBLE or c == "":
-                        continue
-                    if c.isspace():
-                        if x1 - x0 > 0.05 * size:
-                            spaces.append(Space(x0, x1, oy, size))
-                        continue
-                    if _is_mark(c):
-                        _attach_mark(glyphs, c, x0, x1, oy, size)
-                        continue
-                    if unicodedata.category(c) == "Cc":
+                    if c in _INVISIBLE or c == "" or unicodedata.category(c) == "Cc":
                         continue
                     if c in "ﬀﬁﬂﬃﬄ":
                         c = unicodedata.normalize("NFKC", c)
-                    glyphs.append(Glyph(c, x0, y0, x1, y1, size, bold, italic, oy, seq, font))
+                    kind = "space" if c.isspace() else ("mark" if _is_mark(c) else "base")
+                    items.append((kind, c, x0, y0, x1, y1, ox, oy, size, bold, italic, seq, font))
+    glyphs, spaces = _assemble(items)
     if rotated:
         warnings.append(f"{rotated} characters of rotated/vertical text were skipped")
     return glyphs, spaces, rotated, warnings
 
 
-def _attach_mark(glyphs: List[Glyph], mark: str, x0: float, x1: float, baseline: float, size: float) -> None:
-    """Attach a combining mark to its base glyph (normally the stream-previous one)."""
-    xc = (x0 + x1) / 2
-    tol = 0.6 * size
-    for back in range(1, min(6, len(glyphs)) + 1):
-        g = glyphs[-back]
-        if abs(g.baseline - baseline) > 0.5 * max(size, g.size):
+def _assemble(raw: list) -> Tuple[List[Glyph], List[Space]]:
+    """Build glyphs from raw characters.
+
+    Two producer conventions for combining marks are handled:
+    * MS Word: base letter first, marks after it, all sharing the base origin.
+    * Chrome/Skia: marks first, a zero-width base glyph, then a pseudo "space"
+      that carries the cluster's advance width.
+    Marks are matched to the base glyph with the same origin x (nearest in
+    stream order), which is correct for both.
+    """
+    n = len(raw)
+    consumed = [False] * n
+    glyph_of: Dict[int, Glyph] = {}
+    glyphs: List[Glyph] = []
+    for i, r in enumerate(raw):
+        kind, c, x0, y0, x1, y1, ox, oy, size, bold, italic, seq, font = r
+        if kind != "base":
             continue
-        if g.x0 - tol <= xc <= g.x1 + tol:
-            g.text += mark
-            return
-    # Geometric fallback: nearest base glyph on the same baseline
-    best = None
-    best_d = 1e9
-    for g in glyphs[-40:]:
-        if abs(g.baseline - baseline) > 0.6 * max(size, g.size):
+        if x1 - x0 < 0.05 * size:
+            # zero-width base whose advance is carried by an adjacent pseudo
+            # space glyph (Skia); the space may follow or precede the cluster
+            for step in (1, -1):
+                j = i + step
+                while 0 <= j < n and raw[j][0] == "mark":
+                    j += step
+                if 0 <= j < n and raw[j][0] == "space" and not consumed[j] and abs(raw[j][7] - oy) < 0.3 * size and (
+                        abs(raw[j][4] - ox) < 0.6 or abs(raw[j][2] - ox) < 0.6):
+                    x0, x1 = raw[j][2], raw[j][4]
+                    consumed[j] = True
+                    break
+        g = Glyph(c, x0, y0, x1, y1, size, bold, italic, oy, seq, font)
+        g._ox = ox  # type: ignore[attr-defined]
+        glyph_of[i] = g
+        glyphs.append(g)
+    for i, r in enumerate(raw):
+        if r[0] != "mark":
             continue
-        d = 0 if g.x0 <= xc <= g.x1 else min(abs(g.x0 - xc), abs(g.x1 - xc))
-        if d < best_d:
-            best, best_d = g, d
-    if best is not None and best_d < 1.5 * size:
-        best.text += mark
+        mark, mx0, mx1, mox, moy, msize = r[1], r[2], r[4], r[6], r[7], r[8]
+        best = None
+        best_key = None
+        for j in range(max(0, i - 5), min(n, i + 6)):
+            g = glyph_of.get(j)
+            if g is None or abs(g.baseline - moy) > 0.5 * max(msize, g.size):
+                continue
+            d_origin = abs(getattr(g, "_ox", g.x0) - mox)
+            inside = g.x0 - 0.3 * msize <= (mx0 + mx1) / 2 <= g.x1 + 0.3 * msize
+            if d_origin > 0.6 and not inside:
+                continue
+            key = (0 if d_origin <= 0.6 else 1, abs(j - i), 0 if j < i else 1)
+            if best_key is None or key < best_key:
+                best, best_key = g, key
+        if best is None:
+            xc = (mx0 + mx1) / 2
+            bd = 1e9
+            for j in range(max(0, i - 40), min(n, i + 40)):
+                g = glyph_of.get(j)
+                if g is None or abs(g.baseline - moy) > 0.6 * max(msize, g.size):
+                    continue
+                d = 0 if g.x0 <= xc <= g.x1 else min(abs(g.x0 - xc), abs(g.x1 - xc))
+                if d < bd:
+                    best, bd = g, d
+            if bd > 1.5 * msize:
+                best = None
+        if best is not None:
+            best.text += mark
+    spaces = [Space(r[2], r[4], r[7], r[8]) for i, r in enumerate(raw)
+              if r[0] == "space" and not consumed[i] and r[4] - r[2] > 0.05 * r[8]]
+    return glyphs, spaces
 
 
 # ---------------------------------------------------------------------------
@@ -351,14 +390,16 @@ def _attach_scripts(clusters: List[List[Glyph]]) -> List[List[Glyph]]:
 
 def _split_segments(cluster: List[Glyph], gutters: Sequence[Tuple[float, float]]) -> List[List[Glyph]]:
     cluster = sorted(cluster, key=lambda g: (g.xc, g.seq))
+    size = statistics.median(g.size for g in cluster)
+    gaps = [b.x0 - a.x1 for a, b in zip(cluster, cluster[1:])]
+    word_gaps = sorted(g for g in gaps if g > 0.15 * size)
+    med_gap = word_gaps[len(word_gaps) // 2] if word_gaps else 0.3 * size
     segs: List[List[Glyph]] = [[cluster[0]]]
-    for prev, g in zip(cluster, cluster[1:]):
-        size = max(prev.size, g.size)
-        gap = g.x0 - prev.x1
-        split = gap > max(1.6 * size, 14.0)
-        if not split and gap > 0.5 * size:
+    for prev, g, gap in zip(cluster, cluster[1:], gaps):
+        split = gap > max(4.5 * size, 3.2 * med_gap, 18.0)
+        if not split and gap > 0.4 * size:
             for gx0, gx1 in gutters:
-                if prev.x1 <= gx1 and g.x0 >= gx0:
+                if prev.x1 <= gx1 + 1 and g.x0 >= gx0 - 1:
                     split = True
                     break
         if split:
@@ -369,50 +410,45 @@ def _split_segments(cluster: List[Glyph], gutters: Sequence[Tuple[float, float]]
 
 
 def detect_gutters(clusters: List[List[Glyph]], page_x0: float, page_x1: float) -> List[Tuple[float, float]]:
-    """Find vertical whitespace channels that separate text columns."""
-    if len(clusters) < 8:
+    """Find vertical whitespace channels that separate text columns.
+
+    Coverage counts, for every x position, how many text lines have a glyph
+    there.  Word gaps fall at random positions so they never form a channel,
+    whereas a column gutter is empty in (nearly) every line -- this works even
+    for justified text whose word gaps are as wide as the gutter.
+    """
+    lines = [c for c in clusters if len(c) >= 6]
+    if len(lines) < 8:
         return []
     width = int(page_x1 - page_x0) + 2
     cover = [0] * width
-    lines = 0
-    for c in clusters:
-        if len(c) < 4:
-            continue
-        lines += 1
+    for c in lines:
         seen = set()
         for g in c:
             for x in range(max(0, int(g.x0 - page_x0)), min(width, int(math.ceil(g.x1 - page_x0)))):
                 seen.add(x)
-        # fill small intra-line gaps (word spaces) so only real channels remain
-        xs = sorted(seen)
-        if not xs:
-            continue
-        filled = set(xs)
-        for a, b in zip(xs, xs[1:]):
-            if b - a <= 8:
-                filled.update(range(a, b))
-        for x in filled:
+        for x in seen:
             cover[x] += 1
-    if lines < 8:
-        return []
     occupied = [i for i, v in enumerate(cover) if v > 0]
     if not occupied:
         return []
     left, right = occupied[0], occupied[-1]
+    span = right - left
+    nl = len(lines)
+    thresh = max(1, int(0.15 * nl))
+    med_size = statistics.median(g.size for c in lines for g in c)
     gutters = []
     i = left
-    thresh = max(1, int(0.04 * lines))
     while i <= right:
         if cover[i] <= thresh:
             j = i
             while j <= right and cover[j] <= thresh:
                 j += 1
             w = j - i
-            # must be flanked by heavily used text on both sides
-            lside = max(cover[max(left, i - 30):i] or [0])
-            rside = max(cover[j:min(right, j + 30)] or [0])
-            span = right - left
-            if w >= 6 and lside >= 0.25 * lines and rside >= 0.25 * lines and (i - left) > 0.15 * span and (right - j) > 0.15 * span:
+            lside = sorted(cover[max(left, i - 40):i] or [0])[-3:]
+            rside = sorted(cover[j:min(right, j + 40)] or [0])[-3:]
+            if (w >= max(6, 0.6 * med_size) and min(lside) >= 0.35 * nl and min(rside) >= 0.35 * nl
+                    and (i - left) > 0.15 * span and (right - j) > 0.15 * span):
                 gutters.append((i + page_x0, j + page_x0))
             i = j
         else:
@@ -581,7 +617,7 @@ def group_blocks(lines: List[Line], page_rtl: bool) -> List[Block]:
     return blocks
 
 
-def split_paragraphs(block: Block) -> List[Block]:
+def split_paragraphs(block: Block, typ_w: float = 0.0) -> List[Block]:
     """Split a geometric block into paragraphs/list items."""
     if len(block.lines) <= 1:
         return [block]
@@ -610,6 +646,10 @@ def split_paragraphs(block: Block) -> List[Block]:
             brk = True
         if start_indent > 1.2 * size and prev_start_indent < 0.5 * size and a_text and a_text[-1] in _SENT_END:
             brk = True
+        if typ_w and a_text and a_text[-1] in _SENT_END and width < 0.8 * typ_w and (a.x1 - a.x0) < 0.8 * typ_w:
+            # a block much narrower than the text column whose lines end in
+            # full stops: list items rendered without bullet glyphs
+            brk = True
         if brk:
             out.append(Block(lines=cur, rtl=rtl))
             cur = [b]
@@ -622,6 +662,8 @@ def split_paragraphs(block: Block) -> List[Block]:
 def starts_list_item(line: Line) -> Optional[str]:
     if not line.words:
         return None
+    if line.bullet:
+        return "bullet"
     first = line.words[0].text
     if first and all(ch in _BULLETS for ch in first) and len(first) <= 2:
         return "bullet"
@@ -691,6 +733,9 @@ def analyze_page(page: pymupdf.Page, mirror: bool = False, textpage=None) -> Pag
     page_rtl = r > l
     lines = build_lines(glyphs, spaces, rect)
     raw_blocks = group_blocks(lines, page_rtl)
+    bullets = _vector_bullets(page)
+    widths = sorted(l.x1 - l.x0 for l in lines if len(l.glyphs) >= 15)
+    typ_w = widths[int(0.9 * (len(widths) - 1))] if widths else 0.0
     blocks: List[Block] = []
     for b in raw_blocks:
         rr, ll = _strong_counts([g for ln in b.lines for g in ln.glyphs])
@@ -706,7 +751,9 @@ def analyze_page(page: pymupdf.Page, mirror: bool = False, textpage=None) -> Pag
                 line_rtl = True
             ln.rtl = line_rtl
             ln.words = words_for_line(ln, line_rtl, mirror)
-        blocks.extend(split_paragraphs(b))
+            if bullets:
+                ln.bullet = _has_bullet(ln, bullets)
+        blocks.extend(split_paragraphs(b, typ_w))
     blocks = [b for b in blocks if any(ln.words for ln in b.lines)]
     if page_rtl and _stream_is_logical(blocks):
         _fix_section_labels(blocks)
@@ -728,6 +775,42 @@ def analyze_page(page: pymupdf.Page, mirror: bool = False, textpage=None) -> Pag
         width=rect.width, height=rect.height, blocks=blocks, images=images, rtl=page_rtl,
         glyph_count=len(glyphs), garbled_ratio=garbled_ratio, warnings=warnings,
     )
+
+
+def _vector_bullets(page: pymupdf.Page) -> List[Tuple[float, float, float]]:
+    """Small filled shapes (circles/squares) drawn as vector graphics -- how
+    browsers and some word processors render list bullets."""
+    try:
+        drawings = page.get_cdrawings() if hasattr(page, "get_cdrawings") else page.get_drawings()
+    except Exception:
+        return []
+    if len(drawings) > 3000:
+        return []
+    out = []
+    mat = page.rotation_matrix if page.rotation else None
+    for d in drawings:
+        if not d.get("fill"):
+            continue
+        r = pymupdf.Rect(d["rect"])
+        if mat is not None:
+            r = r * mat
+        w, h = r.width, r.height
+        if 1.2 <= w <= 9 and 1.2 <= h <= 9 and 0.6 <= w / max(h, 1e-3) <= 1.6:
+            out.append(((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2, max(w, h)))
+    return out
+
+
+def _has_bullet(ln: Line, bullets) -> bool:
+    size = ln.size
+    yc = (ln.y0 + ln.y1) / 2
+    for bx, by, bs in bullets:
+        if abs(by - yc) > 0.6 * size:
+            continue
+        if ln.rtl and ln.x1 <= bx <= ln.x1 + 2.8 * size:
+            return True
+        if not ln.rtl and ln.x0 - 2.8 * size <= bx <= ln.x0:
+            return True
+    return False
 
 
 _LABEL_RE = re.compile(r"^\d+(\.\d+)+\.?$")

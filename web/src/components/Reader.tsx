@@ -96,6 +96,7 @@ export default function Reader({ docId }: { docId: string }) {
 
   // narrator <-> react
   useEffect(() => {
+    (window as any).__narrator = narrator; // diagnostics / automated tests
     const onStatus = () => setStatus(narrator.status);
     const onPos = (e: Event) => {
       const p = (e as CustomEvent).detail as NarrPos;
