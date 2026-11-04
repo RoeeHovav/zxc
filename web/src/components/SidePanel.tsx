@@ -81,9 +81,10 @@ export default function SidePanel(p: Props) {
                 onClick={() => p.onGo(e.page, e.y, e.unit_id)}
                 onDoubleClick={() => e.unit_id && p.onPlayUnit(e.unit_id)}
                 title={e.unit_id ? "Double-click to start reading here" : undefined}
-                dir="auto"
               >
-                {e.title}
+                <span className="t" dir="auto">
+                  {e.title}
+                </span>
                 <span className="pg">{e.page + 1}</span>
               </button>
             ))}

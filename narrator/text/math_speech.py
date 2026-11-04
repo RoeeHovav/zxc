@@ -66,8 +66,13 @@ MATH_CHARS = set("=≠≈≡≤≥±×÷√∞∑∫∂∈∉⊂∪∩⇒⇔∀�
 _MATH_TOKEN_RE = re.compile(r"[A-Za-z0-9]\s*[+\-−*/^=<>]\s*[A-Za-z0-9(]")
 
 
+_FUNC_RE = re.compile(r"^[A-Za-z]\([A-Za-z0-9]{1,3}(,[A-Za-z0-9]{1,3})*\)$")
+
+
 def looks_like_math(token: str) -> bool:
     if any(c in MATH_CHARS for c in token):
+        return True
+    if _FUNC_RE.match(token):  # f(x), g(t), P(A)
         return True
     if _MATH_TOKEN_RE.search(token) and not re.fullmatch(r"\d{1,4}-\d{1,4}", token):
         # e.g. "a+b", "2x=4" but not year ranges "1911-2002"

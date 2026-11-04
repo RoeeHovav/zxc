@@ -61,6 +61,8 @@ def test_math_verbalization():
     assert verbalize("x²", "he") == "x בְּרִבּוּעַ"
     assert verbalize("a^3", "en") == "a cubed"
     assert "the square root of" in verbalize("√2", "en")
+    assert norm("Let f(x) = x² + 1", lang="en") == ["Let", "f of x", "equals", "x squared", "plus", "1"]
+    assert norm("f(x) שווה", lang="he")[0] == "f שֶׁל x"
 
 
 def test_english_hyphenation_join():

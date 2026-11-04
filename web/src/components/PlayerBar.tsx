@@ -26,7 +26,7 @@ export default function PlayerBar({ narrator, status, error, pos, rate, onRate, 
   const frac = pos && pos.duration > 0 ? Math.min(1, pos.time / pos.duration) : 0;
   const sleepLeft = sleepUntil ? Math.max(0, Math.round((sleepUntil - Date.now()) / 60000)) : 0;
   return (
-    <div className="player" data-testid="player">
+    <div className="player" data-testid="player" dir="ltr" /* transport controls follow the timeline, not the text direction */>
       <div className="timebar" title={pos ? `${pos.time.toFixed(1)}s / ${pos.duration.toFixed(1)}s` : ""}>
         <div style={{ width: `${frac * 100}%` }} />
       </div>

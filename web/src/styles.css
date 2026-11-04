@@ -320,10 +320,20 @@ button:focus-visible {
   background: var(--accent-soft);
   color: var(--accent);
 }
+.outline-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.outline-item .t {
+  flex: 1;
+  min-width: 0;
+}
 .outline-item .pg {
+  flex: none;
   color: var(--fg-muted);
   font-size: 12px;
-  margin-inline-start: 6px;
+  font-variant-numeric: tabular-nums;
 }
 .result {
   padding: 8px;

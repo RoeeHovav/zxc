@@ -389,8 +389,10 @@ class NarratorService:
             if not st.pdf.is_page_cached(n):
                 continue
             pg = st.pdf.page(n)
+            if sum(1 for b in pg["blocks"] if b["kind"] == "toc") >= 3:
+                continue  # the printed table of contents is not part of the outline
             for bi, b in enumerate(pg["blocks"]):
-                if b["kind"] == "heading":
+                if b["kind"] == "heading" and "©" not in page_block_text(pg, bi):
                     title = page_block_text(pg, bi)
                     if len(title) > 120:
                         title = title[:117] + "…"

@@ -463,6 +463,11 @@ def _math(toks: List[Tok], opts: NormOptions) -> List[Tok]:
             out.append(t)
             continue
         lead, core, trail = _split_affixes(t.text)
+        # keep a closing bracket that belongs to the notation, e.g. "f(x)"
+        whole = t.text.rstrip(".,;:!?")
+        if math_speech._FUNC_RE.match(whole):
+            out.append(Tok(math_speech.verbalize(whole, opts.lang) + t.text[len(whole):], t.a, t.b, replaced=True))
+            continue
         if core in ("-", "–") or not core:
             out.append(t)
             continue

@@ -58,3 +58,4 @@ tests/private/
 python-embed/
 dist/
 web/tsconfig.tsbuildinfo
+listening-samples/
