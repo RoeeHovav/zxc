@@ -64,6 +64,13 @@ def main(argv=None) -> int:
     ap.add_argument("--no-browser", action="store_true")
     ap.add_argument("--log", default="info")
     args = ap.parse_args(argv)
+    if sys.stdout is None or sys.stderr is None:
+        # started without a console (pythonw.exe): log to a file instead
+        from .config import data_dir
+        log_path = os.path.join(data_dir(), "narrator.log")
+        stream = open(log_path, "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stdout or stream
+        sys.stderr = sys.stderr or stream
     logging.basicConfig(level=getattr(logging, args.log.upper(), logging.INFO),
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     if _already_running(args.port):
@@ -86,7 +93,10 @@ def main(argv=None) -> int:
             _open_ui(url)
         threading.Thread(target=opener, daemon=True).start()
     print(f"PDF Narrator running at {url}  (close this window to stop)")
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
+    server = uvicorn.Server(config)
+    app.state.shutdown = lambda: setattr(server, "should_exit", True)
+    server.run()
     return 0
 
 

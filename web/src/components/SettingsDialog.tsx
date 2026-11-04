@@ -243,6 +243,8 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
             </div>
           ))}
 
+          <TeacherSettings />
+
           <div className="section-title">OCR</div>
           <div className="small">
             {app.ocr.available ? (
@@ -279,5 +281,60 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
         </footer>
       </div>
     </div>
+  );
+}
+
+function TeacherSettings() {
+  const { settings, update, app, load, lang, toast } = useStore();
+  const [status, setStatus] = useState<string>("");
+  const [key, setKey] = useState("");
+  if (!settings || !app) return null;
+  const he = lang === "he";
+  const test = async () => {
+    setStatus("…");
+    const r = await api.llmStatus();
+    setStatus(r.ok ? `✓ ${r.models?.length || 0} model(s): ${(r.models || []).slice(0, 8).join(", ")}` : `✗ ${r.error}`);
+  };
+  return (
+    <>
+      <div className="section-title">{he ? "מצב מורה (אופציונלי)" : "Teacher Mode (optional)"}</div>
+      <p className="muted small" style={{ marginTop: 0 }}>
+        {he
+          ? "בסוף כל סעיף, מודל שפה מסביר את החומר במילים פשוטות. ההסבר מסומן בבירור ואינו משנה את המסמך. אפשרות חינמית: התקינו Ollama (ollama.com) והריצו למשל ollama pull gemma3:12b או aya-expanse:8b (תמיכה טובה בעברית)."
+          : "At the end of each section a language model explains the material in plain words. Explanations are clearly marked and never change the document. Free option: install Ollama (ollama.com) and run e.g. `ollama pull gemma3:12b` or `aya-expanse:8b` (good Hebrew support)."}
+      </p>
+      <label className="check">
+        <input type="checkbox" checked={settings.teacher_mode} onChange={(e) => update({ teacher_mode: e.target.checked })} />
+        {he ? "הסבר אוטומטי בסוף כל סעיף" : "Explain automatically at the end of each section"}
+      </label>
+      <div className="grid2" style={{ marginTop: 6 }}>
+        <div className="field">
+          <label>{he ? "כתובת השרת (OpenAI-compatible)" : "Endpoint (OpenAI-compatible)"}</label>
+          <input value={settings.llm_base_url} onChange={(e) => update({ llm_base_url: e.target.value })} />
+        </div>
+        <div className="field">
+          <label>{he ? "מודל" : "Model"}</label>
+          <input value={settings.llm_model} placeholder="gemma3:12b" onChange={(e) => update({ llm_model: e.target.value })} />
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <input type="password" placeholder={app.secrets.llm_api_key ? "•••••• (key saved)" : he ? "מפתח API (לא נדרש ל-Ollama)" : "API key (not needed for Ollama)"} value={key} onChange={(e) => setKey(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
+        <button
+          className="btn"
+          onClick={async () => {
+            await api.putSecret("llm_api_key", key);
+            setKey("");
+            await load();
+            toast("Saved");
+          }}
+        >
+          {he ? "שמירה" : "Save"}
+        </button>
+        <button className="btn" onClick={test}>
+          {he ? "בדיקת חיבור" : "Test connection"}
+        </button>
+      </div>
+      {status && <div className="small" style={{ marginTop: 6 }}>{status}</div>}
+    </>
   );
 }

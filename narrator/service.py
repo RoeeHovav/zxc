@@ -29,6 +29,8 @@ from .tts.azure import AzureProvider
 from .tts.base import TTSError, TTSProvider, Voice
 from .tts.edge import EdgeProvider
 from .tts.testtone import TestToneProvider
+from .llm.client import LLMClient, is_local
+from .llm.teacher import ExplanationCache, explain as llm_explain
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +77,7 @@ class NarratorService:
         self._lexicon_version = 0
         self._builtin = load_builtin("he") + load_builtin("en")
         self._secrets_path = os.path.join(self.data_dir, "secrets.json")
+        self.explanations = ExplanationCache(os.path.join(self.data_dir, "explanations"))
         self._apply_provider_settings()
 
     # ============================================================ settings
@@ -601,6 +604,52 @@ class NarratorService:
             pos += len(w) + 1
         return await self._speak(" ".join(words), voice, lang, 0, tokens, (0, len(words)))
 
+    # ============================================================ teacher
+    def llm_client(self) -> LLMClient:
+        s = self.settings()
+        return LLMClient(s.get("llm_base_url") or "", s.get("llm_model") or "", self._secrets().get("llm_api_key"))
+
+    async def llm_status(self) -> dict:
+        c = self.llm_client()
+        try:
+            models = await c.models()
+            return {"ok": True, "models": models, "local": is_local(c.base_url)}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc), "local": is_local(c.base_url)}
+
+    async def explain(self, doc_id: str, unit_id: str, scope: str = "paragraph") -> dict:
+        st = self.open(doc_id)
+        loop = asyncio.get_running_loop()
+        u = await loop.run_in_executor(None, st.units.find_unit, unit_id)
+        if u is None:
+            raise KeyError(unit_id)
+        client = self.llm_client()
+        if not is_local(client.base_url) and "llm" not in self.settings().get("cloud_consent", {}):
+            raise ConsentRequired("llm", _LLMInfo())
+        # walk back to the section heading, collecting the section's text
+        passage_units = [u]
+        heading = ""
+        cur = u
+        for _ in range(80):
+            cur = await loop.run_in_executor(None, st.units.prev_unit, cur.id)
+            if cur is None:
+                break
+            if cur.kind == "heading":
+                heading = cur.text()
+                break
+            if scope == "section" and cur.kind in ("paragraph", "list_item", "note"):
+                passage_units.insert(0, cur)
+        if scope != "section":
+            passage_units = [u]
+        passage = "\n".join(x.text() for x in passage_units)
+        if len(passage) > 4000:
+            passage = passage[-4000:]
+        prev = await loop.run_in_executor(None, st.units.prev_unit, passage_units[0].id)
+        previous = prev.text() if prev is not None and prev.kind in ("paragraph", "note", "list_item") else ""
+        title = (self.db.document(doc_id) or {}).get("title", "")
+        text = await llm_explain(client, self.explanations, u.lang, title, heading, previous, passage)
+        return {"text": text, "lang": u.lang, "model": client.model, "heading": heading, "unit_id": u.id, "scope": scope}
+
     # ============================================================ lexicon
     def lexicon_changed(self) -> None:
         self._invalidate_prepared()
@@ -608,6 +657,11 @@ class NarratorService:
     def set_occurrence(self, doc_id: str, page: int, word: int, spoken: Optional[str]) -> None:
         self.db.set_occurrence(doc_id, page, word, spoken)
         self._invalidate_prepared()
+
+
+class _LLMInfo:
+    name = "Language model for Teacher Mode"
+    privacy = "The passage being explained (and its section heading) is sent to the configured language-model service."
 
 
 def _search_norm(s: str) -> str:

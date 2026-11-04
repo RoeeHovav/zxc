@@ -292,11 +292,18 @@ class PdfDocument:
             except Exception:
                 data = None
         if data is None:
-            data = self._analyze(n)
-            tmp = path + ".tmp"
-            with gzip.open(tmp, "wt", encoding="utf-8") as fh:
-                json.dump(data, fh, ensure_ascii=False, separators=(",", ":"))
-            os.replace(tmp, path)
+            with self._lock:
+                # another thread (background sweep vs. on-demand request) may
+                # have produced the page while we waited for the lock
+                if n in self._mem:
+                    return self._mem[n]
+                data = self._analyze(n)
+                tmp = f"{path}.{os.getpid()}.{threading.get_ident()}.tmp"
+                with gzip.open(tmp, "wt", encoding="utf-8") as fh:
+                    json.dump(data, fh, ensure_ascii=False, separators=(",", ":"))
+                os.replace(tmp, path)
+                self._remember(n, data)
+            return data
         self._remember(n, data)
         return data
 

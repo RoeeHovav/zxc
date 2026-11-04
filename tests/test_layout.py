@@ -90,3 +90,25 @@ def test_cache_reuse(make_doc, he_pdf, tmp_path):
     assert d2.is_page_cached(0)
     assert d2.page(0)["words"] == first["words"]
     d2.close()
+
+
+def test_concurrent_page_requests_do_not_collide(make_doc, en_pdf):
+    """Background processing and on-demand requests may ask for the same page."""
+    import threading
+    d = make_doc(en_pdf)
+    d.stats()
+    errors = []
+
+    def worker():
+        try:
+            for n in range(d.page_count):
+                d.page(n)
+        except Exception as exc:  # pragma: no cover - failure path
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert not errors

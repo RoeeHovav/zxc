@@ -8,6 +8,7 @@ import SettingsDialog from "./SettingsDialog";
 import SidePanel, { Tab } from "./SidePanel";
 import Viewer, { orderSel, PageHighlight, Ref2, Selection, ViewerHandle } from "./Viewer";
 import { ConsentDialog, PageRangeDialog, PronounceDialog, ShortcutsDialog, VoiceLab } from "./Dialogs";
+import { TeacherPanel, useTeacher } from "./Teacher";
 
 interface Menu {
   x: number;
@@ -46,6 +47,7 @@ export default function Reader({ docId }: { docId: string }) {
   const [progress, setProgress] = useState<{ processed: number; pages: number } | null>(null);
   const [lexVersion, setLexVersion] = useState(0);
   const [sleepUntil, setSleepUntil] = useState<number | null>(null);
+  const teacher = useTeacher(docId);
   const followRef = useRef(followPaused);
   followRef.current = followPaused;
 
@@ -130,7 +132,12 @@ export default function Reader({ docId }: { docId: string }) {
     if (!settings) return;
     narrator.pauseScale = settings.pause_scale;
     narrator.readKinds = settings.read_kinds;
-  }, [settings?.pause_scale, settings?.read_kinds]);
+    narrator.teacherMode = !!settings.teacher_mode && !!settings.llm_model;
+  }, [settings?.pause_scale, settings?.read_kinds, settings?.teacher_mode, settings?.llm_model]);
+
+  useEffect(() => {
+    narrator.teacherHandler = (unit) => teacher.explain(unit.id, "section", true);
+  }, [narrator, teacher.explain]);
 
   useEffect(() => {
     narrator.setRate(rate);
@@ -212,7 +219,10 @@ export default function Reader({ docId }: { docId: string }) {
   };
 
   const onPlay = () => {
-    if (status === "playing" || status === "loading") return narrator.pause();
+    if (status === "playing" || status === "loading") {
+      teacher.stopAudio();
+      return narrator.pause();
+    }
     if (narrator.pos || status === "error") return narrator.resume();
     if (resumePos?.unit_id) {
       const p = resumePos;
@@ -627,6 +637,17 @@ export default function Reader({ docId }: { docId: string }) {
             >
               <Icon name="speech" size={16} /> {t.fixPronunciation}
             </button>
+            <button
+              onClick={async () => {
+                setMenu(null);
+                const r = await resolveWord(menu.ref);
+                if (!r) return;
+                if (status === "playing") narrator.pause();
+                teacher.explain(r.unit.id, "paragraph", false);
+              }}
+            >
+              <Icon name="lab" size={16} /> {lang === "he" ? "הסבר (בינה מלאכותית)" : "Explain (AI)"}
+            </button>
             <button onClick={() => (setMenu(null), addBookmark(menu.ref))}>
               <Icon name="bookmark" size={16} /> {t.addBookmark}
             </button>
@@ -634,6 +655,7 @@ export default function Reader({ docId }: { docId: string }) {
         </>
       )}
 
+      {teacher.state && <TeacherPanel state={teacher.state} onPlay={teacher.play} onClose={teacher.close} />}
       {dialog === "settings" && (
         <SettingsDialog
           onClose={() => setDialog(null)}

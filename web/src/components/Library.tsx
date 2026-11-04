@@ -81,6 +81,17 @@ export default function Library() {
         <button className="icon-btn" title={t.settings} aria-label={t.settings} onClick={() => setShowSettings(true)}>
           <Icon name="settings" />
         </button>
+        <button
+          className="btn"
+          title="Stop the narrator service and close"
+          onClick={async () => {
+            await fetch("/api/shutdown", { method: "POST" }).catch(() => undefined);
+            document.body.innerHTML = '<div style="padding:40px;font-family:sans-serif">PDF Narrator has stopped. You can close this window.</div>';
+            window.close();
+          }}
+        >
+          {lang === "he" ? "יציאה" : "Quit"}
+        </button>
       </div>
       <div
         className={`dropzone${drag ? " drag" : ""}`}

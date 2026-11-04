@@ -1,0 +1,2 @@
+# Optional: official Azure AI Speech (needs your own key; free tier available)
+azure-cognitiveservices-speech>=1.35

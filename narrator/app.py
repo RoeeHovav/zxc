@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from . import config
 from .service import ConsentRequired, NarratorService
 from .tts.base import TTSError
+from .llm.client import LLMError
 
 log = logging.getLogger(__name__)
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -24,6 +25,18 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
     app = FastAPI(title=config.APP_NAME, version=config.VERSION)
     app.state.svc = svc
 
+    @app.middleware("http")
+    async def local_only(request: Request, call_next):
+        """Only serve this computer's own UI: reject foreign Host headers (DNS
+        rebinding) and state-changing requests from other web origins (CSRF)."""
+        host = request.headers.get("host", "")
+        if host.rsplit(":", 1)[0].strip("[]") not in ("127.0.0.1", "localhost", "::1", "testserver"):
+            return JSONResponse(status_code=403, content={"error": "forbidden_host"})
+        origin = request.headers.get("origin")
+        if origin and request.method not in ("GET", "HEAD", "OPTIONS") and origin != f"http://{host}":
+            return JSONResponse(status_code=403, content={"error": "forbidden_origin"})
+        return await call_next(request)
+
     @app.exception_handler(ConsentRequired)
     async def _consent(_req: Request, exc: ConsentRequired):
         i = exc.info
@@ -33,6 +46,10 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
     @app.exception_handler(TTSError)
     async def _tts(_req: Request, exc: TTSError):
         return JSONResponse(status_code=502, content={"error": "tts_failed", "message": str(exc), "retryable": exc.retryable})
+
+    @app.exception_handler(LLMError)
+    async def _llm(_req: Request, exc: LLMError):
+        return JSONResponse(status_code=502, content={"error": "llm_failed", "message": str(exc)})
 
     @app.exception_handler(KeyError)
     async def _nf(_req: Request, exc: KeyError):
@@ -71,6 +88,15 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
     @app.get("/api/voices")
     async def voices(provider: Optional[str] = None):
         return {"voices": await svc.voices(provider)}
+
+    @app.post("/api/shutdown")
+    async def shutdown(request: Request):
+        # only reachable from this computer (server binds to 127.0.0.1)
+        fn = getattr(app.state, "shutdown", None)
+        if fn:
+            fn()
+            return {"ok": True}
+        return {"ok": False}
 
     @app.post("/api/ocr/refresh")
     async def ocr_refresh():
@@ -203,6 +229,14 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
             raise HTTPException(404)
         mime = {"mp3": "audio/mpeg", "wav": "audio/wav", "ogg": "audio/ogg"}[ext]
         return FileResponse(path, media_type=mime, headers={"Cache-Control": "max-age=31536000, immutable"})
+
+    @app.post("/api/documents/{doc_id}/explain")
+    async def explain(doc_id: str, body: dict = Body(...)):
+        return await svc.explain(doc_id, body["unit_id"], body.get("scope", "paragraph"))
+
+    @app.get("/api/llm/status")
+    async def llm_status():
+        return await svc.llm_status()
 
     @app.post("/api/preview")
     async def preview(body: dict = Body(...)):

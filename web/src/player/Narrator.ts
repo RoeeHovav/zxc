@@ -45,6 +45,9 @@ export class Narrator extends EventTarget {
   pos: NarrPos | null = null;
   stopAt: StopAt | null = null;
   consentHandler?: (info: any) => Promise<boolean>;
+  /** Teacher Mode: called at the end of each section; narration continues when it resolves. */
+  teacherMode = false;
+  teacherHandler?: (unit: Unit) => Promise<void>;
 
   private audio: HTMLAudioElement;
   private cur: Current | null = null;
@@ -322,6 +325,15 @@ export class Narrator extends EventTarget {
       this.setStatus("idle");
       this.emit("finished");
       return;
+    }
+    if (this.teacherMode && this.teacherHandler && next.unit.id !== cur.unit.id && next.unit.kind === "heading" && ["paragraph", "list_item", "note"].includes(cur.unit.kind)) {
+      // end of a section: let the teacher explain before moving on
+      try {
+        await this.teacherHandler(cur.unit);
+      } catch {
+        /* an explanation failure must never stop the reading */
+      }
+      if (tok !== this.token) return;
     }
     const gap = next.unit.id === cur.unit.id ? 0 : ((cur.unit.pause_after || 0) + (next.unit.pause_before || 0)) * this.pauseScale / this.rate;
     this.pendingNext = next;

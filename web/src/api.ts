@@ -97,6 +97,9 @@ export interface Settings {
   azure_region: string;
   prefetch_chunks: number;
   sleep_minutes: number;
+  teacher_mode: boolean;
+  llm_base_url: string;
+  llm_model: string;
 }
 
 export interface AppState {
@@ -257,4 +260,7 @@ export const api = {
   cacheInfo: () => req<{ bytes: number; limit: number }>("GET", "/api/cache"),
   clearCache: () => req<any>("DELETE", "/api/cache"),
   ocrRefresh: () => req<any>("POST", "/api/ocr/refresh"),
+  explain: (id: string, unitId: string, scope: "paragraph" | "section") =>
+    req<{ text: string; lang: string; model: string; heading: string; unit_id: string; scope: string }>("POST", `/api/documents/${id}/explain`, { unit_id: unitId, scope }),
+  llmStatus: () => req<{ ok: boolean; models?: string[]; error?: string; local: boolean }>("GET", "/api/llm/status"),
 };

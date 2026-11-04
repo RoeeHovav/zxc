@@ -55,10 +55,15 @@ DEFAULT_SETTINGS = {
     "cloud_consent": {},  # provider id -> timestamp of consent
     "azure_region": "",
     "prefetch_chunks": 3,
+    # Teacher Mode (optional, off by default): any OpenAI-compatible endpoint.
+    # The default points at a free local Ollama installation.
+    "teacher_mode": False,
+    "llm_base_url": "http://127.0.0.1:11434/v1",
+    "llm_model": "",
     "sleep_minutes": 0,
 }
 
-SECRET_KEYS = {"azure_key"}
+SECRET_KEYS = {"azure_key", "llm_api_key"}
 
 
 def default_settings() -> dict:

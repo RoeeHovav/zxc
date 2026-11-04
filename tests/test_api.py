@@ -149,3 +149,11 @@ def test_large_document_is_usable_without_full_processing(client, en_pdf, tmp_pa
     units = client.get(f"/api/documents/{doc}/units", params={"page": 580, "count": 5}).json()["units"]
     assert units
     assert time.time() - t0 < 30
+
+
+def test_rejects_foreign_origin_and_host(client):
+    r = client.post("/api/shutdown", headers={"Origin": "https://evil.example"})
+    assert r.status_code == 403
+    r = client.get("/api/state", headers={"Host": "attacker.example"})
+    assert r.status_code == 403
+    assert client.get("/api/state").status_code == 200
