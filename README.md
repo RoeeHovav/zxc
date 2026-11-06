@@ -109,7 +109,10 @@ python -m venv .venv
   differently (שמן = oil / "their name", ספר = book / barber / counted). With a Gemini key (free; text only, whose
   allowance is far larger than its voice's) a language model reads each passage and gives the voice vowel marks
   *only for the ambiguous words*, chosen from the whole sentence. The displayed text never changes; each answer is
-  checked (it must be the same letters) and remembered on this computer. Try it in the **Voice lab** (sample "שמן").
+  checked (it must be the same letters) and remembered on this computer. Measured on 48 test sentences it picks the
+  right reading about 88-94% of the time (`python scripts/eval_pronunciation.py --model gemini-3.1-flash-lite`;
+  see docs/STATUS.md for the caveats). Google's free tier allows 20 requests per day per model, so the app asks
+  about 12 passages per request and moves on to the next model when one is used up. Try it in the **Voice lab** (sample "שמן").
   **Whether a given voice follows vowel marks is not known until you listen**; if a voice ignores them, the
   assistant cannot help with that voice.
 - **Your pronunciation fixes.** Right-click a word, then choose **Fix

@@ -204,12 +204,16 @@ def test_playing_asks_for_the_next_passages_in_one_request(client, he_pdf):
     assert len(posts) == 1 and posts[0] >= 2  # this passage and the ones after it, together
 
 
-def test_model_ranking_prefers_current_flash_and_never_hard_codes_old_names():
+def test_model_ranking_puts_measured_models_first_then_current_flash():
     names = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-2.5-pro", "gemini-flash-latest",
-             "gemini-2.5-flash-lite", "gemini-3.8-pro"]
+             "gemini-2.5-flash-lite", "gemini-3.8-pro", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
     order = sorted(names, key=P.Vocalizer.rank_model)
-    assert order[:3] == ["gemini-flash-latest", "gemini-3.8-flash", "gemini-2.5-flash"]
+    assert order[:2] == ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]  # the models with a measured score
+    assert order[2:5] == ["gemini-flash-latest", "gemini-3.8-flash", "gemini-2.5-flash"]  # then the generic order
     assert order.index("gemini-3.8-flash-lite") < order.index("gemini-2.5-pro")
+    # without the measured models (e.g. a key that cannot see them) the generic order still works
+    rest = sorted([n for n in names if n not in P.VERIFIED_MODELS], key=P.Vocalizer.rank_model)
+    assert rest[0] == "gemini-flash-latest"
 
 
 def test_retired_model_follows_googles_suggestion(tmp_path):
@@ -278,7 +282,7 @@ def test_candidates_reasoning_and_context_are_used(tmp_path):
     words, chosen, cached, details = res[0]
     assert chosen == {3: "שְׁמָן"} and details[3]["c"][1] == "שֶׁמֶן" and details[3]["g"] == ["their name", "oil", "fat"]
     assert '"before": "הקדמה קצרה."' in seen[0] and '"after": "והמשך הטקסט."' in seen[0]
-    assert "reason like a careful grammarian" in P.SYSTEM
+    assert "analysis" in P.SYSTEM and "pick" in P.SYSTEM and "EVERY word" in P.SYSTEM
     # the alternatives are remembered with the answer (so the UI can offer them without asking again)
     v2 = make(tmp_path, lambda r: pytest.fail("no request expected"))
     assert asyncio.run(v2.vocalize(SENT))[3][3]["c"][:2] == ["שְׁמָן", "שֶׁמֶן"]
@@ -346,3 +350,33 @@ def test_suggest_endpoint_for_a_clicked_word(client, he_pdf):
     assert r.status_code == 200, r.text
     j = r.json()
     assert j["readings"] and j["passage"] and j["word"]
+
+
+def test_reasoning_first_answer_format_is_read_with_the_pick_first():
+    words = P.hebrew_words(SENT)
+    answer = {"3": {"readings": [{"v": "שֶׁמֶן", "g": "oil"}, {"v": "שְׁמָן", "g": "their name"}, {"v": "שמן", "g": "no marks"}],
+                    "analysis": "A name; feminine plural booklets.", "pick": 1}}
+    d = P.validate_details(answer, words)
+    assert d[3]["c"] == ["שְׁמָן", "שֶׁמֶן"] and d[3]["g"][:2] == ["their name", "oil"] and "feminine" in d[3]["why"]
+    answer["3"]["pick"] = 99  # a nonsense index falls back to the first reading instead of failing
+    assert P.validate_details(answer, words)[3]["c"][0] == "שֶׁמֶן"
+
+
+def test_damaged_json_is_repaired_or_asked_again(tmp_path):
+    cut = '{"0": {"3": {"readings": [{"v": "שְׁמָן", "g": "name"},], "analysis": "x", "pick": 0}}, "1": {"2": {"readings": [{"v": "סָפַר", "g": "cou'
+    fixed = P._repair_json(cut)
+    assert fixed["0"]["3"]["readings"][0]["v"] == "שְׁמָן"  # trailing comma and a cut-off tail are repaired
+    assert P._parse_json({"candidates": [{"content": {"parts": [{"text": '```json\n{"0": {}}\n```'}]}}]}) == {"0": {}}
+    calls = []
+
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"models": [{"name": "models/gemini-3.1-flash-lite", "supportedGenerationMethods": ["generateContent"]}]})
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "I think the answer is שְׁמָן"}]}}]})
+        return reply({"0": {"3": D(["שְׁמָן"])}})
+
+    v = make(tmp_path, handler)
+    words, chosen, _, _d = asyncio.run(v.vocalize(SENT))
+    assert chosen == {3: "שְׁמָן"} and len(calls) == 2  # one unreadable answer did not lose the passage

@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04 · version 0.9.8. This is the hand-over record for
+Last updated: 2026-11-04 · version 0.9.9. This is the hand-over record for
 continuing development across sessions.
 
 ## Verified (automated)
@@ -85,6 +85,17 @@ Chromium. It uses the test-tone engine for audio and passes:
   assistant worked through every model of the key, one slow attempt after another. 0.9.6: at most 4 models and
   25 s per request, per-model pacing, a model that is over its limit is skipped instead of waited for, a failure
   rests the assistant for 1-5 min so later passages do not wait again, and the Voice lab button says "Working…".
+- **Pronunciation accuracy, measured (0.9.9).** `scripts/eval_pronunciation.py` asks the assistant about 48
+  sentences with ambiguous Hebrew words (answer key written by the assistant author, NOT checked by a native
+  speaker; 25 sentences held out from tuning; one batch grouping per run, temperature 0). Prompt p7:
+  gemini-3.1-flash-lite 96% held-out / 94% all (45/48), gemini-3.5-flash-lite 84% / 88%,
+  gemini-flash-lite-latest 80% / 90% (and wrong on the user's שמן sentence). Earlier prompts: p4 got the user's
+  sentence wrong; p5 (candidates) about 88-91%; p6 (meanings first, "include every word") 96% held-out on 3.1-lite
+  but the user's sentence was flaky (2 of 3 runs right); p7 (possessive suffixes, pick must match the analysis)
+  right in all later runs on 3.1-lite and 3.5-lite. Most remaining misses are words the model did not flag as
+  ambiguous (e.g. עד) which may well be read right by default. Models with more capacity (flash/pro) were out of
+  free quota and are unmeasured. Free tier: 20 requests per day PER MODEL (Google's error text), 12 passages per
+  request, the app rotates models. This measures the TEXT step only; whether a voice obeys vowel marks is separate.
 - **Pronunciation: reasoning, context and corrections (0.9.8).** The user's Voice-lab test showed the assistant
   picking a wrong reading for שמן (shown as the word it gave the voice). 0.9.8: the prompt asks for grammatical
   reasoning and 2-3 ranked candidates with glosses, passages carry the neighbouring text, and the user's own
