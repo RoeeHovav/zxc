@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04 · version 0.9.3. This is the hand-over record for
+Last updated: 2026-11-04 · version 0.9.4. This is the hand-over record for
 continuing development across sessions.
 
 ## Verified (automated)
@@ -69,6 +69,13 @@ Chromium. It uses the test-tone engine for audio and passes:
   (1) whether the Microsoft voices (Hila/Avri/Multilingual "William", "Andrew") actually follow vowel marks,
   (2) how accurate Gemini's choices are on real text, (3) the free text-model allowance in practice.
   Reported by the user: the multilingual voices sound very good but misread homographs (שמן as "oil").
+- **Pronunciation assistant, batching and status.** Passages are asked in groups of up to 12 per request
+  (one request covers the current passage and the next ones; the free request allowance may be only a few per
+  day), with the more accurate `gemini-2.5-flash` first. The Voice lab shows what the voice was given and a
+  status line (added N words / no key / nothing ambiguous / resting / error). The user's first live test with
+  William (Multilingual) still read שמן as "fat"; at that time the status line did not exist, so it is unknown
+  whether the assistant ran or the voice ignores vowel marks. The hand-typed vowel-mark sample in the Voice lab
+  separates the two cases.
 - **Large documents**: the document vocabulary used to be rebuilt from every analysed page on every request,
   stalling playback 10-18 s at a time during the first minutes of a 1,256-page document; it is now incremental
   (worst request 0.7 s in the same test).

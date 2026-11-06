@@ -52,6 +52,7 @@ export interface Speech {
   lang: string;
   text: string;
   notice?: string;
+  assistant?: { state: string; changed: string[][]; detail?: string };
 }
 
 export interface PrepStatus {

@@ -6,7 +6,7 @@ import os
 import sys
 
 APP_NAME = "PDF Narrator"
-VERSION = "0.9.3"
+VERSION = "0.9.4"
 
 
 def data_dir() -> str:

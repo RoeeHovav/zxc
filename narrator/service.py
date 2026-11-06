@@ -564,24 +564,50 @@ class NarratorService:
             raise KeyError(f"chunk {chunk}")
         ch = chunks[chunk]
         voice = await self.voice_for(ch.lang, doc_id)
+        if ch.lang == "he" and self._assistant_enabled(ch, voice, False) is None:
+            ahead = await self._chunks_ahead(st, u, chunk, 11)
+            await self._warm_vowels([ch] + ahead, voice)
         result = await self._speak_chunk(ch, voice)
         if prefetch:
             self._schedule_prefetch(doc_id, unit_id, chunk)
         return result
 
-    async def _vocalize_chunk(self, ch: PreparedChunk, voice: str, force: bool = False):
-        """Add vowel marks to the ambiguous Hebrew words of a chunk (context-aware).  -> (text, tokens, notice)"""
-        s = self.settings()
-        plain = (ch.text, ch.tokens, None)
-        if ch.lang != "he" or voice.startswith("gemini:") or not (force or s.get("ai_pronunciation", True)):
-            return plain
-        v = self.vocalizer
-        if not v.key:
-            return plain
-        if PRONUNCIATION_CONSENT not in s.get("cloud_consent", {}):
+    def _assistant_enabled(self, ch: PreparedChunk, voice: str, force: bool) -> Optional[str]:
+        """None when the pronunciation assistant should run for this chunk, else why not."""
+        if ch.lang != "he":
+            return "not-hebrew"
+        if voice.startswith("gemini:"):
+            return "voice-understands-context"
+        if not (force or self.settings().get("ai_pronunciation", True)):
+            return "off"
+        if not self.vocalizer.key:
+            return "no-key"
+        return None
+
+    def _check_pronunciation_consent(self) -> None:
+        if PRONUNCIATION_CONSENT not in self.settings().get("cloud_consent", {}):
             raise ConsentRequired(PRONUNCIATION_CONSENT, PRONUNCIATION_INFO)
+
+    async def _warm_vowels(self, chunks: List[PreparedChunk], voice: str) -> None:
+        """Ask for the vowel marks of several upcoming passages in ONE request (small free request allowance)."""
+        todo = [c.text for c in chunks if self._assistant_enabled(c, voice, False) is None]
+        if not todo:
+            return
+        self._check_pronunciation_consent()
         try:
-            words, chosen, _ = await v.vocalize(ch.text)
+            await self.vocalizer.vocalize_many(todo)
+        except PronounceError as exc:
+            log.info("pronunciation assistant could not prepare passages: %s", exc)
+
+    async def _vocalize_chunk(self, ch: PreparedChunk, voice: str, force: bool = False):
+        """Add vowel marks to the ambiguous Hebrew words of a chunk (context-aware).
+        -> (text, tokens, notice, info)"""
+        why = self._assistant_enabled(ch, voice, force)
+        if why:
+            return ch.text, ch.tokens, None, {"state": why, "changed": []}
+        self._check_pronunciation_consent()
+        try:
+            words, chosen, _ = await self.vocalizer.vocalize(ch.text)
         except PronounceError as exc:
             log.info("pronunciation assistant skipped a passage: %s", exc)
             notice = None
@@ -589,15 +615,17 @@ class NarratorService:
                 self._pron_notice_at = time.time()
                 notice = ("The pronunciation assistant is resting (Google's free allowance is used up), so words that can be "
                           "read several ways are read the usual way for now. It resumes automatically.")
-            return ch.text, ch.tokens, notice
+            return ch.text, ch.tokens, notice, {"state": "paused" if exc.quota else "error", "changed": [], "detail": str(exc)}
         if not chosen:
-            return plain
+            return ch.text, ch.tokens, None, {"state": "none-needed", "changed": []}
         text, tokens = apply_vowels(ch.text, words, chosen, ch.tokens)
-        return text, tokens, None
+        changed = [[words[i][2], v] for i, v in sorted(chosen.items())]
+        return text, tokens, None, {"state": "ok", "changed": changed}
 
     async def _speak_chunk(self, ch: PreparedChunk, voice: str, allow_fallback: bool = True, force_vowels: bool = False) -> dict:
-        text, tokens, notice = await self._vocalize_chunk(ch, voice, force_vowels)
+        text, tokens, notice, info = await self._vocalize_chunk(ch, voice, force_vowels)
         res = await self._speak(text, voice, ch.lang, ch.rate, tokens, ch.word_range, allow_fallback=allow_fallback)
+        res["assistant"] = info
         if notice and "notice" not in res:
             res["notice"] = notice
         return res
@@ -616,6 +644,24 @@ class NarratorService:
             multi = [v for v in cands if "Multilingual" in v.id]
             return (multi or cands)[0].id
         return None
+
+    async def _chunks_ahead(self, st: DocState, u, chunk: int, n: int) -> List[PreparedChunk]:
+        """The next `n` readable chunks after (unit u, chunk), crossing unit boundaries."""
+        loop = asyncio.get_running_loop()
+        read = self.settings().get("read_kinds", {})
+        out: List[PreparedChunk] = []
+        c = chunk + 1
+        guard = 0
+        while u is not None and len(out) < n and guard < 40:
+            guard += 1
+            chunks = await loop.run_in_executor(None, self.prepared, st, u)
+            if read.get(u.kind, True):
+                while c < len(chunks) and len(out) < n:
+                    out.append(chunks[c])
+                    c += 1
+            u = await loop.run_in_executor(None, st.units.next_unit, u.id)
+            c = 0
+        return out
 
     async def _speak(self, text: str, voice: str, lang: str, rate: int, tokens, word_range,
                      allow_fallback: bool = True) -> dict:
@@ -790,6 +836,7 @@ class NarratorService:
         try:
             read = self.settings().get("read_kinds", {})
             first = True
+            since_warm = 0
             while u is not None and not job.cancel:
                 job.page = min((p for p in outstanding.values()), default=u.page)
                 if read.get(u.kind, True):
@@ -802,6 +849,10 @@ class NarratorService:
                             job.state = "done"
                             return
                         first = False
+                        if since_warm == 0 and self._assistant_enabled(ch, voice, False) is None:
+                            # vowel marks for the next dozen passages in one request
+                            await self._warm_vowels([ch] + await self._chunks_ahead(st, u, ch.index, 11), voice)
+                        since_warm = (since_warm + 1) % 12
                         outstanding[asyncio.ensure_future(one(u.page, ch))] = u.page
                         while len(outstanding) >= 12 and not job.cancel:
                             done, _ = await asyncio.wait(outstanding, return_when=asyncio.FIRST_COMPLETED)
@@ -816,6 +867,10 @@ class NarratorService:
             job.state = "error" if job.error else ("cancelled" if job.cancel else "done")
             if job.state == "done":
                 job.page = job.pages
+        except ConsentRequired as exc:
+            job.error = ("Press play once first and allow sending the text to " + exc.info.name +
+                         " when asked; then press Prepare all again.")
+            job.state = "error"
         except Exception as exc:  # pragma: no cover - defensive
             log.exception("prepare failed")
             job.error = f"{type(exc).__name__}: {exc}"

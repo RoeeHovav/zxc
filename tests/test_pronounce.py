@@ -50,7 +50,7 @@ def test_asks_model_once_and_caches(tmp_path):
             return httpx.Response(200, json={"models": [{"name": "models/gemini-2.5-flash-lite", "supportedGenerationMethods": ["generateContent"]}]})
         seen.append(json.loads(req.content))
         assert req.headers["x-goog-api-key"] == "K" and "key=" not in str(req.url)
-        return reply({"3": "שְׁמָן"})
+        return reply({"0": {"3": "שְׁמָן"}})
 
     v = make(tmp_path, handler)
     words, chosen, cached = asyncio.run(v.vocalize(SENT))
@@ -58,7 +58,7 @@ def test_asks_model_once_and_caches(tmp_path):
     body = seen[0]
     assert body["generationConfig"]["responseMimeType"] == "application/json"
     msg = body["contents"][0]["parts"][0]["text"]
-    assert SENT in msg and '"3": "שמן"' in msg
+    assert SENT in msg and '"3": "שמן"' in msg and "Real input" in msg
     words, chosen, cached = asyncio.run(v.vocalize(SENT))
     assert chosen == {3: "שְׁמָן"} and cached is True and len(seen) == 1  # second time: from disk, no request
     # a new assistant object (e.g. after restart) also reads the disk cache
@@ -94,7 +94,7 @@ def test_service_sends_vowelled_text_to_the_voice(tmp_path):
 
     svc.providers["testtone"].synthesize = spy
     svc.vocalizer = P.Vocalizer(str(tmp_path / "pron"), transport=httpx.MockTransport(
-        lambda r: httpx.Response(200, json={"models": []}) if r.method == "GET" else reply({"3": "שְׁמָן"})))
+        lambda r: httpx.Response(200, json={"models": []}) if r.method == "GET" else reply({"0": {"3": "שְׁמָן"}})))
     svc.set_secret("gemini_api_key", "K")
     svc.vocalizer.configure("K")
     words = SENT.split()
@@ -120,3 +120,74 @@ def test_service_sends_vowelled_text_to_the_voice(tmp_path):
     en = PreparedChunk(index=0, lang="en", text="Hello world", tokens=[(0, 5, 0, 0), (6, 11, 1, 1)], word_range=(0, 2))
     asyncio.run(svc._speak_chunk(en, "testtone:high"))
     assert sent["text"] == "Hello world"
+
+
+def test_many_passages_in_one_request(tmp_path):
+    calls = []
+    texts = [f"הספר במספרה ספר את הכסף {i}" for i in range(5)] + ["hello world", SENT]
+
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"models": [{"name": "models/gemini-2.5-flash", "supportedGenerationMethods": ["generateContent"]}]})
+        calls.append(str(req.url))
+        body = json.loads(req.content)["contents"][0]["parts"][0]["text"]
+        real = json.loads(body.split("Real input:\n")[1].split("\nAnswer:")[0])
+        ans = {}
+        for k, item in real.items():
+            w = item["words"]
+            ans[k] = {i: "הַסַּפָּר" for i, x in w.items() if x == "הספר"}
+            if "שמן" in w.values():
+                ans[k][[i for i, x in w.items() if x == "שמן"][0]] = "שְׁמָן"
+        return reply(ans)
+
+    v = make(tmp_path, handler)
+    res = asyncio.run(v.vocalize_many(texts))
+    assert len(calls) == 1 and "gemini-2.5-flash:generateContent" in calls[0]  # seven passages, one request, the accurate model
+    assert all(chosen == {0: "הַסַּפָּר"} for (_, chosen, _) in res[:5])
+    assert res[5][1] == {} and res[6][1] == {3: "שְׁמָן"}
+    assert asyncio.run(v.vocalize_many(texts))[0][2] is True and len(calls) == 1
+
+
+def test_assistant_reports_what_it_did(tmp_path):
+    from narrator.service import NarratorService
+    svc = NarratorService(str(tmp_path / "d"), test_mode=True)
+    svc.give_consent("gemini-text")
+    words = SENT.split()
+    tokens, pos = [], 0
+    for i, w in enumerate(words):
+        tokens.append((pos, pos + len(w), i, i))
+        pos += len(w) + 1
+    ch = PreparedChunk(index=0, lang="he", text=SENT, tokens=tokens, word_range=(0, len(words)))
+    res = asyncio.run(svc._speak_chunk(ch, "testtone:low"))
+    assert res["assistant"]["state"] == "no-key"
+    svc.vocalizer = P.Vocalizer(str(tmp_path / "pron"), transport=httpx.MockTransport(
+        lambda r: httpx.Response(200, json={"models": []}) if r.method == "GET" else reply({"0": {"3": "שְׁמָן"}})))
+    svc.vocalizer.configure("K")
+    res = asyncio.run(svc._speak_chunk(ch, "testtone:low"))
+    assert res["assistant"] == {"state": "ok", "changed": [["שמן", "שְׁמָן"]]}
+    svc.update_settings({"ai_pronunciation": False})
+    assert asyncio.run(svc._speak_chunk(ch, "testtone:low"))["assistant"]["state"] == "off"
+
+
+def test_playing_asks_for_the_next_passages_in_one_request(client, he_pdf):
+    from conftest import upload
+    svc = client.svc
+    posts = []
+
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"models": []})
+        body = json.loads(req.content)["contents"][0]["parts"][0]["text"]
+        real = json.loads(body.split("Real input:\n")[1].split("\nAnswer:")[0])
+        posts.append(len(real))
+        return reply({k: {} for k in real})
+
+    svc.vocalizer = P.Vocalizer(str(svc.data_dir) + "/pron", transport=httpx.MockTransport(handler))
+    svc.vocalizer.configure("K")
+    svc.give_consent("gemini-text")
+    doc = upload(client, he_pdf)[0]["id"]
+    units = client.get(f"/api/documents/{doc}/units", params={"page": 0, "count": 30}).json()["units"]
+    para = next(u for u in units if u["kind"] == "paragraph" and u["chunks"])
+    r = client.post(f"/api/documents/{doc}/speech", json={"unit_id": para["id"], "chunk": 0})
+    assert r.status_code == 200 and r.json()["assistant"]["state"] in ("none-needed", "ok")
+    assert len(posts) == 1 and posts[0] >= 2  # this passage and the ones after it, together

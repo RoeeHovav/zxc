@@ -30,8 +30,9 @@ import httpx
 log = logging.getLogger(__name__)
 
 API = "https://generativelanguage.googleapis.com/v1beta"
-PROMPT_VERSION = "p3"
-PREFERRED_MODELS = ["gemini-2.5-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-flash-latest"]
+PROMPT_VERSION = "p4"
+PREFERRED_MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-flash-lite-latest"]
+BATCH = 12  # passages per request: a small free daily request allowance then covers hundreds of passages
 MIN_INTERVAL = 4.2  # seconds between requests: stays under the free tier's ~15 requests/minute
 
 NIQQUD = re.compile("[֑-ׇ]")  # cantillation + vowel points + dots
@@ -39,22 +40,22 @@ HEB_WORD = re.compile("[א-ת][א-תְ-ׇ֑-֯\"'׳״]*")
 HAS_NIQQUD = re.compile("[ְ-ּׁׂ]")
 
 SYSTEM = (
-    "You are an expert in Modern Israeli Hebrew pronunciation. You receive a Hebrew passage and its words "
+    "You are an expert in Modern Israeli Hebrew pronunciation. You receive several Hebrew passages; each has its words "
     "numbered from 0. Some Hebrew words are written the same but pronounced differently, for example "
-    "שמן = שֶׁמֶן (oil, fat) or שְׁמָן (their name); ספר = סֵפֶר (book), סַפָּר (barber) or סָפַר (he counted); "
-    "מלך = מֶלֶךְ or מָלַךְ; כלל = כְּלָל or כָּלַל; הקפה = הַקָּפֶה or הֶקֵּף. Using the meaning of the whole sentence, "
-    "decide the correct pronunciation of every word that is ambiguous without vowel marks, and return that word "
-    "fully vowelled (niqqud: vowels, dagesh, shin/sin dot), including any prefix letters (ו, ה, ב, כ, ל, מ, ש). "
-    "Do NOT return words that have only one natural reading, numbers, abbreviations, names that are not ambiguous, or "
-    "non-Hebrew words. Never change, add or remove letters; only add vowel marks. "
-    "Reply with a JSON object whose keys are the word numbers (as strings) and whose values are the vowelled words. "
-    "Reply {} if no word is ambiguous."
+    "שמן = שֶׁמֶן (oil, fat) or שְׁמָן (their name); ספר = סֵפֶר (book), סַפָּר (barber) or סָפַר (he counted / told); "
+    "הספר = הַסֵּפֶר (the book) or הַסַּפָּר (the barber); מלך = מֶלֶךְ or מָלַךְ; כלל = כְּלָל or כָּלַל; הקפה = הַקָּפֶה or הֶקֵּף. "
+    "First understand each whole sentence, then decide the correct pronunciation of every word that is ambiguous without "
+    "vowel marks, and return that word fully vowelled (niqqud: vowels, dagesh, shin/sin dot), including any prefix letters "
+    "(ו, ה, ב, כ, ל, מ, ש). Do NOT return words that have only one natural reading, numbers, abbreviations, or non-Hebrew words. "
+    "Never change, add or remove letters; only add vowel marks. "
+    "Reply with a JSON object whose keys are the passage numbers (as strings); each value is an object whose keys are word "
+    "numbers (as strings) and whose values are the vowelled words, or {} if no word in that passage is ambiguous."
 )
-EXAMPLE = {
-    "passage": "מקראות ישראל הינו שמן של חוברות",
-    "words": {"0": "מקראות", "1": "ישראל", "2": "הינו", "3": "שמן", "4": "של", "5": "חוברות"},
-    "answer": {"3": "שְׁמָן"},
-}
+EXAMPLES = [
+    ("מקראות ישראל הינו שמן של חוברות", {"3": "שְׁמָן"}),
+    ("הספר במספרה ספר את הכסף בקפידה", {"0": "הַסַּפָּר", "2": "סָפַר"}),
+    ("הספר שקניתי אתמול מרתק", {"0": "הַסֵּפֶר"}),
+]
 
 
 class PronounceError(Exception):
@@ -81,13 +82,16 @@ def hebrew_words(text: str) -> List[Tuple[int, int, str]]:
     return out
 
 
-def build_user_message(text: str, words: List[Tuple[int, int, str]]) -> str:
-    shown = {str(i): w for i, (_, _, w) in enumerate(words)}
-    ex = json.dumps(EXAMPLE["words"], ensure_ascii=False)
-    return (
-        f"Example\npassage: {EXAMPLE['passage']}\nwords: {ex}\nanswer: {json.dumps(EXAMPLE['answer'], ensure_ascii=False)}\n\n"
-        f"Now the real input\npassage: {text}\nwords: {json.dumps(shown, ensure_ascii=False)}\nanswer:"
-    )
+def _numbered(words: List[Tuple[int, int, str]]) -> dict:
+    return {str(i): w for i, (_, _, w) in enumerate(words)}
+
+
+def build_user_message(items: List[Tuple[str, List[Tuple[int, int, str]]]]) -> str:
+    ex_in = {str(i): {"passage": t, "words": _numbered(hebrew_words(t))} for i, (t, _) in enumerate(EXAMPLES)}
+    ex_out = {str(i): a for i, (_, a) in enumerate(EXAMPLES)}
+    real = {str(i): {"passage": t, "words": _numbered(w)} for i, (t, w) in enumerate(items)}
+    dump = lambda o: json.dumps(o, ensure_ascii=False)  # noqa: E731
+    return f"Example input:\n{dump(ex_in)}\nExample answer:\n{dump(ex_out)}\n\nReal input:\n{dump(real)}\nAnswer:"
 
 
 def validate(answer: object, words: List[Tuple[int, int, str]]) -> Dict[int, str]:
@@ -166,28 +170,20 @@ class Vocalizer:
         h = hashlib.sha256((PROMPT_VERSION + "\n" + text).encode("utf-8")).hexdigest()[:40]
         return os.path.join(self.cache_dir, h + ".json")
 
-    async def vocalize(self, text: str) -> Tuple[List[Tuple[int, int, str]], Dict[int, str], bool]:
-        """-> (words, chosen {index: vowelled}, from_cache).  Raises PronounceError on a service problem."""
-        words = hebrew_words(text)
-        if not words:
-            return words, {}, True
+    def _read_cache(self, text: str, words) -> Optional[Dict[int, str]]:
         path = self._cache_path(text)
-        if os.path.exists(path):
-            try:
-                with open(path, encoding="utf-8") as fh:
-                    cached = {int(k): v for k, v in json.load(fh).items()}
-                self.stats["cached"] += 1
-                return words, validate({str(k): v for k, v in cached.items()}, words), True
-            except Exception:
-                pass
-        if not self.key:
-            raise PronounceError("no Gemini key")
-        if time.time() < self.cooldown_until:
-            raise PronounceError("cooling down", quota=True)
-        answer = await self._ask(text, words)
-        chosen = validate(answer, words)
-        self.stats["asked"] += 1
-        self.stats["words"] += len(chosen)
+        if not os.path.exists(path):
+            return None
+        try:
+            with open(path, encoding="utf-8") as fh:
+                raw = json.load(fh)
+            self.stats["cached"] += 1
+            return validate(raw, words)
+        except Exception:
+            return None
+
+    def _write_cache(self, text: str, chosen: Dict[int, str]) -> None:
+        path = self._cache_path(text)
         try:
             tmp = path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as fh:
@@ -195,7 +191,51 @@ class Vocalizer:
             os.replace(tmp, path)
         except OSError:
             pass
-        return words, chosen, False
+
+    async def vocalize_many(self, texts: List[str]):
+        """-> [(words, chosen {index: vowelled}, from_cache)] aligned with `texts`.  Passages not yet remembered are
+        asked together in as few requests as possible.  Raises PronounceError when they cannot be asked."""
+        out: list = [None] * len(texts)
+        missing: List[int] = []
+        for i, t in enumerate(texts):
+            words = hebrew_words(t)
+            if not words:
+                out[i] = (words, {}, True)
+                continue
+            cached = self._read_cache(t, words)
+            if cached is not None:
+                out[i] = (words, cached, True)
+            else:
+                out[i] = (words, {}, False)
+                missing.append(i)
+        if not missing:
+            return out
+        if not self.key:
+            raise PronounceError("no Gemini key")
+        if time.time() < self.cooldown_until:
+            raise PronounceError("cooling down", quota=True)
+        # identical passages are asked once
+        unique: Dict[str, int] = {}
+        for i in missing:
+            unique.setdefault(texts[i], i)
+        order = list(unique)
+        answers: Dict[str, Dict[int, str]] = {}
+        for g in range(0, len(order), BATCH):
+            group = order[g:g + BATCH]
+            items = [(t, out[unique[t]][0]) for t in group]
+            reply = await self._ask(items)
+            self.stats["asked"] += 1
+            for j, (t, words) in enumerate(items):
+                chosen = validate(reply.get(str(j)) if isinstance(reply, dict) else None, words)
+                answers[t] = chosen
+                self.stats["words"] += len(chosen)
+                self._write_cache(t, chosen)
+        for i in missing:
+            out[i] = (out[i][0], answers.get(texts[i], {}), False)
+        return out
+
+    async def vocalize(self, text: str) -> Tuple[List[Tuple[int, int, str]], Dict[int, str], bool]:
+        return (await self.vocalize_many([text]))[0]
 
     # ------------------------------------------------------------- service
     def _client(self) -> httpx.AsyncClient:
@@ -230,10 +270,10 @@ class Vocalizer:
         self._models = order or PREFERRED_MODELS
         return self._models
 
-    async def _ask(self, text: str, words) -> object:
+    async def _ask(self, items) -> object:
         body = {
             "systemInstruction": {"parts": [{"text": SYSTEM}]},
-            "contents": [{"role": "user", "parts": [{"text": build_user_message(text, words)}]}],
+            "contents": [{"role": "user", "parts": [{"text": build_user_message(items)}]}],
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
         }
         last = ""

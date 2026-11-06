@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { api, Speech, Voice } from "../api";
+import { api, ApiError, Speech, Voice } from "../api";
 import { useStore } from "../store";
 import { Icon } from "./Icons";
 
@@ -61,7 +61,16 @@ export function usePreviewPlayer() {
   const play = async (text: string, voice: string, lang: string, vowels = false): Promise<Speech | null> => {
     setBusy(true);
     try {
-      const sp = await api.preview(text, voice, lang, vowels);
+      let sp: Speech;
+      try {
+        sp = await api.preview(text, voice, lang, vowels);
+      } catch (e: any) {
+        if (e instanceof ApiError && e.status === 409 && e.body?.error === "consent_required") {
+          if (!window.confirm(`${e.body.name}\n\n${e.body.privacy}\n\nAllow this?`)) throw new Error("Not allowed.");
+          await api.consent(e.body.provider);
+          sp = await api.preview(text, voice, lang, vowels);
+        } else throw e;
+      }
       audio.current?.pause();
       audio.current = new Audio(sp.audio);
       await audio.current.play();
@@ -202,6 +211,29 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
   const opts = voices.filter((v) => v.lang === sample.lang || v.lang === "mul" || (sample.lang === "he" && v.provider === "edge" && v.id.includes("Multilingual")));
   const [vowels, setVowels] = useState(true);
   const [given, setGiven] = useState("");
+  const [assistant, setAssistant] = useState<Speech["assistant"] | null>(null);
+  const assistantLine = () => {
+    const a = assistant;
+    if (!a) return "";
+    switch (a.state) {
+      case "ok":
+        return `Assistant added vowel marks to ${a.changed.length} word(s): ` + a.changed.map((c) => `${c[0]} → ${c[1]}`).join("   ");
+      case "none-needed":
+        return "Assistant found no ambiguous word in this passage, so nothing was changed.";
+      case "no-key":
+        return "No Gemini key is saved, so nothing was changed. Add it in Settings → Speech engines → Google Gemini.";
+      case "paused":
+        return "Assistant is resting because Google's free allowance is used up; nothing was changed. " + (a.detail || "");
+      case "error":
+        return "Assistant could not answer, so nothing was changed: " + (a.detail || "");
+      case "off":
+        return "Assistant is switched off.";
+      case "voice-understands-context":
+        return "This voice reads whole sentences itself; the assistant is not needed.";
+      default:
+        return "";
+    }
+  };
   const rate = async (voice: string, r: number) => {
     setRatings({ ...ratings, [voice]: r });
     await api.addRating({ sample: sample.id, voice, rating: r, variant: text === sample.text ? "" : "edited" });
@@ -229,9 +261,14 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
         </label>
       )}
       {given && (
-        <div className="small" dir="rtl" style={{ margin: "4px 0 8px", padding: 6, border: "1px dashed #8886" }} data-testid="lab-given">
+        <div className="small" dir="rtl" style={{ margin: "4px 0 4px", padding: 6, border: "1px dashed #8886" }} data-testid="lab-given">
           <span className="muted" dir="ltr">What the voice was given: </span>
           {given}
+        </div>
+      )}
+      {assistant && (
+        <div className="small muted" dir="ltr" style={{ margin: "0 0 8px" }} data-testid="lab-assistant">
+          {assistantLine()}
         </div>
       )}
       <div className="lab-grid">
@@ -249,7 +286,10 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
                 </option>
               ))}
             </select>
-            <button className="btn" disabled={!v || busy} onClick={() => play(text, v, sample.lang, sample.lang === "he" && vowels).then((sp) => setGiven(sp && sp.text !== text ? sp.text : "")).catch((e) => toast(e.message, "error"))}>
+            <button className="btn" disabled={!v || busy} onClick={() => play(text, v, sample.lang, sample.lang === "he" && vowels).then((sp) => {
+                setGiven(sp && sp.text !== text ? sp.text : "");
+                setAssistant(sample.lang === "he" && vowels ? sp?.assistant ?? null : null);
+              }).catch((e) => toast(e.message, "error"))}>
               <Icon name="play" size={14} /> Play
             </button>
             <div className="stars" style={{ marginTop: 8 }}>
