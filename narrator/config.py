@@ -54,6 +54,7 @@ DEFAULT_SETTINGS = {
     "zoom": 1.25,
     "cloud_consent": {},  # provider id -> timestamp of consent
     "azure_region": "",
+    "gemini_model": "",  # empty = discover the best available Gemini TTS model
     "prefetch_chunks": 3,
     # Teacher Mode (optional, off by default): any OpenAI-compatible endpoint.
     # The default points at a free local Ollama installation.
@@ -63,7 +64,7 @@ DEFAULT_SETTINGS = {
     "sleep_minutes": 0,
 }
 
-SECRET_KEYS = {"azure_key", "llm_api_key"}
+SECRET_KEYS = {"azure_key", "llm_api_key", "gemini_api_key"}
 
 
 def default_settings() -> dict:

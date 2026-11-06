@@ -10,22 +10,51 @@ hundreds of pages.
 
 ## Start on Windows
 
-1. Download or clone this repository, e.g. to `C:\PDF Narrator`.
-2. Double-click **`Start PDF Narrator.bat`**.
+1. Install **Python 3.10 or newer** if you do not have it: from the **Microsoft Store** (search "Python 3.13",
+   publisher *Python Software Foundation*) or from <https://www.python.org/downloads/windows/>. Both are signed
+   by the Python Software Foundation, so Windows trusts them.
+2. Download this repository (green **Code** button > **Download ZIP**) and extract it, e.g. to `C:\PDF Narrator`.
+3. Double-click **`Start PDF Narrator.py`**. If Windows opens it in an editor instead, right-click it >
+   **Open with** > **Python**.
 
-The first start does the setup for you, which takes a few minutes:
-- It finds Python 3.10+, or offers to install it with `winget`.
-- It creates a private environment in `.venv` and installs the dependencies.
-- It downloads the Hebrew and English OCR data (about 5 MB).
-- It creates a **PDF Narrator** desktop shortcut.
+There is intentionally no `.bat`, `.ps1` or `.exe` file: the only program that runs is `python.exe`.
+The first start does the setup for you (a few minutes, needs internet):
+- creates a private environment in `.venv` and installs the pinned libraries from `requirements.txt`
+  (wheels only, from pypi.org);
+- checks that every library loads, and tells you exactly which file Windows blocked if one does not;
+- downloads the Hebrew and English OCR data (about 5 MB, verified against a fixed SHA-256);
+- starts the reader and opens it in your browser (Edge/Chrome open it in app mode).
 
-The app opens in its own window (Edge/Chrome app mode). Later starts take a few
-seconds. To stop it, use **Quit** on the library screen.
+Later starts take a few seconds. To stop it, use **Quit** on the library screen.
 
-Advanced options:
-- `scripts\windows\launch.ps1 -Console` runs with a visible log.
-- `-Reinstall` rebuilds the environment.
-- `-Port 9000` uses a different port.
+### If Windows says "Smart App Control blocked a file" or "Windows protected your PC"
+
+- **"Windows protected your PC" (SmartScreen)**: click **More info** > **Run anyway**. Or, before extracting the
+  ZIP, right-click the ZIP > **Properties** > tick **Unblock** > OK, then extract.
+- **"Smart App Control blocked a file"**: Smart App Control blocks any program file that is not digitally signed by
+  a publisher Microsoft already trusts, and has no per-file exception. This project cannot be signed (it is an
+  open-source project with no code-signing certificate), and several of the libraries it uses (PyMuPDF,
+  pydantic-core, ...) contain compiled files that are not signed either. The launcher tells you which file was
+  blocked. Then either switch Smart App Control to **Off** (Windows Security > App & browser control >
+  Smart App Control settings), or tell us the file name. On older Windows 11 builds, turning it off could not be
+  undone without reinstalling Windows; Microsoft has announced that recent updates allow turning it back on, so check
+  your Windows version before deciding. This was **not** tested on a Windows machine with Smart App Control enabled.
+
+Advanced options (run `python "Start PDF Narrator.py" --help` in a terminal): `--console` shows the server log,
+`--reinstall` rebuilds the environment, `--port 9000` uses another port, `--check` only sets up and tests.
+
+### What is downloaded, and is it safe?
+
+| What | From | Size | Why |
+| --- | --- | --- | --- |
+| Python 3.10+ | Microsoft Store or python.org (you install it) | ~30 MB | runs the program |
+| 30 Python packages at exact versions | pypi.org (`requirements.txt`) | ~25 MB | PDF engine (PyMuPDF), web server (FastAPI/uvicorn), Microsoft voice client (edge-tts), MP3 encoder (lameenc), ... |
+| `heb.traineddata`, `eng.traineddata` | github.com/tesseract-ocr/tessdata_fast | ~5 MB | reading scanned pages (OCR); SHA-256 checked |
+| Voice audio, while reading | Microsoft's online voice service (default) | - | only the text being read is sent, never the PDF file |
+
+Nothing else is downloaded, nothing is installed system-wide, nothing is sent anywhere else, and there is no
+telemetry. The reader listens only on `127.0.0.1` (your own computer). Versions are pinned but not hash-locked, so
+the trust placed in PyPI is the usual one for Python software.
 
 Other systems (or manual start):
 
@@ -105,6 +134,7 @@ python -m venv .venv
 | Engine | Cost | Notes |
 |---|---|---|
 | **Microsoft neural voices via Edge "Read Aloud"** (default) | Free, no account | Hebrew: Hila, Avri. English: Ava, Andrew, Emma, Brian, Sonia, Ryan, and 100+ locales. Exact per-word timing. Unofficial endpoint, so it could change. Text being read is sent to Microsoft. |
+| **Google Gemini voices** (recommended for Hebrew, needs a free key) | Free tier (rate-limited); paid use only if you enable billing | Language-model voices that read the *whole sentence*, so unvowelled Hebrew words ("ספר": book / barber / counted) are resolved from context, with more natural intonation. Get a free key at <https://aistudio.google.com> > *Get API key*, paste it in **Settings > Speech engines > Google Gemini**, then pick a Gemini voice (e.g. Kore, Charon) for Hebrew/English under *Narrator voice per language*. No word-level timing: highlighting follows the sentence ("sentence sync"). On Google's free tier submitted text may be used to improve their products. **Written and tested against a simulated service only; not heard or tried live yet.** |
 | Azure AI Speech (same voices, official) | Free tier of 0.5 M characters/month (≈ 9 hours), then pay-as-you-go | Needs your key + `pip install -r requirements-optional.txt`. Not tested live yet. |
 
 An hour of narration is roughly 50–60 k characters. Details and the engine

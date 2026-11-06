@@ -14,6 +14,13 @@ import threading
 import time
 import webbrowser
 
+# The speech client (aiohttp & friends) ships optional compiled speed-ups.  They are
+# not needed here (a few kilobytes per sentence), and every compiled file is one more
+# thing Windows' Smart App Control can refuse to load, so use the pure-Python versions.
+for _var in ("AIOHTTP_NO_EXTENSIONS", "MULTIDICT_NO_EXTENSIONS", "YARL_NO_EXTENSIONS", "FROZENLIST_NO_EXTENSIONS",
+             "PROPCACHE_NO_EXTENSIONS"):
+    os.environ.setdefault(_var, "1")
+
 
 def _free_port(preferred: int) -> int:
     for port in [preferred] + list(range(preferred + 1, preferred + 50)):

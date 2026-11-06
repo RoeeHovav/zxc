@@ -58,7 +58,7 @@ audio_cache/, explanations/, narrator.sqlite3, secrets.json, tessdata/
 
 - **Units** (`units.py`): one per block. A paragraph spanning pages or columns
   is one unit. Each unit gets:
-  - its language (script-based, with `lingua` for Latin/Cyrillic);
+  - its language (script-based; Latin/Cyrillic languages by function-word counts, no model download);
   - its sentences (abbreviation-aware), each typed as question / definition /
     warning / conclusion / example / quotation / statement.
 - **Prepare** (`prepare.py`)
@@ -121,7 +121,7 @@ are.
 
 - **New speech engine:** subclass `TTSProvider` (`tts/base.py`) and register it
   in `NarratorService.providers`. Voices are addressed as `provider:voice`.
-- **New language:** usually nothing to do (script/lingua detection plus a voice
+- **New language:** usually nothing to do (script / function-word detection plus a voice
   mapping). Optionally add `narrator/data/lexicon_<lang>.tsv` and load it in
   `service.py`.
 - **Better Hebrew vocalisation:** hook a diacritiser (e.g. Phonikud or

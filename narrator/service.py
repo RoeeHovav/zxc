@@ -28,6 +28,7 @@ from .text.normalize import LexEntry, Lexicon, load_builtin, strip_niqqud, unify
 from .tts.azure import AzureProvider
 from .tts.base import TTSError, TTSProvider, Voice
 from .tts.edge import EdgeProvider
+from .tts.gemini import GeminiProvider
 from .tts.testtone import TestToneProvider
 from .llm.client import LLMClient, is_local
 from .llm.teacher import ExplanationCache, explain as llm_explain
@@ -67,6 +68,7 @@ class NarratorService:
         self.providers: Dict[str, TTSProvider] = {
             "edge": EdgeProvider(cache_dir=self.data_dir),
             "azure": AzureProvider(),
+            "gemini": GeminiProvider(),
         }
         if self.test_mode:
             self.providers["testtone"] = TestToneProvider()
@@ -197,7 +199,7 @@ class NarratorService:
             vs = await p.list_voices()
         except Exception:
             vs = []
-        cands = [v for v in vs if v.lang == lang]
+        cands = [v for v in vs if v.lang == lang] or [v for v in vs if v.lang == "mul"]
         if cands:
             multi = [v for v in cands if "Multilingual" in v.id]
             return (multi or cands)[0].id
@@ -583,8 +585,11 @@ class NarratorService:
                         c += 1
                 u = await loop.run_in_executor(None, st.units.next_unit, u.id)
                 c = 0
-            for u, ch in todo:
+            for i, (u, ch) in enumerate(todo):
                 voice = await self.voice_for(ch.lang, doc_id)
+                limit = getattr(self.providers.get(voice.split(":", 1)[0]), "prefetch_limit", None)
+                if limit is not None and i >= limit:
+                    return  # rate-limited engines: do not burn quota on far-ahead audio
                 async with self._prefetch_sem:
                     try:
                         await self._speak(ch.text, voice, ch.lang, ch.rate, ch.tokens, ch.word_range)

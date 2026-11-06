@@ -29,6 +29,7 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
   const { settings, update, app, load, t, lang, toast } = useStore();
   const [voices, setVoices] = useState<Voice[]>([]);
   const [azureKey, setAzureKey] = useState("");
+  const [geminiKey, setGeminiKey] = useState("");
   const [cache, setCache] = useState<{ bytes: number; limit: number } | null>(null);
   const [extraLang, setExtraLang] = useState("");
 
@@ -39,11 +40,14 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
 
   const byLang = useMemo(() => {
     const m = new Map<string, Voice[]>();
+    const multilingual = voices.filter((v) => v.lang === "mul"); // e.g. Gemini voices read every language
     for (const v of voices) {
+      if (v.lang === "mul") continue;
       const arr = m.get(v.lang) || [];
       arr.push(v);
       m.set(v.lang, arr);
     }
+    for (const lg of Array.from(new Set(["he", "en", ...Object.keys(LANG_NAMES)]))) m.set(lg, [...(m.get(lg) || []), ...multilingual]);
     return m;
   }, [voices]);
 
@@ -221,6 +225,49 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
                   ) : (
                     <span className="muted">{he ? "יתבקש אישור לפני השימוש הראשון" : "You will be asked before first use"}</span>
                   )}
+                </div>
+              )}
+              {p.id === "gemini" && (
+                <div style={{ marginTop: 8 }}>
+                  <div className="small muted" style={{ marginBottom: 6 }}>
+                    {he
+                      ? "הקול הזה הוא מודל שפה שקורא את המשפט כולו, ולכן בוחר את המילה הנכונה בעברית לפי ההקשר. מפתח חינמי: aistudio.google.com ← Get API key. אחרי השמירה בחרו קול Gemini (למשל Kore או Charon) בעברית ובאנגלית למעלה. המכסה החינמית מוגבלת, ההדגשה היא ברמת משפט."
+                      : "This voice is a language model that reads the whole sentence, so it picks the right Hebrew word from context. Get a free key at aistudio.google.com → Get API key, paste it here, then choose a Gemini voice (e.g. Kore or Charon) for Hebrew and English above. The free quota is limited and highlighting is per sentence."}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <input
+                      placeholder={app.secrets.gemini_api_key ? "•••••• (key saved)" : "Gemini API key"}
+                      type="password"
+                      value={geminiKey}
+                      onChange={(e) => setGeminiKey(e.target.value)}
+                      style={{ flex: 1, minWidth: 180 }}
+                      data-testid="gemini-key"
+                    />
+                    <button
+                      className="btn"
+                      onClick={async () => {
+                        await api.putSecret("gemini_api_key", geminiKey);
+                        setGeminiKey("");
+                        await load();
+                        setVoices((await api.voices()).voices);
+                        toast("Saved");
+                      }}
+                    >
+                      {t.save}
+                    </button>
+                    {app.secrets.gemini_api_key && (
+                      <button
+                        className="btn"
+                        onClick={async () => {
+                          await api.putSecret("gemini_api_key", "");
+                          await load();
+                          setVoices((await api.voices()).voices);
+                        }}
+                      >
+                        {he ? "הסרת המפתח" : "Remove key"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
               {p.id === "azure" && (

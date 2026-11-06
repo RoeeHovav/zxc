@@ -194,10 +194,10 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
     setText(sample.text);
     const def = settings?.voices[sample.lang] || "";
     setA(def);
-    const alt = voices.find((v) => v.lang === sample.lang && v.id !== def);
+    const alt = voices.find((v) => (v.lang === sample.lang || v.lang === "mul") && v.id !== def);
     setB(alt?.id || "");
   }, [sample, voices.length]);
-  const opts = voices.filter((v) => v.lang === sample.lang);
+  const opts = voices.filter((v) => v.lang === sample.lang || v.lang === "mul");
   const rate = async (voice: string, r: number) => {
     setRatings({ ...ratings, [voice]: r });
     await api.addRating({ sample: sample.id, voice, rating: r, variant: text === sample.text ? "" : "edited" });

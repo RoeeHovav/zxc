@@ -56,6 +56,7 @@ class ProviderInfo:
 
 class TTSProvider:
     info: ProviderInfo
+    prefetch_limit: Optional[int] = None  # cap on look-ahead synthesis for rate-limited engines
 
     def configure(self, settings: dict) -> None:
         """Receive (possibly secret) settings such as API keys."""

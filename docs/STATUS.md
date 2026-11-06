@@ -52,8 +52,19 @@ Chromium. It uses the test-tone engine for audio and passes:
   samples could not reach the network from the dev environment. Hebrew
   naturalness, whether niqqud is honoured, and acronym expansions all need the
   listening test (`scripts/make_listening_samples.py`).
-- **Windows launcher** (`Start PDF Narrator.bat`, `launch.ps1`). It is written
-  for Windows 10/11 but was not executed on Windows here.
+- **Windows launcher** (`Start PDF Narrator.py`; the former `.bat`/`.ps1` were
+  replaced because SmartScreen / Smart App Control block scripts). The launcher
+  logic (venv, wheel-only pinned install, per-library load check, OCR download
+  with SHA-256, detached start, failure diagnosis) was run end-to-end on Linux
+  only. It was **never run on Windows**, and **Smart App Control may still block
+  compiled libraries (PyMuPDF, pydantic-core, ...)**: that cannot be fixed
+  without a code-signing certificate and the only workaround is turning Smart
+  App Control off. The launcher reports the blocked module by name.
+- **Gemini voices** (`narrator/tts/gemini.py`). Request/response shapes, model
+  discovery, retry and error handling are tested against a simulated service.
+  Live synthesis was not reachable from the development environment, so
+  Hebrew quality, real rate limits of the free tier and the current model names
+  are unverified. No word timing (sentence-level highlight only).
 - **Teacher Mode** with a real model. The protocol was tested with a mock;
   explanation quality, especially in Hebrew with small local models, is
   unknown.
