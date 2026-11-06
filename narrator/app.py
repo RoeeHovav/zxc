@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 import tempfile
+import traceback
 from typing import List, Optional
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
@@ -50,6 +51,16 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
     @app.exception_handler(LLMError)
     async def _llm(_req: Request, exc: LLMError):
         return JSONResponse(status_code=502, content={"error": "llm_failed", "message": str(exc)})
+
+    @app.exception_handler(Exception)
+    async def _unexpected(req: Request, exc: Exception):
+        """Never hide the cause: this server only talks to this computer, so show the
+        error (and write it to narrator.log) instead of a bare "Internal Server Error"."""
+        log.error("Unhandled error in %s %s", req.method, req.url.path, exc_info=exc)
+        trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[-2500:]
+        return JSONResponse(status_code=500, content={
+            "error": "internal", "message": f"{type(exc).__name__}: {exc}",
+            "where": f"{req.method} {req.url.path}", "trace": trace, "log": os.path.join(config.data_dir(), "narrator.log")})
 
     @app.exception_handler(KeyError)
     async def _nf(_req: Request, exc: KeyError):

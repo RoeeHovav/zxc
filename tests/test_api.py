@@ -157,3 +157,21 @@ def test_rejects_foreign_origin_and_host(client):
     r = client.get("/api/state", headers={"Host": "attacker.example"})
     assert r.status_code == 403
     assert client.get("/api/state").status_code == 200
+
+
+def test_unexpected_errors_show_their_cause(client, monkeypatch):
+    """A bare 'Internal Server Error' hides what went wrong on the user's machine."""
+    from fastapi.testclient import TestClient
+    from narrator.app import create_app
+    from narrator.service import NarratorService
+    client = TestClient(create_app(client.svc), raise_server_exceptions=False)
+
+    def boom(self):
+        raise PermissionError("[WinError 5] Access is denied: 'C:\\\\x'")
+
+    monkeypatch.setattr(NarratorService, "providers_info", boom)
+    r = client.get("/api/state")
+    assert r.status_code == 500
+    j = r.json()
+    assert j["error"] == "internal" and "PermissionError" in j["message"] and "Access is denied" in j["message"]
+    assert "GET /api/state" == j["where"] and "boom" in j["trace"] and j["log"].endswith("narrator.log")

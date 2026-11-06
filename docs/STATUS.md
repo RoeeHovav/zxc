@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04 · version 0.9.0. This is the hand-over record for
+Last updated: 2026-11-04 · version 0.9.1. This is the hand-over record for
 continuing development across sessions.
 
 ## Verified (automated)

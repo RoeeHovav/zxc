@@ -25,7 +25,12 @@ The first start does the setup for you (a few minutes, needs internet):
 - downloads the Hebrew and English OCR data (about 5 MB, verified against a fixed SHA-256);
 - starts the reader and opens it in your browser (Edge/Chrome open it in app mode).
 
-Later starts take a few seconds. To stop it, use **Quit** on the library screen.
+Later starts take a few seconds. The reader keeps running in the background after you close its window, so to
+stop it use **Quit** on the library screen. After you install a newer copy of the project, just double-click
+`Start PDF Narrator.py` again: it notices an older instance still running and restarts it with the new version.
+
+If the page shows an error, it now includes the real cause. The same details are written to
+`%LOCALAPPDATA%\PDFNarrator\narrator.log` (paste it into Windows' Run box to open the folder).
 
 ### If Windows says "Smart App Control blocked a file" or "Windows protected your PC"
 

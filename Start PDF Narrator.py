@@ -197,6 +197,40 @@ def server_up(port: int) -> bool:
         return False
 
 
+def running_version(port: int):
+    """Version of a PDF Narrator already answering on this port (None if nothing does)."""
+    import json
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/state", timeout=2) as r:
+            return json.load(r).get("version", "?")
+    except Exception:
+        return None
+
+
+def stop_running(port: int) -> bool:
+    """Ask a running instance to quit, so the freshly installed code is what runs."""
+    req = urllib.request.Request(f"http://127.0.0.1:{port}/api/shutdown", data=b"{}", method="POST",
+                                 headers={"Origin": f"http://127.0.0.1:{port}", "Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=3).read()
+    except Exception:
+        pass
+    for _ in range(40):
+        if not server_up(port):
+            return True
+        time.sleep(0.25)
+    return False
+
+
+def own_version() -> str:
+    sys.path.insert(0, str(ROOT))
+    try:
+        from narrator.config import VERSION
+        return VERSION
+    finally:
+        sys.path.pop(0)
+
+
 def start_server(port: int, no_browser: bool, console: bool) -> int:
     cmd = [venv_python(windowless=not console), "-m", "narrator", "--port", str(port)]
     if no_browser:
@@ -237,6 +271,7 @@ def main(argv=None) -> int:
     ap.add_argument("--no-browser", action="store_true")
     ap.add_argument("--check", action="store_true", help="set up and test only")
     ap.add_argument("--reinstall", action="store_true")
+    ap.add_argument("--restart", action="store_true", help="stop a running instance first")
     ap.add_argument("--port", type=int, default=int(os.environ.get("NARRATOR_PORT", "8765")))
     args = ap.parse_args(argv)
     if sys.version_info < (3, 10):
@@ -253,7 +288,15 @@ def main(argv=None) -> int:
         if args.check:
             say("Everything is installed and loads correctly.")
             return 0
-        return start_server(args.port, args.no_browser, args.console)
+        old = running_version(args.port)
+        if old is not None and (args.restart or old != own_version()):
+            say(f"PDF Narrator {old} is still running in the background; restarting it with this version...")
+            if not stop_running(args.port):
+                say("It did not stop. Close it from Task Manager (end the 'Python' / pythonw.exe tasks), then start again.")
+                return 1
+        code = start_server(args.port, args.no_browser, args.console)
+        say(f"If something goes wrong, the log is: {data_dir() / 'narrator.log'}")
+        return code
     except KeyboardInterrupt:
         return 130
 
