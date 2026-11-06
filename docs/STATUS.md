@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04 · version 0.9.5. This is the hand-over record for
+Last updated: 2026-11-04 · version 0.9.6. This is the hand-over record for
 continuing development across sessions.
 
 ## Verified (automated)
@@ -81,6 +81,10 @@ Chromium. It uses the test-tone engine for audio and passes:
   models are ranked from the key's own model list (current flash alias, newest flash, flash-lite, ...), a
   retired/refused model is skipped for hours and Google's suggested replacement is tried next, the model that
   worked is remembered. Still unverified live: that the answers are accurate and that the voices follow vowel marks.
+- **Live finding (0.9.5):** both Voice-lab Play buttons stayed grey (request never returned) because the
+  assistant worked through every model of the key, one slow attempt after another. 0.9.6: at most 4 models and
+  25 s per request, per-model pacing, a model that is over its limit is skipped instead of waited for, a failure
+  rests the assistant for 1-5 min so later passages do not wait again, and the Voice lab button says "Working…".
 - **Large documents**: the document vocabulary used to be rebuilt from every analysed page on every request,
   stalling playback 10-18 s at a time during the first minutes of a 1,256-page document; it is now incremental
   (worst request 0.7 s in the same test).

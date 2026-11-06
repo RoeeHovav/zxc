@@ -32,7 +32,9 @@ log = logging.getLogger(__name__)
 API = "https://generativelanguage.googleapis.com/v1beta"
 PROMPT_VERSION = "p4"
 BATCH = 12  # passages per request: a small free daily request allowance then covers hundreds of passages
-MIN_INTERVAL = 4.2  # seconds between requests: stays under the free tier's ~15 requests/minute
+MIN_INTERVAL = 4.2  # seconds between requests to the same model: stays under the free tier's ~15 requests/minute
+BUDGET = 25.0       # seconds one passage group may spend asking before the app reads normally instead
+MAX_MODELS = 4      # models tried per request before giving up
 
 NIQQUD = re.compile("[֑-ׇ]")  # cantillation + vowel points + dots
 HEB_WORD = re.compile("[א-ת][א-תְ-ׇ֑-֯\"'׳״]*")
@@ -150,8 +152,10 @@ class Vocalizer:
         self.key: Optional[str] = None
         self.model_pref = ""
         self.cooldown_until = 0.0
+        self.cool_message = ""
+        self.cool_quota = False
         self._gate: Optional[asyncio.Lock] = None  # created lazily inside the running loop
-        self._next_time = 0.0
+        self._next_by_model: Dict[str, float] = {}
         self._models: List[str] = []
         self._blocked: Dict[str, float] = {}
         self.working_model: Optional[str] = None
@@ -213,7 +217,7 @@ class Vocalizer:
         if not self.key:
             raise PronounceError("no Gemini key")
         if time.time() < self.cooldown_until:
-            raise PronounceError("cooling down", quota=True)
+            raise PronounceError(self.cool_message or "cooling down", quota=self.cool_quota)
         # identical passages are asked once
         unique: Dict[str, int] = {}
         for i in missing:
@@ -223,7 +227,13 @@ class Vocalizer:
         for g in range(0, len(order), BATCH):
             group = order[g:g + BATCH]
             items = [(t, out[unique[t]][0]) for t in group]
-            reply = await self._ask(items)
+            try:
+                reply = await self._ask(items)
+            except PronounceError as exc:
+                # do not make every following passage wait for the same failure
+                self.cooldown_until = max(self.cooldown_until, time.time() + (300 if exc.quota else 60))
+                self.cool_message, self.cool_quota = str(exc), exc.quota
+                raise
             self.stats["asked"] += 1
             for j, (t, words) in enumerate(items):
                 chosen = validate(reply.get(str(j)) if isinstance(reply, dict) else None, words)
@@ -239,7 +249,7 @@ class Vocalizer:
 
     # ------------------------------------------------------------- service
     def _client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(timeout=60, transport=self.transport, headers={"x-goog-api-key": self.key or ""})
+        return httpx.AsyncClient(timeout=25, transport=self.transport, headers={"x-goog-api-key": self.key or ""})
 
     @staticmethod
     def rank_model(name: str):
@@ -281,34 +291,37 @@ class Vocalizer:
         self._models = order
         return order
 
-    async def _ask(self, items) -> object:
+    async def _ask(self, items, budget: float = BUDGET) -> object:
         body = {
             "systemInstruction": {"parts": [{"text": SYSTEM}]},
             "contents": [{"role": "user", "parts": [{"text": build_user_message(items)}]}],
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
         }
-        last = ""
+        deadline = time.time() + budget
+        notes: List[str] = []
         queue = list(await self._model_order())
-        tried = set()
-        while queue:
+        tried: List[str] = []
+        quota = False
+        while queue and len(tried) < MAX_MODELS and time.time() < deadline:
             model = queue.pop(0)
             if model in tried or self._blocked.get(model, 0) > time.time():
                 continue
-            tried.add(model)
-            for attempt in range(3):
+            tried.append(model)
+            for attempt in range(2):
+                if time.time() >= deadline:
+                    break
                 if self._gate is None:
                     self._gate = asyncio.Lock()
-                async with self._gate:  # one request every few seconds, however many chunks ask at once
-                    wait = self._next_time - time.time()
+                async with self._gate:  # pace requests to the same model
+                    wait = self._next_by_model.get(model, 0.0) - time.time()
                     if wait > 0:
-                        await asyncio.sleep(wait)
-                    self._next_time = time.time() + MIN_INTERVAL
+                        await asyncio.sleep(min(wait, 10.0))
+                    self._next_by_model[model] = time.time() + MIN_INTERVAL
                 try:
                     async with self._client() as c:
                         r = await c.post(f"{API}/models/{model}:generateContent", json=body)
                 except httpx.HTTPError as exc:
-                    last = f"could not reach Google: {exc}"
-                    await asyncio.sleep(1.5 * (attempt + 1))
+                    notes.append(f"{model}: could not reach Google ({type(exc).__name__})")
                     continue
                 if r.status_code == 200:
                     self.working_model = model
@@ -318,30 +331,35 @@ class Vocalizer:
                     return _parse_json(r.json())
                 low = r.text.lower()
                 if r.status_code == 429:
-                    last = "Google's free allowance for the pronunciation assistant is used up"
-                    if "perday" in low.replace("_", "").replace(" ", "") or attempt >= 1:
-                        self._blocked[model] = time.time() + 3600
-                        break
-                    self._next_time = time.time() + _retry(r, 20.0)
+                    quota = True
+                    retry = _retry(r, 20.0)
+                    notes.append(f"{model}: free allowance used up")
+                    if "perday" in low.replace("_", "").replace(" ", "") or retry > 10 or attempt >= 1:
+                        self._blocked[model] = time.time() + min(max(retry, 60.0), 3600.0)
+                        break  # another model has its own allowance
+                    self._next_by_model[model] = time.time() + retry
                     continue
                 if r.status_code == 404 or (r.status_code == 400 and any(
                         w in low for w in ("not found", "no longer available", "not supported", "deprecated", "unavailable"))):
                     # renamed / retired / not offered to this key: remember, and follow Google's own suggestion
-                    last = f"model {model} is not available to this key"
+                    notes.append(f"{model}: not available to this key")
                     self._blocked[model] = time.time() + 6 * 3600
+                    self._next_by_model.pop(model, None)
                     for sug in re.findall(r"models/(gemini-[\w.\-]+)", r.text):
                         if sug != model and sug not in tried:
                             queue.insert(0, sug)
                     break
                 if r.status_code >= 500:
-                    last = f"Gemini error {r.status_code}"
-                    await asyncio.sleep(2.0 * (attempt + 1))
+                    notes.append(f"{model}: Gemini error {r.status_code}")
+                    await asyncio.sleep(1.0)
                     continue
                 raise PronounceError(f"Gemini error {r.status_code}: {r.text[:200]}")
-        if "allowance" in last:
-            self.cooldown_until = min((t for t in self._blocked.values() if t > time.time()), default=time.time() + 3600)
-            raise PronounceError(last, quota=True)
-        raise PronounceError(last or "the pronunciation assistant did not answer")
+        summary = "; ".join(notes[-4:]) or "no answer in time"
+        log.info("pronunciation assistant gave up: %s", summary)
+        if quota and all("allowance" in n or "not available" in n for n in notes):
+            self.cooldown_until = min((t for t in self._blocked.values() if t > time.time()), default=time.time() + 300)
+            raise PronounceError("Google's free allowance is used up (" + summary + ")", quota=True)
+        raise PronounceError("could not get an answer (" + summary + ")")
 
 
 def _retry(r: httpx.Response, default: float) -> float:

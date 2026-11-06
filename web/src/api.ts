@@ -114,6 +114,7 @@ export interface Settings {
   prefetch_chunks: number;
   buffer_percent: number;
   ai_pronunciation: boolean;
+  pronunciation_model: string;
   free_fallback: boolean;
   sleep_minutes: number;
   teacher_mode: boolean;

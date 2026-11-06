@@ -290,7 +290,7 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
                 setGiven(sp && sp.text !== text ? sp.text : "");
                 setAssistant(sample.lang === "he" && vowels ? sp?.assistant ?? null : null);
               }).catch((e) => toast(e.message, "error"))}>
-              <Icon name="play" size={14} /> Play
+              <Icon name="play" size={14} /> {busy ? "Working…" : "Play"}
             </button>
             <div className="stars" style={{ marginTop: 8 }}>
               {[1, 2, 3, 4, 5].map((n) => (

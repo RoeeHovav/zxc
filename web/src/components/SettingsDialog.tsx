@@ -219,6 +219,10 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
               ? "לתת לבינה מלאכותית (Gemini) להכריע, לפי המשפט כולו, איך לקרוא מילים דו-משמעיות (שמן, ספר, מלך…) ולתת לקול ניקוד רק עליהן"
               : "Let Gemini decide from the whole sentence how ambiguous words (שמן, ספר, מלך…) are read, and give the voice vowel marks for only those words"}
           </label>
+          <div className="field">
+            <label>{he ? "מודל Gemini לעוזר ההגייה (ריק = אוטומטי)" : "Gemini model for the assistant (empty = automatic)"}</label>
+            <input placeholder="e.g. gemini-3.8-flash" value={settings.pronunciation_model || ""} onChange={(e) => set({ pronunciation_model: e.target.value.trim() })} data-testid="pron-model" />
+          </div>
           <div className="muted small" style={{ marginBottom: 8 }}>
             {app.secrets.gemini_api_key
               ? he

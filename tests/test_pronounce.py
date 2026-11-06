@@ -15,6 +15,11 @@ def reply(mapping):
     return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": json.dumps(mapping, ensure_ascii=False)}]}}]})
 
 
+@pytest.fixture(autouse=True)
+def _fast_pacing(monkeypatch):
+    monkeypatch.setattr(P, "MIN_INTERVAL", 0.02)
+
+
 def make(tmp_path, handler, key="K"):
     v = P.Vocalizer(str(tmp_path / "pron"), transport=httpx.MockTransport(handler))
     v.configure(key)
@@ -233,3 +238,21 @@ def test_all_models_refused_is_reported_not_silent(tmp_path):
     v = make(tmp_path, handler)
     with pytest.raises(P.PronounceError, match="not available"):
         asyncio.run(v.vocalize(SENT))
+
+
+def test_never_hangs_when_every_model_refuses(tmp_path):
+    """Reported: both Play buttons stayed grey. Many models, all refusing, must fail fast and read normally."""
+    import time
+    names = [f"gemini-3.{i}-flash" for i in range(10)] + ["gemini-2.5-pro"]
+
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"models": [{"name": f"models/{n}", "supportedGenerationMethods": ["generateContent"]} for n in names]})
+        return httpx.Response(429, json={"error": {"message": "quota", "details": [{"retryDelay": "30s"}]}})
+
+    v = make(tmp_path, handler)
+    t = time.time()
+    with pytest.raises(P.PronounceError) as ei:
+        asyncio.run(v.vocalize(SENT))
+    assert time.time() - t < 3 and ei.value.quota
+    assert not v.available()  # and the next passage does not even try for a while
