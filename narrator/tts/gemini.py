@@ -229,7 +229,8 @@ class GeminiProvider(TTSProvider):
                 last = _error_message(r)
                 await asyncio.sleep(2.0 * (attempt + 1))
                 continue
-            if r.status_code == 404:
+            if r.status_code == 404 or (r.status_code == 400 and any(
+                    w in r.text.lower() for w in ("no longer available", "not found", "deprecated"))):
                 return "skip", _error_message(r)
             raise TTSError(_error_message(r), retryable=False)
         if "429" in last or "quota" in last.lower():

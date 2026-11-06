@@ -31,7 +31,6 @@ log = logging.getLogger(__name__)
 
 API = "https://generativelanguage.googleapis.com/v1beta"
 PROMPT_VERSION = "p4"
-PREFERRED_MODELS = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-flash-lite-latest"]
 BATCH = 12  # passages per request: a small free daily request allowance then covers hundreds of passages
 MIN_INTERVAL = 4.2  # seconds between requests: stays under the free tier's ~15 requests/minute
 
@@ -155,6 +154,7 @@ class Vocalizer:
         self._next_time = 0.0
         self._models: List[str] = []
         self._blocked: Dict[str, float] = {}
+        self.working_model: Optional[str] = None
         self.stats = {"asked": 0, "cached": 0, "words": 0, "failed": 0}
 
     def configure(self, key: Optional[str], model: str = "") -> None:
@@ -241,6 +241,21 @@ class Vocalizer:
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(timeout=60, transport=self.transport, headers={"x-goog-api-key": self.key or ""})
 
+    @staticmethod
+    def rank_model(name: str):
+        """Newest, most accurate, free-friendly first: the alias for the current flash model, then flash by
+        version (newest first), then flash-lite, then the rest.  Google renames models often, so nothing is
+        hard-coded except these preferences."""
+        if name == "gemini-flash-latest":
+            return (0, 0.0, name)
+        m = re.match(r"gemini-(\d+(?:\.\d+)?)-(.+)$", name)
+        ver = float(m.group(1)) if m else 0.0
+        rest = m.group(2) if m else name
+        family = 1 if rest == "flash" else 2 if rest == "flash-lite" else 3 if rest.startswith("flash") else 4 if "pro" in rest else 5
+        if name == "gemini-flash-lite-latest":
+            return (2, 0.0, name)
+        return (family, -ver, name)
+
     async def _model_order(self) -> List[str]:
         if self.model_pref:
             return [self.model_pref]
@@ -254,21 +269,17 @@ class Vocalizer:
                     for m in r.json().get("models", []):
                         n = m.get("name", "").split("/")[-1]
                         if (n.startswith("gemini") and "generateContent" in m.get("supportedGenerationMethods", [])
-                                and not any(x in n for x in ("tts", "image", "live", "audio", "embedding", "vision", "robotics"))):
+                                and not any(x in n for x in ("tts", "image", "live", "audio", "embedding", "vision", "robotics",
+                                                              "computer-use", "thinking", "learnlm", "exp"))):
                             names.append(n)
         except httpx.HTTPError:
             pass
-
-        def rank(n: str):
-            for i, p in enumerate(PREFERRED_MODELS):
-                if n == p:
-                    return (0, i, n)
-            return (1, 0 if "flash-lite" in n else 1 if "flash" in n else 2, n)
-
-        have = set(names)
-        order = [p for p in PREFERRED_MODELS if p in have or not have] + sorted(have - set(PREFERRED_MODELS), key=rank)
-        self._models = order or PREFERRED_MODELS
-        return self._models
+        order = sorted(set(names), key=self.rank_model)
+        for fallback in ("gemini-flash-latest", "gemini-flash-lite-latest"):  # always worth a try
+            if fallback not in order:
+                order.append(fallback)
+        self._models = order
+        return order
 
     async def _ask(self, items) -> object:
         body = {
@@ -277,9 +288,13 @@ class Vocalizer:
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
         }
         last = ""
-        for model in await self._model_order():
-            if self._blocked.get(model, 0) > time.time():
+        queue = list(await self._model_order())
+        tried = set()
+        while queue:
+            model = queue.pop(0)
+            if model in tried or self._blocked.get(model, 0) > time.time():
                 continue
+            tried.add(model)
             for attempt in range(3):
                 if self._gate is None:
                     self._gate = asyncio.Lock()
@@ -296,25 +311,35 @@ class Vocalizer:
                     await asyncio.sleep(1.5 * (attempt + 1))
                     continue
                 if r.status_code == 200:
+                    self.working_model = model
+                    if model in self._models:  # remember what works: try it first from now on
+                        self._models.remove(model)
+                    self._models.insert(0, model)
                     return _parse_json(r.json())
+                low = r.text.lower()
                 if r.status_code == 429:
-                    low = r.text.replace("_", "").replace(" ", "").lower()
                     last = "Google's free allowance for the pronunciation assistant is used up"
-                    if "perday" in low or attempt >= 1:
+                    if "perday" in low.replace("_", "").replace(" ", "") or attempt >= 1:
                         self._blocked[model] = time.time() + 3600
                         break
                     self._next_time = time.time() + _retry(r, 20.0)
                     continue
-                if r.status_code in (404, 400) and "not found" in r.text.lower():
+                if r.status_code == 404 or (r.status_code == 400 and any(
+                        w in low for w in ("not found", "no longer available", "not supported", "deprecated", "unavailable"))):
+                    # renamed / retired / not offered to this key: remember, and follow Google's own suggestion
+                    last = f"model {model} is not available to this key"
                     self._blocked[model] = time.time() + 6 * 3600
+                    for sug in re.findall(r"models/(gemini-[\w.\-]+)", r.text):
+                        if sug != model and sug not in tried:
+                            queue.insert(0, sug)
                     break
                 if r.status_code >= 500:
                     last = f"Gemini error {r.status_code}"
                     await asyncio.sleep(2.0 * (attempt + 1))
                     continue
                 raise PronounceError(f"Gemini error {r.status_code}: {r.text[:200]}")
-        if any(t > time.time() for t in self._blocked.values()) and "allowance" in last:
-            self.cooldown_until = min(self._blocked.values())
+        if "allowance" in last:
+            self.cooldown_until = min((t for t in self._blocked.values() if t > time.time()), default=time.time() + 3600)
             raise PronounceError(last, quota=True)
         raise PronounceError(last or "the pronunciation assistant did not answer")
 

@@ -191,3 +191,45 @@ def test_playing_asks_for_the_next_passages_in_one_request(client, he_pdf):
     r = client.post(f"/api/documents/{doc}/speech", json={"unit_id": para["id"], "chunk": 0})
     assert r.status_code == 200 and r.json()["assistant"]["state"] in ("none-needed", "ok")
     assert len(posts) == 1 and posts[0] >= 2  # this passage and the ones after it, together
+
+
+def test_model_ranking_prefers_current_flash_and_never_hard_codes_old_names():
+    names = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-2.5-pro", "gemini-flash-latest",
+             "gemini-2.5-flash-lite", "gemini-3.8-pro"]
+    order = sorted(names, key=P.Vocalizer.rank_model)
+    assert order[:3] == ["gemini-flash-latest", "gemini-3.8-flash", "gemini-2.5-flash"]
+    assert order.index("gemini-3.8-flash-lite") < order.index("gemini-2.5-pro")
+
+
+def test_retired_model_follows_googles_suggestion(tmp_path):
+    """Reported by the user: 'models/gemini-2.5-flash is no longer available to new users ... use gemini-3.8-flash'."""
+    asked = []
+
+    def handler(req):
+        if req.method == "GET":  # the model list only knows the retired name
+            return httpx.Response(200, json={"models": [{"name": "models/gemini-2.5-flash", "supportedGenerationMethods": ["generateContent"]}]})
+        model = str(req.url).split("/models/")[1].split(":")[0]
+        asked.append(model)
+        if model == "gemini-2.5-flash":
+            return httpx.Response(404, json={"error": {"code": 404, "message":
+                "This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.8-flash for the latest features and improvements.",
+                "status": "NOT_FOUND"}})
+        return reply({"0": {"3": "שְׁמָן"}})
+
+    v = make(tmp_path, handler)
+    words, chosen, _ = asyncio.run(v.vocalize(SENT))
+    assert chosen == {3: "שְׁמָן"} and asked[:2] == ["gemini-2.5-flash", "gemini-3.8-flash"]
+    asked.clear()
+    asyncio.run(v.vocalize(SENT + " עוד"))
+    assert asked == ["gemini-3.8-flash"]  # the retired model is not tried again
+
+
+def test_all_models_refused_is_reported_not_silent(tmp_path):
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"models": []})
+        return httpx.Response(404, json={"error": {"message": "model not found"}})
+
+    v = make(tmp_path, handler)
+    with pytest.raises(P.PronounceError, match="not available"):
+        asyncio.run(v.vocalize(SENT))

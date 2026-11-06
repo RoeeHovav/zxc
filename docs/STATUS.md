@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04 · version 0.9.4. This is the hand-over record for
+Last updated: 2026-11-04 · version 0.9.5. This is the hand-over record for
 continuing development across sessions.
 
 ## Verified (automated)
@@ -76,6 +76,11 @@ Chromium. It uses the test-tone engine for audio and passes:
   William (Multilingual) still read שמן as "fat"; at that time the status line did not exist, so it is unknown
   whether the assistant ran or the voice ignores vowel marks. The hand-typed vowel-mark sample in the Voice lab
   separates the two cases.
+- **Live finding (user's Voice lab, 0.9.4):** Gemini answered 404 "models/gemini-2.5-flash is no longer
+  available to new users ... use models/gemini-3.8-flash", so the assistant had changed nothing. Fixed in 0.9.5:
+  models are ranked from the key's own model list (current flash alias, newest flash, flash-lite, ...), a
+  retired/refused model is skipped for hours and Google's suggested replacement is tried next, the model that
+  worked is remembered. Still unverified live: that the answers are accurate and that the voices follow vowel marks.
 - **Large documents**: the document vocabulary used to be rebuilt from every analysed page on every request,
   stalling playback 10-18 s at a time during the first minutes of a 1,256-page document; it is now incremental
   (worst request 0.7 s in the same test).
