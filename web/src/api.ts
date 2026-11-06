@@ -52,7 +52,22 @@ export interface Speech {
   lang: string;
   text: string;
   notice?: string;
-  assistant?: { state: string; changed: string[][]; detail?: string };
+  assistant?: { state: string; changed: AssistantChange[]; detail?: string };
+}
+
+export interface AssistantChange {
+  word: string;
+  chosen: string;
+  why: string;
+  left: string;
+  right: string;
+  alternatives: { v: string; g: string }[];
+}
+
+export interface Reading {
+  v: string;
+  g: string;
+  fits: boolean;
 }
 
 export interface PrepStatus {
@@ -263,6 +278,7 @@ export const api = {
   unit: (id: string, unitId: string) => req<Unit>("GET", `/api/documents/${id}/units/${enc(unitId)}`),
   neighbour: (id: string, unitId: string, direction: 1 | -1) => req<{ unit: Unit | null }>("GET", `/api/documents/${id}/units/${enc(unitId)}/next?direction=${direction}`),
   unitAt: (id: string, page: number, word: number) => req<{ unit: Unit; word: number }>("GET", `/api/documents/${id}/unit_at?page=${page}&word=${word}`),
+  suggest: (id: string, page: number, word: number) => req<{ word: string; passage: string; readings: Reading[] }>("POST", `/api/documents/${id}/suggest`, { page, word }),
   prepare: (id: string, unitId: string, patient = false) => req<PrepStatus>("POST", `/api/documents/${id}/prepare`, { unit_id: unitId, patient }),
   prepareStatus: (id: string) => req<PrepStatus>("GET", `/api/documents/${id}/prepare`),
   prepareCancel: (id: string) => req<PrepStatus>("DELETE", `/api/documents/${id}/prepare`),

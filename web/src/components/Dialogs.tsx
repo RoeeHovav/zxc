@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { api, ApiError, Speech, Voice } from "../api";
+import { api, ApiError, AssistantChange, Reading, Speech, Voice } from "../api";
 import { useStore } from "../store";
 import { Icon } from "./Icons";
 
@@ -93,6 +93,26 @@ export function PronounceDialog({ docId, page, word, text, lang, onClose, onSave
   const he = /[֐-׿]/.test(clean);
   const NIQQUD = ["ַ", "ָ", "ֶ", "ֵ", "ִ", "ֹ", "ֻ", "ְ", "ּ", "ׁ", "ׂ", "ֲ"];
   const inp = useRef<HTMLInputElement>(null);
+  const [readings, setReadings] = useState<Reading[] | null>(null);
+  const [asking, setAsking] = useState(false);
+  const suggest = async (): Promise<void> => {
+    setAsking(true);
+    try {
+      const r = await api.suggest(docId, page, word);
+      setReadings(r.readings);
+      if (!r.readings.length) toast("No readings were suggested for this word.", "error");
+    } catch (e: any) {
+      if (e instanceof ApiError && e.status === 409 && e.body?.error === "consent_required") {
+        if (window.confirm(`${e.body.name}\n\n${e.body.privacy}\n\nAllow this?`)) {
+          await api.consent(e.body.provider);
+          setAsking(false);
+          return suggest();
+        }
+      } else toast(e.message, "error");
+    } finally {
+      setAsking(false);
+    }
+  };
   const insert = (m: string) => {
     const el = inp.current;
     if (!el) return;
@@ -146,6 +166,31 @@ export function PronounceDialog({ docId, page, word, text, lang, onClose, onSave
             <Icon name="play" size={14} /> Preview
           </button>
         </div>
+        {he && (
+          <div style={{ marginTop: 8 }}>
+            <button className="btn" disabled={asking} onClick={suggest} data-testid="suggest-readings">
+              {asking ? "Asking…" : "Suggest readings (uses your Gemini key)"}
+            </button>
+            {readings && readings.length > 0 && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }} data-testid="readings">
+                {readings.map((r) => (
+                  <button
+                    key={r.v}
+                    className={"btn" + (r.fits ? " primary" : "")}
+                    style={{ fontSize: 18 }}
+                    title={r.fits ? "Fits this sentence best" : ""}
+                    onClick={() => {
+                      setSpoken(r.v);
+                      setScope("occurrence"); // a word with several readings must only be changed where it was misread
+                    }}
+                  >
+                    <span dir="rtl">{r.v}</span> <span className="small muted">{r.g}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {he && (
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
             {NIQQUD.map((m) => (
@@ -212,12 +257,72 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
   const [vowels, setVowels] = useState(true);
   const [given, setGiven] = useState("");
   const [assistant, setAssistant] = useState<Speech["assistant"] | null>(null);
+  const [lastVoice, setLastVoice] = useState("");
+  const [typed, setTyped] = useState<Record<string, string>>({});
+  const playLab = async (v: string) => {
+    setLastVoice(v);
+    try {
+      const sp = await play(text, v, sample.lang, sample.lang === "he" && vowels);
+      setGiven(sp && sp.text !== text ? sp.text : "");
+      setAssistant(sample.lang === "he" && vowels ? sp?.assistant ?? null : null);
+    } catch (e: any) {
+      toast(e.message, "error");
+    }
+  };
+  const fix = async (c: AssistantChange, reading: string) => {
+    // a rule that names the neighbouring words, so only this wording changes (שמן is "oil" in other sentences)
+    const written = [c.left, c.word, c.right].filter(Boolean).join(" ");
+    const spoken = [c.left, reading, c.right].filter(Boolean).join(" ");
+    try {
+      await api.addLexicon({ written, spoken, scope: "global", lang: "he", note: "Voice lab correction" });
+      toast(`Saved for all documents: ${written} → ${spoken}`);
+      if (lastVoice) await playLab(lastVoice);
+    } catch (e: any) {
+      toast(e.message, "error");
+    }
+  };
   const assistantLine = () => {
     const a = assistant;
-    if (!a) return "";
+    if (!a) return null;
     switch (a.state) {
       case "ok":
-        return `Assistant added vowel marks to ${a.changed.length} word(s): ` + a.changed.map((c) => `${c[0]} → ${c[1]}`).join("   ");
+        return (
+          <div>
+            {a.changed.map((c) => (
+              <div key={c.word + c.left} style={{ marginBottom: 6 }}>
+                <div>
+                  Assistant gave the voice{" "}
+                  <b dir="rtl" style={{ fontSize: 17 }}>
+                    {c.chosen}
+                  </b>{" "}
+                  for <span dir="rtl">{c.word}</span>
+                  {c.alternatives[0]?.g ? ` (${c.alternatives[0].g})` : ""}
+                  {c.why ? ` — ${c.why}` : ""}
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 3 }}>
+                  <span>Wrong? Pick the right reading:</span>
+                  {c.alternatives
+                    .filter((alt) => alt.v !== c.chosen)
+                    .map((alt) => (
+                      <button key={alt.v} className="btn" style={{ fontSize: 16 }} onClick={() => fix(c, alt.v)} data-testid="lab-alt">
+                        <span dir="rtl">{alt.v}</span> <span className="small muted">{alt.g}</span>
+                      </button>
+                    ))}
+                  <input
+                    placeholder="or type it with vowel marks"
+                    dir="rtl"
+                    value={typed[c.word] || ""}
+                    onChange={(e) => setTyped({ ...typed, [c.word]: e.target.value })}
+                    style={{ width: 190 }}
+                  />
+                  <button className="btn" disabled={!(typed[c.word] || "").trim()} onClick={() => fix(c, typed[c.word].trim())}>
+                    Save
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
       case "none-needed":
         return "Assistant found no ambiguous word in this passage, so nothing was changed.";
       case "no-key":
@@ -286,10 +391,7 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
                 </option>
               ))}
             </select>
-            <button className="btn" disabled={!v || busy} onClick={() => play(text, v, sample.lang, sample.lang === "he" && vowels).then((sp) => {
-                setGiven(sp && sp.text !== text ? sp.text : "");
-                setAssistant(sample.lang === "he" && vowels ? sp?.assistant ?? null : null);
-              }).catch((e) => toast(e.message, "error"))}>
+            <button className="btn" disabled={!v || busy} onClick={() => playLab(v)}>
               <Icon name="play" size={14} /> {busy ? "Working…" : "Play"}
             </button>
             <div className="stars" style={{ marginTop: 8 }}>

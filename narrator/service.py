@@ -27,7 +27,7 @@ from .pdf.ocr import OcrEngine
 from .text.normalize import LexEntry, Lexicon, load_builtin, strip_niqqud, unify_quotes
 from .tts.azure import AzureProvider
 from .tts.base import ProviderInfo, TTSError, TTSProvider, Voice
-from .llm.pronounce import PronounceError, Vocalizer, apply as apply_vowels
+from .llm.pronounce import HEB_WORD as HEB_WORD_RE, PronounceError, Vocalizer, apply as apply_vowels
 from .tts.edge import EdgeProvider
 from .tts.gemini import CHUNK_CHARS as GEMINI_CHUNK_CHARS, GeminiProvider
 from .tts.testtone import TestToneProvider
@@ -591,12 +591,16 @@ class NarratorService:
 
     async def _warm_vowels(self, chunks: List[PreparedChunk], voice: str) -> None:
         """Ask for the vowel marks of several upcoming passages in ONE request (small free request allowance)."""
-        todo = [c.text for c in chunks if self._assistant_enabled(c, voice, False) is None]
+        todo, ctx = [], []
+        for i, c in enumerate(chunks):
+            if self._assistant_enabled(c, voice, False) is None:
+                todo.append(c.text)
+                ctx.append((chunks[i - 1].text[-200:] if i > 0 else "", chunks[i + 1].text[:200] if i + 1 < len(chunks) else ""))
         if not todo:
             return
         self._check_pronunciation_consent()
         try:
-            await self.vocalizer.vocalize_many(todo)
+            await self.vocalizer.vocalize_many(todo, ctx)
         except PronounceError as exc:
             log.info("pronunciation assistant could not prepare passages: %s", exc)
 
@@ -608,7 +612,7 @@ class NarratorService:
             return ch.text, ch.tokens, None, {"state": why, "changed": []}
         self._check_pronunciation_consent()
         try:
-            words, chosen, _ = await self.vocalizer.vocalize(ch.text)
+            words, chosen, _, details = await self.vocalizer.vocalize(ch.text)
         except PronounceError as exc:
             log.info("pronunciation assistant skipped a passage: %s", exc)
             notice = None
@@ -620,7 +624,15 @@ class NarratorService:
         if not chosen:
             return ch.text, ch.tokens, None, {"state": "none-needed", "changed": []}
         text, tokens = apply_vowels(ch.text, words, chosen, ch.tokens)
-        changed = [[words[i][2], v] for i, v in sorted(chosen.items())]
+        changed = []
+        for i, v in sorted(chosen.items()):
+            st_, en_, w = words[i]
+            left = ch.text[:st_].split()[-1:] or [""]
+            right = ch.text[en_:].split()[:1] or [""]
+            d = details.get(i, {})
+            changed.append({"word": w, "chosen": v, "why": d.get("why", ""), "left": left[0], "right": right[0],
+                            "alternatives": [{"v": c, "g": (d.get("g") or [""] * 3)[k] if k < len(d.get("g", [])) else ""}
+                                             for k, c in enumerate(d.get("c", [v]))]})
         return text, tokens, None, {"state": "ok", "changed": changed}
 
     async def _speak_chunk(self, ch: PreparedChunk, voice: str, allow_fallback: bool = True, force_vowels: bool = False) -> dict:
@@ -883,6 +895,9 @@ class NarratorService:
 
     async def preview(self, text: str, voice: str, lang: str, vowels: bool = False) -> dict:
         """Voice Lab: synthesize arbitrary text (not tied to a document).  `vowels` runs the pronunciation assistant."""
+        for e in self.db.lexicon(None):  # the user's own saved pronunciations apply here too
+            if e.get("enabled") and e.get("scope") == "global" and e.get("written") and e["written"] in text:
+                text = re.sub(r"(?<![\w\u0590-\u05FF])" + re.escape(e["written"]) + r"(?![\w\u0590-\u05FF])", lambda m, sp=e["spoken"]: sp, text)
         words = text.split()
         tokens = []
         pos = 0
@@ -891,6 +906,30 @@ class NarratorService:
             pos += len(w) + 1
         ch = PreparedChunk(index=0, lang=lang, text=" ".join(words), tokens=tokens, word_range=(0, len(words)))
         return await self._speak_chunk(ch, voice, force_vowels=vowels)
+
+    async def suggest_readings(self, doc_id: str, page: int, word: int) -> dict:
+        """Every common reading of a clicked word, with the one that fits its sentence first."""
+        st = self.open(doc_id)
+        loop = asyncio.get_running_loop()
+        u = await loop.run_in_executor(None, st.units.unit_for_word, page, word)
+        if u is None:
+            raise KeyError("word")
+        k = u.words.index((page, word))
+        a, b = 0, len(u.texts)
+        for sa, sb, _ in u.sentences:
+            if sa <= k < sb:
+                a, b = sa, sb
+                break
+        prev_a = max(0, a - 25)
+        passage = " ".join(u.texts[prev_a:b])
+        target = u.texts[k]
+        m = HEB_WORD_RE.search(target)
+        core = m.group(0) if m else target
+        if not self.vocalizer.key:
+            raise PronounceError("Add your Gemini key in Settings first.")
+        self._check_pronunciation_consent()
+        readings = await self.vocalizer.suggest(passage, strip_niqqud(core))
+        return {"word": core, "passage": passage, "readings": readings}
 
     # ============================================================ teacher
     def llm_client(self) -> LLMClient:

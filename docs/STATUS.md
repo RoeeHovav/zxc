@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04 · version 0.9.7. This is the hand-over record for
+Last updated: 2026-11-04 · version 0.9.8. This is the hand-over record for
 continuing development across sessions.
 
 ## Verified (automated)
@@ -85,6 +85,15 @@ Chromium. It uses the test-tone engine for audio and passes:
   assistant worked through every model of the key, one slow attempt after another. 0.9.6: at most 4 models and
   25 s per request, per-model pacing, a model that is over its limit is skipped instead of waited for, a failure
   rests the assistant for 1-5 min so later passages do not wait again, and the Voice lab button says "Working…".
+- **Pronunciation: reasoning, context and corrections (0.9.8).** The user's Voice-lab test showed the assistant
+  picking a wrong reading for שמן (shown as the word it gave the voice). 0.9.8: the prompt asks for grammatical
+  reasoning and 2-3 ranked candidates with glosses, passages carry the neighbouring text, and the user's own
+  test sentence was removed from the prompt examples (so tests of it are honest). Corrections that stick: in
+  the Voice lab "Wrong? Pick the right reading" (or type one) saves a global rule naming the neighbouring words
+  (so oil is untouched elsewhere) and replays; in the reader, Fix pronunciation > "Suggest readings" asks Gemini
+  for all readings of the clicked word (defaults to "only this occurrence"). Saved rules always beat the assistant.
+  Accuracy on real text and whether voices follow vowel marks remain unverified; no way to guarantee a model is
+  right every time, which is why corrections are one click.
 - **Why "Preparing narration" is slow (0.9.7):** measured on a 314-page booklet: text preparation is fast
   (about 680 chunks/s) but the booklet yields about 8 chunks per page (many short items) and every chunk is one
   request to the voice service, so 50% of a long document is thousands of requests. The wait now also stops after

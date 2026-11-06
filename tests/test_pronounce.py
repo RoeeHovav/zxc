@@ -11,6 +11,10 @@ from narrator.narration.prepare import PreparedChunk
 SENT = "מקראות ישראל הינו שמן של חוברות"
 
 
+def D(c, g=None, why=""):
+    return {"c": c if isinstance(c, list) else [c], "g": g or [], "why": why}
+
+
 def reply(mapping):
     return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": json.dumps(mapping, ensure_ascii=False)}]}}]})
 
@@ -58,13 +62,13 @@ def test_asks_model_once_and_caches(tmp_path):
         return reply({"0": {"3": "שְׁמָן"}})
 
     v = make(tmp_path, handler)
-    words, chosen, cached = asyncio.run(v.vocalize(SENT))
+    words, chosen, cached, details = asyncio.run(v.vocalize(SENT))
     assert chosen == {3: "שְׁמָן"} and cached is False and len(seen) == 1
     body = seen[0]
     assert body["generationConfig"]["responseMimeType"] == "application/json"
     msg = body["contents"][0]["parts"][0]["text"]
     assert SENT in msg and '"3": "שמן"' in msg and "Real input" in msg
-    words, chosen, cached = asyncio.run(v.vocalize(SENT))
+    words, chosen, cached, details = asyncio.run(v.vocalize(SENT))
     assert chosen == {3: "שְׁמָן"} and cached is True and len(seen) == 1  # second time: from disk, no request
     # a new assistant object (e.g. after restart) also reads the disk cache
     v2 = make(tmp_path, lambda r: pytest.fail("should not call the service"))
@@ -148,7 +152,7 @@ def test_many_passages_in_one_request(tmp_path):
     v = make(tmp_path, handler)
     res = asyncio.run(v.vocalize_many(texts))
     assert len(calls) == 1 and "gemini-2.5-flash:generateContent" in calls[0]  # seven passages, one request, the accurate model
-    assert all(chosen == {0: "הַסַּפָּר"} for (_, chosen, _) in res[:5])
+    assert all(r[1] == {0: "הַסַּפָּר"} for r in res[:5])
     assert res[5][1] == {} and res[6][1] == {3: "שְׁמָן"}
     assert asyncio.run(v.vocalize_many(texts))[0][2] is True and len(calls) == 1
 
@@ -169,7 +173,9 @@ def test_assistant_reports_what_it_did(tmp_path):
         lambda r: httpx.Response(200, json={"models": []}) if r.method == "GET" else reply({"0": {"3": "שְׁמָן"}})))
     svc.vocalizer.configure("K")
     res = asyncio.run(svc._speak_chunk(ch, "testtone:low"))
-    assert res["assistant"] == {"state": "ok", "changed": [["שמן", "שְׁמָן"]]}
+    a = res["assistant"]
+    assert a["state"] == "ok" and a["changed"][0]["word"] == "שמן" and a["changed"][0]["chosen"] == "שְׁמָן"
+    assert a["changed"][0]["left"] == "הינו" and a["changed"][0]["right"] == "של"  # for a context rule
     svc.update_settings({"ai_pronunciation": False})
     assert asyncio.run(svc._speak_chunk(ch, "testtone:low"))["assistant"]["state"] == "off"
 
@@ -222,7 +228,7 @@ def test_retired_model_follows_googles_suggestion(tmp_path):
         return reply({"0": {"3": "שְׁמָן"}})
 
     v = make(tmp_path, handler)
-    words, chosen, _ = asyncio.run(v.vocalize(SENT))
+    words, chosen, _, _d = asyncio.run(v.vocalize(SENT))
     assert chosen == {3: "שְׁמָן"} and asked[:2] == ["gemini-2.5-flash", "gemini-3.8-flash"]
     asked.clear()
     asyncio.run(v.vocalize(SENT + " עוד"))
@@ -256,3 +262,87 @@ def test_never_hangs_when_every_model_refuses(tmp_path):
         asyncio.run(v.vocalize(SENT))
     assert time.time() - t < 3 and ei.value.quota
     assert not v.available()  # and the next passage does not even try for a while
+
+
+def test_candidates_reasoning_and_context_are_used(tmp_path):
+    seen = []
+
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"models": []})
+        seen.append(json.loads(req.content)["contents"][0]["parts"][0]["text"])
+        return reply({"0": {"3": D(["שְׁמָן", "שֶׁמֶן", "שָׁמֵן"], ["their name", "oil", "fat"], "feminine plural booklets")}})
+
+    v = make(tmp_path, handler)
+    res = asyncio.run(v.vocalize_many([SENT], [("הקדמה קצרה.", "והמשך הטקסט.")]))
+    words, chosen, cached, details = res[0]
+    assert chosen == {3: "שְׁמָן"} and details[3]["c"][1] == "שֶׁמֶן" and details[3]["g"] == ["their name", "oil", "fat"]
+    assert '"before": "הקדמה קצרה."' in seen[0] and '"after": "והמשך הטקסט."' in seen[0]
+    assert "reason like a careful grammarian" in P.SYSTEM
+    # the alternatives are remembered with the answer (so the UI can offer them without asking again)
+    v2 = make(tmp_path, lambda r: pytest.fail("no request expected"))
+    assert asyncio.run(v2.vocalize(SENT))[3][3]["c"][:2] == ["שְׁמָן", "שֶׁמֶן"]
+
+
+def test_every_example_in_the_prompt_is_itself_valid():
+    for text, ans in P.EXAMPLES:
+        assert len(P.validate_details(ans, P.hebrew_words(text))) == len(ans)
+
+
+def test_wrong_letters_in_candidates_are_dropped():
+    words = P.hebrew_words(SENT)
+    d = P.validate_details({"3": {"c": ["שֶׁמֶנ", "שְׁמָן", "שמן"], "g": ["x", "their name", "plain"]}}, words)
+    assert d[3]["c"] == ["שְׁמָן"] and d[3]["g"] == ["their name"]
+
+
+def test_suggest_lists_readings_and_caches(tmp_path):
+    calls = []
+
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"models": []})
+        calls.append(1)
+        return reply({"readings": [{"v": "שְׁמָן", "g": "their name", "fits": True}, {"v": "שֶׁמֶן", "g": "oil", "fits": False},
+                                   {"v": "שֶׁמֶנ", "g": "bad letters", "fits": False}]})
+
+    v = make(tmp_path, handler)
+    r = asyncio.run(v.suggest(SENT, "שמן"))
+    assert [x["v"] for x in r] == ["שְׁמָן", "שֶׁמֶן"] and r[0]["fits"] is True
+    asyncio.run(v.suggest(SENT, "שמן"))
+    assert len(calls) == 1
+
+
+def test_voice_lab_preview_applies_the_users_saved_rules(client):
+    svc = client.svc
+    sent = {}
+    real = svc.providers["testtone"].synthesize
+
+    async def spy(text, voice, lang, rate=0, pitch=0):
+        sent["t"] = text
+        return await real(text, voice, lang, rate, pitch)
+
+    svc.providers["testtone"].synthesize = spy
+    client.post("/api/lexicon", json={"written": "הינו שמן של", "spoken": "הינו שְׁמָן של", "scope": "global", "lang": "he"})
+    r = client.post("/api/preview", json={"text": SENT, "voice": "testtone:low", "lang": "he", "vowels": False})
+    assert r.status_code == 200 and "שְׁמָן" in sent["t"] and "הינו שְׁמָן של" in sent["t"]
+
+
+def test_suggest_endpoint_for_a_clicked_word(client, he_pdf):
+    from conftest import upload
+    svc = client.svc
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json={"models": []})
+        word = json.loads(json.loads(req.content)["contents"][0]["parts"][0]["text"])["word"]
+        return reply({"readings": [{"v": word + "\u05b7", "g": "reading one", "fits": True}, {"v": word + "\u05b6", "g": "reading two", "fits": False}]})
+
+    svc.vocalizer = P.Vocalizer(str(svc.data_dir) + "/pron", transport=httpx.MockTransport(handler))
+    svc.vocalizer.configure("K")
+    svc.give_consent("gemini-text")
+    doc = upload(client, he_pdf)[0]["id"]
+    lay = client.get(f"/api/documents/{doc}/pages/0/layout").json()
+    idx = next(i for i, w in enumerate(lay["words"]) if len(w[0]) >= 3 and "\u05d0" <= w[0][0] <= "\u05ea")
+    r = client.post(f"/api/documents/{doc}/suggest", json={"page": 0, "word": idx})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["readings"] and j["passage"] and j["word"]

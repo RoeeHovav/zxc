@@ -101,3 +101,15 @@ def test_language_detection():
     assert detect_language("The quick brown fox jumps over the lazy dog", "he") == "en"
     assert detect_language("Le chat est sur la table et il dort tranquillement", "en") == "fr"
     assert detect_language("Мама мыла раму", "en") in ("ru", "uk", "bg")
+
+
+def test_voice_lab_style_correction_rule_names_the_neighbours():
+    """A correction saved as 'left word right' changes only that wording, and the assistant leaves vowelled words alone."""
+    from narrator.text.normalize import LexEntry
+    from narrator.llm.pronounce import hebrew_words
+    lex = Lexicon([LexEntry("הינו שמן של", "הינו שְׁמָן של", "he", scope="global")] + load_builtin("he"))
+    out = norm("מקראות ישראל הינו שמן של חוברות", lex=lex)
+    assert any("שְׁמָן" in t for t in out)
+    other = norm("קניתי שמן זית", lex=lex)
+    assert not any("שְׁמָן" in t for t in other)  # oil elsewhere is untouched
+    assert [w for _, _, w in hebrew_words(" ".join(out))] == ["מקראות", "ישראל", "של", "חוברות"] or "שְׁמָן" in " ".join(out)

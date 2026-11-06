@@ -16,6 +16,7 @@ from . import config
 from .service import ConsentRequired, NarratorService
 from .tts.base import TTSError
 from .llm.client import LLMError
+from .llm.pronounce import PronounceError
 
 log = logging.getLogger(__name__)
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -61,6 +62,10 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
         return JSONResponse(status_code=500, content={
             "error": "internal", "message": f"{type(exc).__name__}: {exc}",
             "where": f"{req.method} {req.url.path}", "trace": trace, "log": os.path.join(config.data_dir(), "narrator.log")})
+
+    @app.exception_handler(PronounceError)
+    async def _pron(_req: Request, exc: PronounceError):
+        return JSONResponse(status_code=502, content={"error": "assistant_failed", "message": str(exc)})
 
     @app.exception_handler(KeyError)
     async def _nf(_req: Request, exc: KeyError):
@@ -225,6 +230,10 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
         if r is None:
             raise HTTPException(404, "no narration unit at this position")
         return r
+
+    @app.post("/api/documents/{doc_id}/suggest")
+    async def suggest_readings(doc_id: str, body: dict = Body(...)):
+        return await svc.suggest_readings(doc_id, int(body["page"]), int(body["word"]))
 
     @app.post("/api/documents/{doc_id}/prepare")
     async def prepare_start(doc_id: str, body: dict = Body(...)):
