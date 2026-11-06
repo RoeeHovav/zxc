@@ -49,6 +49,8 @@ export class Narrator extends EventTarget {
   noticeHandler?: (msg: string) => void;
   /** Before the first play, wait until this share (0-100) of the remaining document is narrated. */
   bufferPercent = 0;
+  /** ...but never longer than this many minutes of narration (0 = no cap). */
+  bufferMinutes = 0;
   prep: PrepStatus | null = null;
   private skipWait = false;
   private prepPoll: number | undefined;
@@ -144,7 +146,7 @@ export class Narrator extends EventTarget {
       let st = await api.prepare(this.docId, unit.id);
       while (tok === this.token) {
         this.setPrep(st);
-        if (this.skipWait || st.state !== "running" || st.percent >= this.bufferPercent) break;
+        if (this.skipWait || st.state !== "running" || st.percent >= this.bufferPercent || (this.bufferMinutes > 0 && st.minutes_ready >= this.bufferMinutes)) break;
         await new Promise((r) => setTimeout(r, 700));
         st = await api.prepareStatus(this.docId);
       }

@@ -201,6 +201,10 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
               {he ? "מהמסמך (0 = להתחיל מיד)" : "of the document (0 = start at once)"}
             </label>
             <input type="range" min={0} max={100} step={5} value={settings.buffer_percent ?? 0} onChange={(e) => set({ buffer_percent: Number(e.target.value) })} data-testid="buffer-percent" />
+            <label style={{ marginTop: 8 }}>
+              {he ? "אבל לא להמתין יותר מכ-" : "but wait for no more than about"} <strong>{settings.buffer_minutes ?? 0}</strong> {he ? "דקות קריינות (0 = ללא הגבלה)" : "minutes of narration (0 = no limit)"}
+            </label>
+            <input type="range" min={0} max={60} step={5} value={settings.buffer_minutes ?? 0} onChange={(e) => set({ buffer_minutes: Number(e.target.value) })} data-testid="buffer-minutes" />
             <div className="muted small">
               {he
                 ? "ההכנה ממשיכה ברקע גם בזמן ההשמעה, ואפשר ללחוץ ״התחל עכשיו״. קול עם מכסה חינמית קטנה (Gemini) לא מוכן מראש בכמות גדולה; לשם כך יש את הכפתור ״הכנת הכול״ בנגן, שממשיך לאט לאורך ימים."

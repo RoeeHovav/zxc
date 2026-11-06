@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04 · version 0.9.6. This is the hand-over record for
+Last updated: 2026-11-04 · version 0.9.7. This is the hand-over record for
 continuing development across sessions.
 
 ## Verified (automated)
@@ -85,6 +85,11 @@ Chromium. It uses the test-tone engine for audio and passes:
   assistant worked through every model of the key, one slow attempt after another. 0.9.6: at most 4 models and
   25 s per request, per-model pacing, a model that is over its limit is skipped instead of waited for, a failure
   rests the assistant for 1-5 min so later passages do not wait again, and the Voice lab button says "Working…".
+- **Why "Preparing narration" is slow (0.9.7):** measured on a 314-page booklet: text preparation is fast
+  (about 680 chunks/s) but the booklet yields about 8 chunks per page (many short items) and every chunk is one
+  request to the voice service, so 50% of a long document is thousands of requests. The wait now also stops after
+  about 10 minutes of narration (setting `buffer_minutes`), and 5 chunks are prepared at once instead of 3. Real
+  voice-service speed was not measurable here (service blocked); the test-tone engine itself is slow (pure Python).
 - **Large documents**: the document vocabulary used to be rebuilt from every analysed page on every request,
   stalling playback 10-18 s at a time during the first minutes of a 1,256-page document; it is now incremental
   (worst request 0.7 s in the same test).

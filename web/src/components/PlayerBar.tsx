@@ -48,8 +48,8 @@ export default function PlayerBar({ narrator, status, error, pos, rate, onRate, 
                   ? `ממתין לחידוש המכסה החינמית של הקול (כ-${Math.ceil(prep.waiting_seconds / 60)} דק׳). ההכנה תמשיך אוטומטית כל עוד התוכנה פתוחה.`
                   : `Waiting for the voice's free allowance to refill (about ${Math.ceil(prep.waiting_seconds / 60)} min). It continues by itself while the app is open.`
                 : he
-                  ? `מכין קריינות… ${prep.percent.toFixed(0)}% (עמוד ${prep.page + 1} מתוך ${prep.pages})`
-                  : `Preparing narration… ${prep.percent.toFixed(0)}% (page ${prep.page + 1} of ${prep.pages})`}
+                  ? `מכין קריינות… ${prep.percent.toFixed(0)}% · כ-${Math.round(prep.minutes_ready)} דק׳ מוכנות (עמוד ${prep.page + 1} מתוך ${prep.pages})`
+                  : `Preparing narration… ${prep.percent.toFixed(0)}% · about ${Math.round(prep.minutes_ready)} min ready (page ${prep.page + 1} of ${prep.pages})`}
           </span>
           {status === "loading" && prep.state === "running" && (
             <button className="btn primary" onClick={() => narrator.startNow()} data-testid="start-now">

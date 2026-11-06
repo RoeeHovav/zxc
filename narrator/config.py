@@ -6,7 +6,7 @@ import os
 import sys
 
 APP_NAME = "PDF Narrator"
-VERSION = "0.9.6"
+VERSION = "0.9.7"
 
 
 def data_dir() -> str:
@@ -59,6 +59,7 @@ DEFAULT_SETTINGS = {
     # Before the first play, narrate this much of the remaining document (0 = start at once);
     # the rest keeps being prepared in the background while it plays.
     "buffer_percent": 50,
+    "buffer_minutes": 10,  # ...but never wait for more than about this many minutes of narration (0 = no cap)
     # When a limited online voice (e.g. Gemini free tier) runs out, continue with the free voice.
     "free_fallback": True,
     # Pronunciation assistant: a language model reads each Hebrew passage and adds vowel marks to

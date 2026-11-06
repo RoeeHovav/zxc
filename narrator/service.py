@@ -82,6 +82,7 @@ class PrepJob:
         self.pages = pages
         self.page = start_page
         self.chunks_done = 0
+        self.chars_done = 0
         self.state = "running"
         self.cancel = False
         self.error: Optional[str] = None
@@ -93,7 +94,7 @@ class PrepJob:
         span = max(1, self.pages - self.from_page)
         pct = 100.0 if self.state == "done" else min(100.0, 100.0 * max(0, self.page - self.from_page) / span)
         return {"state": self.state, "percent": round(pct, 1), "page": self.page, "from_page": self.from_page,
-                "pages": self.pages, "chunks_done": self.chunks_done, "error": self.error, "skipped": self.skipped,
+                "pages": self.pages, "chunks_done": self.chunks_done, "minutes_ready": round(self.chars_done / 900.0, 1), "error": self.error, "skipped": self.skipped,
                 "seconds": round(time.time() - self.started, 1), "patient": self.patient,
                 "waiting_seconds": int(max(0.0, self.waiting_until - time.time()))}
 
@@ -802,7 +803,7 @@ class NarratorService:
 
     async def _prepare_run(self, job: "PrepJob", st: DocState, u) -> None:
         loop = asyncio.get_running_loop()
-        sem = asyncio.Semaphore(1 if job.patient else 3)
+        sem = asyncio.Semaphore(1 if job.patient else 5)
         outstanding: Dict[asyncio.Task, int] = {}
 
         async def one(page: int, ch):
@@ -812,6 +813,7 @@ class NarratorService:
                     try:
                         await self._speak_chunk(ch, voice, allow_fallback=not job.patient)
                         job.chunks_done += 1
+                        job.chars_done += len(ch.text)
                         return
                     except TTSError as exc:
                         if not (job.patient and exc.quota):

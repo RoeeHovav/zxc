@@ -36,6 +36,7 @@ def test_prepare_narrates_whole_document_then_playback_is_instant(client, he_pdf
     assert start["state"] in ("running", "done") and start["pages"] == 2
     j = wait_job(client, doc)
     assert j["state"] == "done" and j["percent"] == 100 and j["chunks_done"] >= 2 and not j["error"]
+    assert j["minutes_ready"] > 0  # the player stops waiting after ~10 minutes of narration, not only at 50%
     # everything is cached: asking for speech again calls the engine zero more times
     calls = {"n": 0}
     real = client.svc.providers["testtone"].synthesize

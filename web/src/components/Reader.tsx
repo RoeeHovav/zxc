@@ -138,8 +138,9 @@ export default function Reader({ docId }: { docId: string }) {
     narrator.pauseScale = settings.pause_scale;
     narrator.readKinds = settings.read_kinds;
     narrator.bufferPercent = settings.buffer_percent ?? 0;
+    narrator.bufferMinutes = settings.buffer_minutes ?? 0;
     narrator.teacherMode = !!settings.teacher_mode && !!settings.llm_model;
-  }, [settings?.buffer_percent, settings?.pause_scale, settings?.read_kinds, settings?.teacher_mode, settings?.llm_model]);
+  }, [settings?.buffer_percent, settings?.buffer_minutes, settings?.pause_scale, settings?.read_kinds, settings?.teacher_mode, settings?.llm_model]);
 
   useEffect(() => {
     narrator.teacherHandler = (unit) => teacher.explain(unit.id, "section", true);

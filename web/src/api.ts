@@ -62,6 +62,7 @@ export interface PrepStatus {
   from_page: number;
   pages: number;
   chunks_done: number;
+  minutes_ready: number;
   error: string | null;
   skipped: string | null;
   seconds: number;
@@ -113,6 +114,7 @@ export interface Settings {
   azure_region: string;
   prefetch_chunks: number;
   buffer_percent: number;
+  buffer_minutes: number;
   ai_pronunciation: boolean;
   pronunciation_model: string;
   free_fallback: boolean;
