@@ -105,6 +105,13 @@ python -m venv .venv
   - whole sentences in another language get a matching voice.
 
   The original text is never rewritten. Only how it is spoken changes.
+- **Pronunciation assistant (Hebrew).** Unvowelled Hebrew has words that are written the same but read
+  differently (שמן = oil / "their name", ספר = book / barber / counted). With a Gemini key (free; text only, whose
+  allowance is far larger than its voice's) a language model reads each passage and gives the voice vowel marks
+  *only for the ambiguous words*, chosen from the whole sentence. The displayed text never changes; each answer is
+  checked (it must be the same letters) and remembered on this computer. Try it in the **Voice lab** (sample "שמן").
+  **Whether a given voice follows vowel marks is not known until you listen**; if a voice ignores them, the
+  assistant cannot help with that voice.
 - **Your pronunciation fixes.** Right-click a word, then choose **Fix
   pronunciation…** and enter niqqud or a respelling. The fix can apply to that
   occurrence, to the whole document, or to all documents. Multi-word entries act

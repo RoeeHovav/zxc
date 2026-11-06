@@ -212,6 +212,23 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
             {he ? "כשהמכסה החינמית של קול מוגבל (Gemini) נגמרת, להמשיך עם הקול החינמי של מיקרוסופט" : "When a limited voice runs out, carry on with the free Microsoft voice"}
           </label>
 
+          <div className="section-title">{he ? "עוזר ההגייה (עברית)" : "Pronunciation assistant (Hebrew)"}</div>
+          <label className="check">
+            <input type="checkbox" checked={settings.ai_pronunciation !== false} onChange={(e) => set({ ai_pronunciation: e.target.checked })} data-testid="ai-pronunciation" />
+            {he
+              ? "לתת לבינה מלאכותית (Gemini) להכריע, לפי המשפט כולו, איך לקרוא מילים דו-משמעיות (שמן, ספר, מלך…) ולתת לקול ניקוד רק עליהן"
+              : "Let Gemini decide from the whole sentence how ambiguous words (שמן, ספר, מלך…) are read, and give the voice vowel marks for only those words"}
+          </label>
+          <div className="muted small" style={{ marginBottom: 8 }}>
+            {app.secrets.gemini_api_key
+              ? he
+                ? "משתמש במפתח ה-Gemini שלכם (טקסט בלבד, מכסה חינמית גדולה בהרבה מזו של הקול). הטקסט המוצג לא משתנה, ופסקה שכבר עובדה נשמרת במחשב. ניתן לבדוק ב״מעבדת הקולות״."
+                : "Uses your Gemini key (text only; its free allowance is much larger than the voice's). The displayed text never changes, and each passage is remembered on this computer. Try it in the Voice lab."
+              : he
+                ? "דורש מפתח Gemini חינמי (ראו ״מנועי דיבור״ למטה)."
+                : "Needs your free Gemini key (see “Speech engines” below)."}
+          </div>
+
           <div className="section-title">{he ? "מנועי דיבור" : "Speech engines"}</div>
           {app.providers.map((p) => (
             <div className="provider-card" key={p.id}>

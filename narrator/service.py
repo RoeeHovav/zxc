@@ -26,7 +26,8 @@ from .pdf.document import PdfDocument, page_block_text, page_block_word_range
 from .pdf.ocr import OcrEngine
 from .text.normalize import LexEntry, Lexicon, load_builtin, strip_niqqud, unify_quotes
 from .tts.azure import AzureProvider
-from .tts.base import TTSError, TTSProvider, Voice
+from .tts.base import ProviderInfo, TTSError, TTSProvider, Voice
+from .llm.pronounce import PronounceError, Vocalizer, apply as apply_vowels
 from .tts.edge import EdgeProvider
 from .tts.gemini import CHUNK_CHARS as GEMINI_CHUNK_CHARS, GeminiProvider
 from .tts.testtone import TestToneProvider
@@ -34,6 +35,16 @@ from .llm.client import LLMClient, is_local
 from .llm.teacher import ExplanationCache, explain as llm_explain
 
 log = logging.getLogger(__name__)
+
+
+PRONUNCIATION_CONSENT = "gemini-text"
+PRONUNCIATION_INFO = ProviderInfo(
+    id=PRONUNCIATION_CONSENT, name="Gemini pronunciation assistant", free=True, cloud=True, requires_key=True,
+    word_timing=False,
+    privacy=("The Hebrew passages being read are sent to Google's Gemini API (with your key) so it can choose the correct"
+             " pronunciation of ambiguous words from the sentence. Only text is sent, never the PDF. On Google's free tier"
+             " Google may use submitted content to improve its products."),
+    verified="Request handling and validation are tested against a simulated service; live results are unverified.")
 
 
 class ConsentRequired(Exception):
@@ -112,6 +123,8 @@ class NarratorService:
         self._builtin = load_builtin("he") + load_builtin("en")
         self._secrets_path = os.path.join(self.data_dir, "secrets.json")
         self.explanations = ExplanationCache(os.path.join(self.data_dir, "explanations"))
+        self.vocalizer = Vocalizer(os.path.join(self.data_dir, "pronunciation"))
+        self._pron_notice_at = 0.0
         self._apply_provider_settings()
 
     # ============================================================ settings
@@ -183,6 +196,8 @@ class NarratorService:
         merged.update(self._secrets())
         for p in self.providers.values():
             p.configure(merged)
+        if hasattr(self, "vocalizer"):
+            self.vocalizer.configure(merged.get("gemini_api_key"), merged.get("pronunciation_model") or "")
 
     def providers_info(self) -> List[dict]:
         out = []
@@ -549,10 +564,43 @@ class NarratorService:
             raise KeyError(f"chunk {chunk}")
         ch = chunks[chunk]
         voice = await self.voice_for(ch.lang, doc_id)
-        result = await self._speak(ch.text, voice, ch.lang, ch.rate, ch.tokens, ch.word_range)
+        result = await self._speak_chunk(ch, voice)
         if prefetch:
             self._schedule_prefetch(doc_id, unit_id, chunk)
         return result
+
+    async def _vocalize_chunk(self, ch: PreparedChunk, voice: str, force: bool = False):
+        """Add vowel marks to the ambiguous Hebrew words of a chunk (context-aware).  -> (text, tokens, notice)"""
+        s = self.settings()
+        plain = (ch.text, ch.tokens, None)
+        if ch.lang != "he" or voice.startswith("gemini:") or not (force or s.get("ai_pronunciation", True)):
+            return plain
+        v = self.vocalizer
+        if not v.key:
+            return plain
+        if PRONUNCIATION_CONSENT not in s.get("cloud_consent", {}):
+            raise ConsentRequired(PRONUNCIATION_CONSENT, PRONUNCIATION_INFO)
+        try:
+            words, chosen, _ = await v.vocalize(ch.text)
+        except PronounceError as exc:
+            log.info("pronunciation assistant skipped a passage: %s", exc)
+            notice = None
+            if exc.quota and time.time() - self._pron_notice_at > 600:
+                self._pron_notice_at = time.time()
+                notice = ("The pronunciation assistant is resting (Google's free allowance is used up), so words that can be "
+                          "read several ways are read the usual way for now. It resumes automatically.")
+            return ch.text, ch.tokens, notice
+        if not chosen:
+            return plain
+        text, tokens = apply_vowels(ch.text, words, chosen, ch.tokens)
+        return text, tokens, None
+
+    async def _speak_chunk(self, ch: PreparedChunk, voice: str, allow_fallback: bool = True, force_vowels: bool = False) -> dict:
+        text, tokens, notice = await self._vocalize_chunk(ch, voice, force_vowels)
+        res = await self._speak(text, voice, ch.lang, ch.rate, tokens, ch.word_range, allow_fallback=allow_fallback)
+        if notice and "notice" not in res:
+            res["notice"] = notice
+        return res
 
     async def free_voice(self, lang: str) -> Optional[str]:
         """The always-available free voice for a language (used when a limited voice runs out)."""
@@ -667,7 +715,7 @@ class NarratorService:
                     return  # rate-limited engines: do not burn quota on far-ahead audio
                 async with self._prefetch_sem:
                     try:
-                        await self._speak(ch.text, voice, ch.lang, ch.rate, ch.tokens, ch.word_range)
+                        await self._speak_chunk(ch, voice)
                     except ConsentRequired:
                         return
                     except Exception as exc:
@@ -716,8 +764,7 @@ class NarratorService:
                 while not job.cancel:
                     voice = await self.voice_for(ch.lang, job.doc_id)
                     try:
-                        await self._speak(ch.text, voice, ch.lang, ch.rate, ch.tokens, ch.word_range,
-                                          allow_fallback=not job.patient)
+                        await self._speak_chunk(ch, voice, allow_fallback=not job.patient)
                         job.chunks_done += 1
                         return
                     except TTSError as exc:
@@ -777,15 +824,16 @@ class NarratorService:
             for t in list(outstanding):
                 t.cancel()
 
-    async def preview(self, text: str, voice: str, lang: str) -> dict:
-        """Voice Lab: synthesize arbitrary text (not tied to a document)."""
+    async def preview(self, text: str, voice: str, lang: str, vowels: bool = False) -> dict:
+        """Voice Lab: synthesize arbitrary text (not tied to a document).  `vowels` runs the pronunciation assistant."""
         words = text.split()
         tokens = []
         pos = 0
         for i, w in enumerate(words):
             tokens.append((pos, pos + len(w), i, i))
             pos += len(w) + 1
-        return await self._speak(" ".join(words), voice, lang, 0, tokens, (0, len(words)))
+        ch = PreparedChunk(index=0, lang=lang, text=" ".join(words), tokens=tokens, word_range=(0, len(words)))
+        return await self._speak_chunk(ch, voice, force_vowels=vowels)
 
     # ============================================================ teacher
     def llm_client(self) -> LLMClient:

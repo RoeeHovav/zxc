@@ -279,6 +279,20 @@ class PdfDocument:
     def _cache_path(self, n: int) -> str:
         return os.path.join(self.cache_dir, "pages", f"{n}.json.gz")
 
+    def cached_pages(self) -> set:
+        """Numbers of pages already analysed (one directory listing, not one stat per page)."""
+        out = set(self._mem)
+        try:
+            for name in os.listdir(os.path.join(self.cache_dir, "pages")):
+                if name.endswith(".json.gz"):
+                    try:
+                        out.add(int(name.split(".")[0]))
+                    except ValueError:
+                        pass
+        except OSError:
+            pass
+        return out
+
     def is_page_cached(self, n: int) -> bool:
         return n in self._mem or os.path.exists(self._cache_path(n))
 

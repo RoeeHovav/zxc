@@ -112,6 +112,7 @@ export interface Settings {
   azure_region: string;
   prefetch_chunks: number;
   buffer_percent: number;
+  ai_pronunciation: boolean;
   free_fallback: boolean;
   sleep_minutes: number;
   teacher_mode: boolean;
@@ -262,7 +263,7 @@ export const api = {
   prepareStatus: (id: string) => req<PrepStatus>("GET", `/api/documents/${id}/prepare`),
   prepareCancel: (id: string) => req<PrepStatus>("DELETE", `/api/documents/${id}/prepare`),
   speech: (id: string, unitId: string, chunk: number, signal?: AbortSignal) => req<Speech>("POST", `/api/documents/${id}/speech`, { unit_id: unitId, chunk }, signal),
-  preview: (text: string, voice: string, lang: string) => req<Speech>("POST", "/api/preview", { text, voice, lang }),
+  preview: (text: string, voice: string, lang: string, vowels = false) => req<Speech>("POST", "/api/preview", { text, voice, lang, vowels }),
   position: (id: string) => req<{ position: Position | null }>("GET", `/api/documents/${id}/position`),
   savePosition: (id: string, p: Partial<Position> & { event?: string }) => req<any>("PUT", `/api/documents/${id}/position`, p),
   bookmarks: (id: string) => req<{ bookmarks: Bookmark[] }>("GET", `/api/documents/${id}/bookmarks`),

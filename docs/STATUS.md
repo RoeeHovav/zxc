@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04 · version 0.9.2. This is the hand-over record for
+Last updated: 2026-11-04 · version 0.9.3. This is the hand-over record for
 continuing development across sessions.
 
 ## Verified (automated)
@@ -64,6 +64,14 @@ Chromium. It uses the test-tone engine for audio and passes:
   test-tone engine (completion, cancel, patient mode waiting out a quota, instant replay) and in the browser
   acceptance run; never run against real Edge/Gemini audio. The default of 50% before the first play can mean
   a long wait on a very long document with a real engine; "Start now" skips it.
+- **Pronunciation assistant** (`narrator/llm/pronounce.py`, `_vocalize_chunk` in `service.py`). Tested
+  against a simulated Gemini service (validation, token alignment, caching, consent, quota). Unverified:
+  (1) whether the Microsoft voices (Hila/Avri/Multilingual "William", "Andrew") actually follow vowel marks,
+  (2) how accurate Gemini's choices are on real text, (3) the free text-model allowance in practice.
+  Reported by the user: the multilingual voices sound very good but misread homographs (שמן as "oil").
+- **Large documents**: the document vocabulary used to be rebuilt from every analysed page on every request,
+  stalling playback 10-18 s at a time during the first minutes of a 1,256-page document; it is now incremental
+  (worst request 0.7 s in the same test).
 - **OCR in a separate process** (`OcrEngine.analyze`). In-process OCR held Python's global lock for seconds
   per page, freezing the whole server (found with a thread dump; it made the acceptance run flaky). Measured on
   real pages here: 3-4.5 s each. Windows start-up of the worker (spawn) was not run on Windows.

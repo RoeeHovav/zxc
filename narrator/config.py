@@ -6,7 +6,7 @@ import os
 import sys
 
 APP_NAME = "PDF Narrator"
-VERSION = "0.9.2"
+VERSION = "0.9.3"
 
 
 def data_dir() -> str:
@@ -61,6 +61,10 @@ DEFAULT_SETTINGS = {
     "buffer_percent": 50,
     # When a limited online voice (e.g. Gemini free tier) runs out, continue with the free voice.
     "free_fallback": True,
+    # Pronunciation assistant: a language model reads each Hebrew passage and adds vowel marks to
+    # the words that can be read several ways (שמן, ספר, ...).  Needs the Gemini key; text only.
+    "ai_pronunciation": True,
+    "pronunciation_model": "",
     # Teacher Mode (optional, off by default): any OpenAI-compatible endpoint.
     # The default points at a free local Ollama installation.
     "teacher_mode": False,

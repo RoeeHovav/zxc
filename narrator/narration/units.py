@@ -61,22 +61,26 @@ class UnitIndex:
         self._cache: Dict[int, List[Unit]] = {}
         self._lock = threading.RLock()
         self._vocab: Optional[Counter] = None
-        self._vocab_pages = 0
+        self._vocab_done: set = set()
+        self._vocab_lock = threading.Lock()
         self.default_lang = default_lang or ("he" if doc.stats().rtl else "en")
 
     # ------------------------------------------------------------------ vocab
     def vocab(self) -> Counter:
-        """Document vocabulary (used to repair split words).  Rebuilt as more
-        pages become available."""
-        cached = sum(1 for n in range(self.doc.page_count) if self.doc.is_page_cached(n))
-        if self._vocab is None or cached > self._vocab_pages + 20 or (cached == self.doc.page_count and self._vocab_pages != cached):
-            lists = []
-            for n in range(self.doc.page_count):
-                if self.doc.is_page_cached(n):
-                    lists.append([w[0] for w in self.doc.page(n)["words"]])
-            self._vocab = build_vocab(lists)
-            self._vocab_pages = cached
-        return self._vocab
+        """Document vocabulary (used to repair split words), grown a few pages at a time as pages are
+        analysed.  Rebuilding it from every page on each request froze large documents for 10-20 s."""
+        with self._vocab_lock:
+            if self._vocab is None:
+                self._vocab = Counter()
+                self._vocab_done = set()
+            todo = sorted(self.doc.cached_pages() - self._vocab_done)[:25]
+            for n in todo:
+                try:
+                    self._vocab.update(build_vocab([[w[0] for w in self.doc.page(n)["words"]]]))
+                except Exception:
+                    pass
+                self._vocab_done.add(n)
+            return self._vocab
 
     # ------------------------------------------------------------------ units
     def units_on_page(self, n: int) -> List[Unit]:

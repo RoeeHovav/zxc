@@ -263,7 +263,7 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
 
     @app.post("/api/preview")
     async def preview(body: dict = Body(...)):
-        return await svc.preview(body["text"], body["voice"], body.get("lang", "he"))
+        return await svc.preview(body["text"], body["voice"], body.get("lang", "he"), bool(body.get("vowels")))
 
     # ------------------------------------------------- position / bookmarks
     @app.get("/api/documents/{doc_id}/position")

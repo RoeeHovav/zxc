@@ -58,10 +58,10 @@ export function ConsentDialog({ info, onAnswer }: { info: any; onAnswer: (ok: bo
 export function usePreviewPlayer() {
   const audio = useRef<HTMLAudioElement | null>(null);
   const [busy, setBusy] = useState(false);
-  const play = async (text: string, voice: string, lang: string): Promise<Speech | null> => {
+  const play = async (text: string, voice: string, lang: string, vowels = false): Promise<Speech | null> => {
     setBusy(true);
     try {
-      const sp = await api.preview(text, voice, lang);
+      const sp = await api.preview(text, voice, lang, vowels);
       audio.current?.pause();
       audio.current = new Audio(sp.audio);
       await audio.current.play();
@@ -171,6 +171,8 @@ export function PronounceDialog({ docId, page, word, text, lang, onClose, onSave
 const SAMPLES: { id: string; lang: string; title: string; text: string }[] = [
   { id: "he-homographs", lang: "he", title: "Hebrew homographs (ספר)", text: "הספר שקניתי אתמול מרתק. הספר במספרה ספר את הכסף בקפידה. מעבר לספר עברו פליטים רבים." },
   { id: "he-academic", lang: "he", title: "Hebrew academic", text: "במחקר זה נבחנה ההשפעה של משתנים חברתיים על דפוסי ההצבעה. הממצאים מראים כי קיים מתאם חיובי בין רמת ההשכלה לבין ההשתתפות הפוליטית." },
+  { id: "he-homograph-user", lang: "he", title: "Hebrew: שמן = “their name” (the one that was read wrongly)", text: "מקראות ישראל הינו שמן של חוברות" },
+  { id: "he-niqqud-typed", lang: "he", title: "Hebrew: same sentence with vowel marks typed by hand", text: "מִקְרָאוֹת יִשְׂרָאֵל הִינוֹ שְׁמָן שֶׁל חוּבְרוֹת" },
   { id: "he-acronyms", lang: "he", title: "Hebrew acronyms (military)", text: "המג\"ד והמ\"פ הגיעו לבה\"ד 1. הרמטכ\"ל ביקר בבסיס צה\"ל, והקמב\"ץ דיווח לאג\"ם." },
   { id: "he-mixed", lang: "he", title: "Hebrew + English", text: "האלגוריתם משתמש ב-machine learning כדי לשפר את הדיוק. ראו גם את המאמר של Smith et al. משנת 2019." },
   { id: "he-numbers", lang: "he", title: "Hebrew numbers & dates", text: "ב-17 בספטמבר 1982 נסוגה ישראל מביירות. כ-2500 עולים הגיעו, ו-35% מהם התיישבו בגליל." },
@@ -197,7 +199,9 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
     const alt = voices.find((v) => (v.lang === sample.lang || v.lang === "mul") && v.id !== def);
     setB(alt?.id || "");
   }, [sample, voices.length]);
-  const opts = voices.filter((v) => v.lang === sample.lang || v.lang === "mul");
+  const opts = voices.filter((v) => v.lang === sample.lang || v.lang === "mul" || (sample.lang === "he" && v.provider === "edge" && v.id.includes("Multilingual")));
+  const [vowels, setVowels] = useState(true);
+  const [given, setGiven] = useState("");
   const rate = async (voice: string, r: number) => {
     setRatings({ ...ratings, [voice]: r });
     await api.addRating({ sample: sample.id, voice, rating: r, variant: text === sample.text ? "" : "edited" });
@@ -217,6 +221,19 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
         </select>
         <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} dir="auto" />
       </div>
+      {sample.lang === "he" && (
+        <label className="check" style={{ margin: "6px 0" }}>
+          <input type="checkbox" checked={vowels} onChange={(e) => setVowels(e.target.checked)} data-testid="lab-vowels" />
+          Pronunciation assistant: let Gemini choose the right reading of ambiguous words from the sentence and give the voice vowel marks
+          (needs the Gemini key from Settings)
+        </label>
+      )}
+      {given && (
+        <div className="small" dir="rtl" style={{ margin: "4px 0 8px", padding: 6, border: "1px dashed #8886" }} data-testid="lab-given">
+          <span className="muted" dir="ltr">What the voice was given: </span>
+          {given}
+        </div>
+      )}
       <div className="lab-grid">
         {[
           [a, setA, "A"],
@@ -232,7 +249,7 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
                 </option>
               ))}
             </select>
-            <button className="btn" disabled={!v || busy} onClick={() => play(text, v, sample.lang).catch((e) => toast(e.message, "error"))}>
+            <button className="btn" disabled={!v || busy} onClick={() => play(text, v, sample.lang, sample.lang === "he" && vowels).then((sp) => setGiven(sp && sp.text !== text ? sp.text : "")).catch((e) => toast(e.message, "error"))}>
               <Icon name="play" size={14} /> Play
             </button>
             <div className="stars" style={{ marginTop: 8 }}>
