@@ -32,6 +32,8 @@ from .base import ProviderInfo, SynthResult, TTSError, TTSProvider, Voice
 log = logging.getLogger(__name__)
 
 API = "https://generativelanguage.googleapis.com/v1beta"
+CHUNK_CHARS = 2000          # fewer, longer requests stretch a small daily request allowance
+MODEL_BLOCK_SECONDS = 3600  # how long a model whose daily allowance ran out is left alone
 
 # Prebuilt voices (name, style) -- all of them speak every supported language.
 VOICES = [
@@ -95,7 +97,7 @@ def pcm_to_wav(pcm: bytes, rate: int) -> bytes:
 class GeminiProvider(TTSProvider):
     info = ProviderInfo(
         id="gemini",
-        name="Google Gemini voices (most natural; understands context)",
+        name="Google Gemini voices (very natural, but the free quota is small)",
         free=True,
         cloud=True,
         requires_key=True,
@@ -112,25 +114,31 @@ class GeminiProvider(TTSProvider):
         self.key: Optional[str] = None
         self.model_pref: str = ""
         self.transport = transport
-        self._model: Optional[str] = None
+        self._models: List[str] = []
         self._model_time = 0.0
+        self._gate_until = 0.0      # per-minute limit: nobody calls before this time
+        self._blocked: dict = {}    # model -> time until which its (daily) allowance is considered used up
 
     def configure(self, settings: dict) -> None:
         key = (settings.get("gemini_api_key") or "").strip() or None
         pref = (settings.get("gemini_model") or "").strip()
         if key != self.key or pref != self.model_pref:
-            self._model = None
+            self._models = []
+            self._blocked = {}
+            self.cooldown_until = 0.0
         self.key = key
         self.model_pref = pref
 
     def available(self) -> tuple:
+        if self.cooling() > 0:
+            return False, f"Gemini's free allowance is used up; trying again in {int(self.cooling() // 60) + 1} min."
         if not self.key:
             return False, "Add a free Gemini API key in Settings (get one at aistudio.google.com)."
         return True, ""
 
     @property
     def version(self) -> str:
-        return "gemini-1:" + (self._model or self.model_pref or "auto")
+        return "gemini-2"  # independent of the model: a different model's audio is the same voice
 
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(timeout=120, transport=self.transport, headers={"x-goog-api-key": self.key or ""})
@@ -162,11 +170,13 @@ class GeminiProvider(TTSProvider):
                     break
         return names
 
-    async def model(self) -> str:
+    async def model_order(self) -> List[str]:
+        """TTS models to try, best first.  Each model has its own free allowance, so when one is used
+        up the next one can still speak."""
         if self.model_pref:
-            return self.model_pref
-        if self._model and time.time() - self._model_time < 6 * 3600:
-            return self._model
+            return [self.model_pref]
+        if self._models and time.time() - self._model_time < 6 * 3600:
+            return self._models
         names = await self.models()
         if not names:
             raise TTSError("Your Gemini API key has no text-to-speech model available.", retryable=False)
@@ -177,26 +187,27 @@ class GeminiProvider(TTSProvider):
                     return (i, n)
             return (len(PREFERRED_MODELS), n)
 
-        self._model = sorted(names, key=rank)[0]
+        self._models = sorted(set(names), key=rank)
         self._model_time = time.time()
-        log.info("Gemini TTS model: %s", self._model)
-        return self._model
+        log.info("Gemini TTS models: %s", self._models)
+        return self._models
 
-    async def synthesize(self, text: str, voice: str, lang: str, rate: int = 0, pitch: int = 0) -> SynthResult:
-        ok, reason = self.available()
-        if not ok:
-            raise TTSError(reason, retryable=False)
-        model = await self.model()
-        name = voice.split(":", 1)[-1]
-        body = {
-            "contents": [{"role": "user", "parts": [{"text": f"{style_instruction(lang)}\n\n{text}"}]}],
-            "generationConfig": {
-                "responseModalities": ["AUDIO"],
-                "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": name}}},
-            },
-        }
+    async def model(self) -> str:
+        return (await self.model_order())[0]
+
+    async def _wait_gate(self) -> None:
+        """All requests wait together when Google asks us to slow down (per-minute limits)."""
+        while True:
+            wait = self._gate_until - time.time()
+            if wait <= 0:
+                return
+            await asyncio.sleep(min(wait, 5.0))
+
+    async def _call(self, model: str, body: dict):
+        """-> ("ok", SynthResult) | ("exhausted", message) | ("skip", message)"""
         last = ""
         for attempt in range(4):
+            await self._wait_gate()
             try:
                 async with self._client() as c:
                     r = await c.post(f"{API}/models/{model}:generateContent", json=body)
@@ -205,19 +216,51 @@ class GeminiProvider(TTSProvider):
                 await asyncio.sleep(1.5 * (attempt + 1))
                 continue
             if r.status_code == 200:
-                return self._parse(r.json())
-            if r.status_code == 429 or r.status_code >= 500:
-                wait = _retry_delay(r) or 2.0 * (attempt + 1)
-                last = _error_message(r)
-                if wait > 40:
-                    break
-                await asyncio.sleep(wait)
+                return "ok", self._parse(r.json())
+            if r.status_code == 429:
+                kind, retry, limit = _quota_info(r)
+                last = _error_message(r) + (f" [limit {limit}]" if limit else "")
+                if kind == "day" or (kind == "unknown" and (retry is None or attempt >= 1)) or (retry or 0) > 75:
+                    return "exhausted", last
+                wait = retry if retry is not None else 15.0 * (attempt + 1)
+                self._gate_until = max(self._gate_until, time.time() + wait + 1)
                 continue
+            if r.status_code >= 500:
+                last = _error_message(r)
+                await asyncio.sleep(2.0 * (attempt + 1))
+                continue
+            if r.status_code == 404:
+                return "skip", _error_message(r)
             raise TTSError(_error_message(r), retryable=False)
-        if "quota" in last.lower() or "rate" in last.lower() or "429" in last:
-            last = ("Gemini free-tier limit reached. Narration will continue when the limit resets, or enable"
-                    " billing on your Google AI Studio key for uninterrupted use. (" + last[:200] + ")")
+        if "429" in last or "quota" in last.lower():
+            return "exhausted", last
         raise TTSError(last or "Gemini speech generation failed.")
+
+    async def synthesize(self, text: str, voice: str, lang: str, rate: int = 0, pitch: int = 0) -> SynthResult:
+        ok, reason = self.available()
+        if not ok:
+            raise TTSError(reason, retryable=False, quota=self.cooling() > 0)
+        name = voice.split(":", 1)[-1]
+        body = {
+            "contents": [{"role": "user", "parts": [{"text": f"{style_instruction(lang)}\n\n{text}"}]}],
+            "generationConfig": {
+                "responseModalities": ["AUDIO"],
+                "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": name}}},
+            },
+        }
+        notes = []
+        for model in await self.model_order():
+            if self._blocked.get(model, 0) > time.time():
+                continue
+            status, out = await self._call(model, body)
+            if status == "ok":
+                return out
+            notes.append(f"{model}: {out}")
+            self._blocked[model] = time.time() + MODEL_BLOCK_SECONDS
+        # every model's allowance is used up: stop asking for a while
+        self.cooldown_until = min(self._blocked.values(), default=time.time() + MODEL_BLOCK_SECONDS)
+        raise TTSError("Gemini's free allowance for speech is used up for now (Google limits how many requests the"
+                       " free tier allows)." + (" " + notes[-1][:220] if notes else ""), retryable=False, quota=True)
 
     @staticmethod
     def _parse(data: dict) -> SynthResult:
@@ -248,6 +291,26 @@ def _error_message(r: httpx.Response) -> str:
     if r.status_code in (400, 403) and ("API key" in msg or "API_KEY" in msg or status == "PERMISSION_DENIED"):
         return "Google rejected the Gemini API key. Check it in Settings. (" + msg[:200] + ")"
     return f"Gemini API error {r.status_code}: {msg}"
+
+
+def _quota_info(r: httpx.Response):
+    """(kind, retry_seconds, limit) of a 429: kind is "day", "minute" or "unknown"."""
+    kind, limit, retry = "unknown", "", _retry_delay(r)
+    try:
+        blob = r.text
+        low = blob.replace("_", "").replace(" ", "").lower()
+        if "perday" in low:
+            kind = "day"
+        elif "perminute" in low:
+            kind = "minute"
+        for d in r.json().get("error", {}).get("details", []):
+            for v in d.get("violations", []) or []:
+                if v.get("quotaValue") not in (None, ""):
+                    limit = str(v["quotaValue"])
+                    break
+    except Exception:
+        pass
+    return kind, retry, limit
 
 
 def _retry_delay(r: httpx.Response) -> Optional[float]:

@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04 · version 0.9.1. This is the hand-over record for
+Last updated: 2026-11-04 · version 0.9.2. This is the hand-over record for
 continuing development across sessions.
 
 ## Verified (automated)
@@ -60,11 +60,21 @@ Chromium. It uses the test-tone engine for audio and passes:
   compiled libraries (PyMuPDF, pydantic-core, ...)**: that cannot be fixed
   without a code-signing certificate and the only workaround is turning Smart
   App Control off. The launcher reports the blocked module by name.
+- **Narrate ahead / Prepare all** (`prepare_start` in `service.py`, player bar). Tested with the
+  test-tone engine (completion, cancel, patient mode waiting out a quota, instant replay) and in the browser
+  acceptance run; never run against real Edge/Gemini audio. The default of 50% before the first play can mean
+  a long wait on a very long document with a real engine; "Start now" skips it.
+- **OCR in a separate process** (`OcrEngine.analyze`). In-process OCR held Python's global lock for seconds
+  per page, freezing the whole server (found with a thread dump; it made the acceptance run flaky). Measured on
+  real pages here: 3-4.5 s each. Windows start-up of the worker (spawn) was not run on Windows.
 - **Gemini voices** (`narrator/tts/gemini.py`). Request/response shapes, model
   discovery, retry and error handling are tested against a simulated service.
   Live synthesis was not reachable from the development environment, so
   Hebrew quality, real rate limits of the free tier and the current model names
-  are unverified. No word timing (sentence-level highlight only).
+  are unverified. No word timing (sentence-level highlight only). The user reported the quality as very good
+  but the free allowance (a few requests) as far too small; mitigations (quota-kind detection, pacing, model
+  rotation, 2000-character requests, automatic fall-back to the free voice, slow "patient" background narration)
+  are tested against a simulated service only and cannot lift Google's limit.
 - **Teacher Mode** with a real model. The protocol was tested with a mock;
   explanation quality, especially in Hebrew with small local models, is
   unknown.

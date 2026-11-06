@@ -104,8 +104,10 @@ class PdfDocument:
         self.path = pdf_path
         self.cache_dir = cache_dir
         os.makedirs(os.path.join(cache_dir, "pages"), exist_ok=True)
-        self._lock = threading.RLock()
+        self._lock = threading.RLock()          # the main PyMuPDF handle (fast text analysis only)
         self._render_lock = threading.Lock()
+        self._page_locks: Dict[int, threading.Lock] = {}
+        self._page_locks_guard = threading.Lock()
         self._doc = pymupdf.open(pdf_path)
         self._render_doc = pymupdf.open(pdf_path)
         self.page_count = self._doc.page_count
@@ -141,6 +143,10 @@ class PdfDocument:
             self._doc.close()
         with self._render_lock:
             self._render_doc.close()
+
+    def _page_lock(self, n: int) -> threading.Lock:
+        with self._page_locks_guard:
+            return self._page_locks.setdefault(n, threading.Lock())
 
     def metadata(self) -> dict:
         with self._lock:
@@ -292,19 +298,32 @@ class PdfDocument:
             except Exception:
                 data = None
         if data is None:
-            with self._lock:
-                # another thread (background sweep vs. on-demand request) may
-                # have produced the page while we waited for the lock
-                if n in self._mem:
-                    return self._mem[n]
+            # one analysis per page at a time (duplicates wait and reuse the result), but different
+            # pages proceed in parallel: a slow OCR page must not freeze the rest of the document
+            with self._page_lock(n):
+                with self._lock:
+                    if n in self._mem:
+                        return self._mem[n]
+                if os.path.exists(path):  # produced by another thread while we waited
+                    try:
+                        with gzip.open(path, "rt", encoding="utf-8") as fh:
+                            cached = json.load(fh)
+                        if cached.get("v") == EXTRACTOR_VERSION:
+                            with self._lock:
+                                self._remember(n, cached)
+                            return cached
+                    except Exception:
+                        pass
                 data = self._analyze(n)
                 tmp = f"{path}.{os.getpid()}.{threading.get_ident()}.tmp"
                 with gzip.open(tmp, "wt", encoding="utf-8") as fh:
                     json.dump(data, fh, ensure_ascii=False, separators=(",", ":"))
                 os.replace(tmp, path)
-                self._remember(n, data)
+                with self._lock:
+                    self._remember(n, data)
             return data
-        self._remember(n, data)
+        with self._lock:
+            self._remember(n, data)
         return data
 
     def _remember(self, n: int, data: dict) -> None:
@@ -320,24 +339,24 @@ class PdfDocument:
         with self._lock:
             page = self._doc[n]
             lay = L.analyze_page(page, mirror=stats.mirror)
-            source = "text"
-            ocr_info = None
             image_cover = _coverage(lay.images, lay.width, lay.height)
             needs_ocr = (lay.glyph_count < 25 and image_cover > 0.3) or lay.garbled_ratio > 0.3
-            if needs_ocr:
-                if self.ocr is not None and self.ocr.available():
-                    try:
-                        tp, ocr_info = self.ocr.textpage(page)
-                        lay2 = L.analyze_page(page, mirror=False, textpage=tp)
-                        if lay2.glyph_count > lay.glyph_count:
-                            lay = lay2
-                            source = "ocr"
-                    except Exception as exc:
-                        lay.warnings.append(f"OCR failed: {exc}")
-                        source = "ocr_failed"
-                else:
-                    source = "needs_ocr"
-                    lay.warnings.append("This page looks scanned but OCR (Tesseract) is not installed.")
+        source = "text"
+        ocr_info = None
+        if needs_ocr:
+            if self.ocr is not None and self.ocr.available():
+                try:
+                    # separate process: OCR must neither freeze the server nor block other pages
+                    lay2, ocr_info = self.ocr.analyze(self.path, n)
+                    if lay2.glyph_count > lay.glyph_count:
+                        lay = lay2
+                        source = "ocr"
+                except Exception as exc:
+                    lay.warnings.append(f"OCR failed: {exc}")
+                    source = "ocr_failed"
+            else:
+                source = "needs_ocr"
+                lay.warnings.append("This page looks scanned but OCR (Tesseract) is not installed.")
         return self._serialize(n, lay, source, ocr_info, stats)
 
     # ------------------------------------------------------------ classifying

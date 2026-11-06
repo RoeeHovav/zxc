@@ -10,9 +10,10 @@ from ..narration.align import Boundary
 class TTSError(Exception):
     """A synthesis failure that should be shown to the user."""
 
-    def __init__(self, message: str, retryable: bool = True):
+    def __init__(self, message: str, retryable: bool = True, quota: bool = False):
         super().__init__(message)
         self.retryable = retryable
+        self.quota = quota  # the service's free allowance is used up (not an error in the text)
 
 
 @dataclass
@@ -57,6 +58,12 @@ class ProviderInfo:
 class TTSProvider:
     info: ProviderInfo
     prefetch_limit: Optional[int] = None  # cap on look-ahead synthesis for rate-limited engines
+    cooldown_until: float = 0.0  # after a quota error: do not call the service again before this time
+
+    def cooling(self) -> float:
+        """Seconds left in a quota cool-down (0 = usable)."""
+        import time
+        return max(0.0, self.cooldown_until - time.time())
 
     def configure(self, settings: dict) -> None:
         """Receive (possibly secret) settings such as API keys."""

@@ -226,6 +226,18 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
             raise HTTPException(404, "no narration unit at this position")
         return r
 
+    @app.post("/api/documents/{doc_id}/prepare")
+    async def prepare_start(doc_id: str, body: dict = Body(...)):
+        return await svc.prepare_start(doc_id, body["unit_id"], bool(body.get("patient")))
+
+    @app.get("/api/documents/{doc_id}/prepare")
+    async def prepare_status(doc_id: str):
+        return svc.prepare_status(doc_id)
+
+    @app.delete("/api/documents/{doc_id}/prepare")
+    async def prepare_cancel(doc_id: str):
+        return svc.prepare_cancel(doc_id)
+
     @app.post("/api/documents/{doc_id}/speech")
     async def speech(doc_id: str, body: dict = Body(...)):
         return await svc.speech(doc_id, body["unit_id"], int(body.get("chunk", 0)), prefetch=bool(body.get("prefetch", True)))

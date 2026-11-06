@@ -84,41 +84,96 @@ def test_no_tts_model_is_reported():
         asyncio.run(p.model())
 
 
-def test_rate_limit_retry_then_success(monkeypatch):
+def quota_error(kind, retry="0.05s", limit="3"):
+    return httpx.Response(429, json={"error": {"code": 429, "message": "You exceeded your current quota, please check your plan",
+        "status": "RESOURCE_EXHAUSTED", "details": [
+            {"@type": "type.googleapis.com/google.rpc.QuotaFailure", "violations": [
+                {"quotaMetric": "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+                 "quotaId": f"GenerateRequestsPer{kind}PerProjectPerModel-FreeTier", "quotaValue": limit}]},
+            {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": retry}]}})
+
+
+def test_per_minute_limit_waits_and_succeeds():
     calls = {"n": 0}
-
-    async def fast_sleep(_):
-        return None
-
-    monkeypatch.setattr(g.asyncio, "sleep", fast_sleep)
 
     def handler(req):
         if req.method == "GET":
             return httpx.Response(200, json=MODELS)
         calls["n"] += 1
-        if calls["n"] < 3:
-            return httpx.Response(429, json={"error": {"message": "quota", "details": [{"retryDelay": "2s"}]}})
-        return audio_response(pcm())
+        return quota_error("Minute") if calls["n"] < 3 else audio_response(pcm())
 
     p = make(handler)
     res = asyncio.run(p.synthesize("Hello there.", "gemini:Puck", "en"))
-    assert calls["n"] == 3 and res.duration > 0
+    assert calls["n"] == 3 and res.duration > 0 and p.cooling() == 0
 
 
-def test_quota_exhausted_message(monkeypatch):
-    async def fast_sleep(_):
-        return None
+def test_daily_limit_rotates_to_next_model_then_remembers():
+    seen = []
 
-    monkeypatch.setattr(g.asyncio, "sleep", fast_sleep)
+    def handler(req):
+        if req.method == "GET":
+            return httpx.Response(200, json=MODELS)
+        model = str(req.url).split("/models/")[1].split(":")[0]
+        seen.append(model)
+        return quota_error("Day", limit="10") if model == "gemini-2.5-flash-preview-tts" else audio_response(pcm())
 
+    p = make(handler)
+    asyncio.run(p.synthesize("Hello there.", "gemini:Puck", "en"))
+    assert seen == ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"]
+    seen.clear()
+    asyncio.run(p.synthesize("Another one.", "gemini:Puck", "en"))
+    assert seen == ["gemini-2.5-pro-preview-tts"]  # the used-up model is left alone for a while
+
+
+def test_all_models_used_up_reports_quota_and_cools_down():
+    def handler(req):
+        return httpx.Response(200, json=MODELS) if req.method == "GET" else quota_error("Day", limit="10")
+
+    p = make(handler)
+    with pytest.raises(TTSError, match="allowance for speech is used up") as ei:
+        asyncio.run(p.synthesize("Hello there.", "gemini:Puck", "en"))
+    assert ei.value.quota is True and ei.value.retryable is False
+    assert p.cooling() > 0 and p.available()[0] is False
+    # while cooling down no request is sent at all
+    with pytest.raises(TTSError) as ei2:
+        asyncio.run(p.synthesize("Hello there.", "gemini:Puck", "en"))
+    assert ei2.value.quota is True
+
+
+def test_quota_without_details_is_treated_as_used_up():
     def handler(req):
         if req.method == "GET":
             return httpx.Response(200, json=MODELS)
         return httpx.Response(429, json={"error": {"message": "You exceeded your current quota", "status": "RESOURCE_EXHAUSTED"}})
 
     p = make(handler)
-    with pytest.raises(TTSError, match="free-tier limit"):
+    with pytest.raises(TTSError) as ei:
         asyncio.run(p.synthesize("Hello there.", "gemini:Puck", "en"))
+    assert ei.value.quota
+
+
+def test_service_falls_back_to_free_voice_when_allowance_used_up(tmp_path):
+    from narrator.service import NarratorService
+    from narrator.tts.testtone import TestToneProvider
+
+    def handler(req):
+        return httpx.Response(200, json=MODELS) if req.method == "GET" else quota_error("Day", limit="10")
+
+    svc = NarratorService(str(tmp_path), test_mode=True)
+    svc.providers["gemini"] = make(handler)
+    svc.providers["edge"] = TestToneProvider()  # stands in for the free Microsoft voice
+    svc.give_consent("gemini")
+    svc.give_consent("edge")
+
+    async def free(lang):
+        return "edge:low"
+
+    svc.free_voice = free
+    res = asyncio.run(svc._speak("Hello there world.", "gemini:Kore", "en", 0, [], (0, 3)))
+    assert res["voice"] == "edge:low" and "allowance" in res["notice"] and res["duration"] > 0
+    svc.update_settings({"free_fallback": False})
+    with pytest.raises(TTSError):
+        asyncio.run(svc._speak("Hello there world two.", "gemini:Kore", "en", 0, [], (0, 4)))
 
 
 def test_bad_key_message():

@@ -51,6 +51,21 @@ export interface Speech {
   voice: string;
   lang: string;
   text: string;
+  notice?: string;
+}
+
+export interface PrepStatus {
+  state: "none" | "running" | "done" | "error" | "cancelled";
+  percent: number;
+  page: number;
+  from_page: number;
+  pages: number;
+  chunks_done: number;
+  error: string | null;
+  skipped: string | null;
+  seconds: number;
+  patient: boolean;
+  waiting_seconds: number;
 }
 
 export interface Provider {
@@ -96,6 +111,8 @@ export interface Settings {
   cloud_consent: Record<string, number>;
   azure_region: string;
   prefetch_chunks: number;
+  buffer_percent: number;
+  free_fallback: boolean;
   sleep_minutes: number;
   teacher_mode: boolean;
   llm_base_url: string;
@@ -241,6 +258,9 @@ export const api = {
   unit: (id: string, unitId: string) => req<Unit>("GET", `/api/documents/${id}/units/${enc(unitId)}`),
   neighbour: (id: string, unitId: string, direction: 1 | -1) => req<{ unit: Unit | null }>("GET", `/api/documents/${id}/units/${enc(unitId)}/next?direction=${direction}`),
   unitAt: (id: string, page: number, word: number) => req<{ unit: Unit; word: number }>("GET", `/api/documents/${id}/unit_at?page=${page}&word=${word}`),
+  prepare: (id: string, unitId: string, patient = false) => req<PrepStatus>("POST", `/api/documents/${id}/prepare`, { unit_id: unitId, patient }),
+  prepareStatus: (id: string) => req<PrepStatus>("GET", `/api/documents/${id}/prepare`),
+  prepareCancel: (id: string) => req<PrepStatus>("DELETE", `/api/documents/${id}/prepare`),
   speech: (id: string, unitId: string, chunk: number, signal?: AbortSignal) => req<Speech>("POST", `/api/documents/${id}/speech`, { unit_id: unitId, chunk }, signal),
   preview: (text: string, voice: string, lang: string) => req<Speech>("POST", "/api/preview", { text, voice, lang }),
   position: (id: string) => req<{ position: Position | null }>("GET", `/api/documents/${id}/position`),

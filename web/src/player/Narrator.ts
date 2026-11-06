@@ -1,4 +1,4 @@
-import { api, ApiError, Speech, Unit } from "../api";
+import { api, ApiError, PrepStatus, Speech, Unit } from "../api";
 
 export type Status = "idle" | "loading" | "playing" | "paused" | "error";
 
@@ -45,6 +45,14 @@ export class Narrator extends EventTarget {
   pos: NarrPos | null = null;
   stopAt: StopAt | null = null;
   consentHandler?: (info: any) => Promise<boolean>;
+  /** Called with a plain-language message, e.g. when a limited voice ran out and the free voice took over. */
+  noticeHandler?: (msg: string) => void;
+  /** Before the first play, wait until this share (0-100) of the remaining document is narrated. */
+  bufferPercent = 0;
+  prep: PrepStatus | null = null;
+  private skipWait = false;
+  private prepPoll: number | undefined;
+  private lastNotice = "";
   /** Teacher Mode: called at the end of each section; narration continues when it resolves. */
   teacherMode = false;
   teacherHandler?: (unit: Unit) => Promise<void>;
@@ -86,6 +94,66 @@ export class Narrator extends EventTarget {
     cancelAnimationFrame(this.raf);
     clearTimeout(this.gapTimer);
     clearTimeout(this.sleepTimer);
+    clearInterval(this.prepPoll);
+  }
+
+  // ------------------------------------------------- narrate ahead
+  /** Stop waiting for the buffer and start playing now (narration keeps being prepared). */
+  startNow() {
+    this.skipWait = true;
+  }
+
+  private setPrep(p: PrepStatus | null) {
+    this.prep = p;
+    this.emit("prep", p);
+  }
+
+  /** Follow a running background job (also after playback has started) so the UI can show progress. */
+  watchPrep() {
+    clearInterval(this.prepPoll);
+    const tick = async () => {
+      try {
+        const st = await api.prepareStatus(this.docId);
+        this.setPrep(st.state === "none" ? null : st);
+        if (st.state !== "running") clearInterval(this.prepPoll);
+      } catch {
+        clearInterval(this.prepPoll);
+      }
+    };
+    this.prepPoll = window.setInterval(tick, 2500);
+    tick();
+  }
+
+  /** Start narrating the whole document ahead of the position (optionally keeping a limited premium voice). */
+  async prepareFrom(unitId: string, patient = false) {
+    const st = await api.prepare(this.docId, unitId, patient);
+    this.setPrep(st);
+    this.watchPrep();
+  }
+
+  async cancelPrep() {
+    clearInterval(this.prepPoll);
+    await api.prepareCancel(this.docId).catch(() => undefined);
+    this.setPrep(null);
+  }
+
+  private async waitForBuffer(unit: Unit, tok: number) {
+    this.skipWait = false;
+    try {
+      await this.fetchSpeech(unit, 0); // first words ready, and the permission question (if any) asked now
+      let st = await api.prepare(this.docId, unit.id);
+      while (tok === this.token) {
+        this.setPrep(st);
+        if (this.skipWait || st.state !== "running" || st.percent >= this.bufferPercent) break;
+        await new Promise((r) => setTimeout(r, 700));
+        st = await api.prepareStatus(this.docId);
+      }
+      if (st.state === "running") this.watchPrep();
+      else if (st.state !== "error") this.setPrep(null);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) throw e;
+      /* preparing ahead is best effort: play normally */
+    }
   }
 
   // ----------------------------------------------------------- events
@@ -152,7 +220,12 @@ export class Narrator extends EventTarget {
   private async fetchSpeech(u: Unit, chunk: number): Promise<Speech> {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        return await api.speech(this.docId, u.id, chunk);
+        const sp = await api.speech(this.docId, u.id, chunk);
+        if (sp.notice && sp.notice !== this.lastNotice) {
+          this.lastNotice = sp.notice;
+          this.noticeHandler?.(sp.notice);
+        }
+        return sp;
       } catch (e) {
         if (e instanceof ApiError && e.status === 409 && e.body?.error === "consent_required") {
           const ok = this.consentHandler ? await this.consentHandler(e.body) : false;
@@ -203,6 +276,10 @@ export class Narrator extends EventTarget {
         if (next) return this.playFrom(next, 0, opts);
         this.setStatus("idle");
         return;
+      }
+      if (!this.pos && !this.stopAt && this.bufferPercent > 0 && opts.time == null) {
+        await this.waitForBuffer(unit, tok);
+        if (tok !== this.token) return;
       }
       this.origin = { unitId: unit.id, word, stopAt: this.stopAt };
       const chunk = this.chunkForWord(unit, word);

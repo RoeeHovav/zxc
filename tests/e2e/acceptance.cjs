@@ -58,6 +58,8 @@ async function narr(page, expr) { return page.evaluate(new Function('return (' +
   log(`built ${big.pages}-page Hebrew test PDF (user document included: ${big.real})`);
   startServer();
   await waitServer();
+  // the long-document scenario starts at once; buffering ahead is exercised on the English document below
+  await fetch(URL + 'api/settings', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ buffer_percent: 0 }) });
   let browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   let page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
@@ -185,10 +187,19 @@ async function narr(page, expr) { return page.evaluate(new Function('return (' +
     return (await fetch(`/api/documents/${id}/pages/0/layout`)).json();
   });
   const enWord = enLayout.words.findIndex((w) => w[0] === 'Reading');
+  // narrate-ahead: with 50% buffering the first play prepares the document first, then plays by itself
+  await page.evaluate(async () => {
+    await fetch('/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ buffer_percent: 50 }) });
+    window.__preps = [];
+    window.__narrator.addEventListener('prep', (e) => window.__preps.push(e.detail ? e.detail.state : null));
+    window.__narrator.bufferPercent = 50;
+  });
   await page.dblclick(`.page[data-page="0"] .w[data-w="${enWord}"]`);
   await page.waitForFunction(() => window.__narrator && window.__narrator.status === 'playing', null, { timeout: 30000 });
   const en = await narr(page, '({lang: window.__narrator.pos.unit.lang, text: window.__narrator.pos.unit.text.slice(0, 40)})');
   check(en.lang === 'en', `English document narrated with English routing ("${en.text}…")`);
+  const preps = await page.evaluate(() => window.__preps);
+  check(preps.length > 0 && preps.some((x) => x === 'running' || x === 'done'), `narration was prepared ahead before playing (${JSON.stringify(preps)})`);
   await page.screenshot({ path: path.join(TMP, 'english.png') });
 
   check(errors.length === 0, 'no JavaScript errors: ' + JSON.stringify(errors));

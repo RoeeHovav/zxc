@@ -790,3 +790,7 @@ kbd {
   color: var(--warn);
   margin-bottom: 4px;
 }
+
+.player .prep { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-bottom: 1px solid var(--border, #ddd); flex-wrap: wrap; }
+.player .prep .prepbar { width: 160px; height: 6px; border-radius: 3px; background: rgba(128,128,128,.25); overflow: hidden; flex: none; }
+.player .prep .prepbar > div { height: 100%; background: var(--accent, #2563eb); transition: width .4s; }

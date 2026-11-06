@@ -6,7 +6,7 @@ import os
 import sys
 
 APP_NAME = "PDF Narrator"
-VERSION = "0.9.1"
+VERSION = "0.9.2"
 
 
 def data_dir() -> str:
@@ -56,6 +56,11 @@ DEFAULT_SETTINGS = {
     "azure_region": "",
     "gemini_model": "",  # empty = discover the best available Gemini TTS model
     "prefetch_chunks": 3,
+    # Before the first play, narrate this much of the remaining document (0 = start at once);
+    # the rest keeps being prepared in the background while it plays.
+    "buffer_percent": 50,
+    # When a limited online voice (e.g. Gemini free tier) runs out, continue with the free voice.
+    "free_fallback": True,
     # Teacher Mode (optional, off by default): any OpenAI-compatible endpoint.
     # The default points at a free local Ollama installation.
     "teacher_mode": False,

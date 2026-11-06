@@ -28,7 +28,7 @@ from .text.normalize import LexEntry, Lexicon, load_builtin, strip_niqqud, unify
 from .tts.azure import AzureProvider
 from .tts.base import TTSError, TTSProvider, Voice
 from .tts.edge import EdgeProvider
-from .tts.gemini import GeminiProvider
+from .tts.gemini import CHUNK_CHARS as GEMINI_CHUNK_CHARS, GeminiProvider
 from .tts.testtone import TestToneProvider
 from .llm.client import LLMClient, is_local
 from .llm.teacher import ExplanationCache, explain as llm_explain
@@ -56,6 +56,37 @@ class DocState:
         self.error: Optional[str] = None
 
 
+PATIENT_MIN_WAIT = 60.0  # seconds a background narration waits before asking an exhausted voice again
+
+
+class PrepJob:
+    """Progress of narrating a document ahead of playback."""
+
+    def __init__(self, doc_id: str, unit_id: str, start_page: int, pages: int, patient: bool = False):
+        self.patient = patient  # keep the premium voice: wait for the allowance to refill instead of using the free voice
+        self.waiting_until = 0.0
+        self.doc_id = doc_id
+        self.unit_id = unit_id
+        self.from_page = start_page
+        self.pages = pages
+        self.page = start_page
+        self.chunks_done = 0
+        self.state = "running"
+        self.cancel = False
+        self.error: Optional[str] = None
+        self.skipped: Optional[str] = None
+        self.started = time.time()
+        self.task: Optional[asyncio.Task] = None
+
+    def to_json(self) -> dict:
+        span = max(1, self.pages - self.from_page)
+        pct = 100.0 if self.state == "done" else min(100.0, 100.0 * max(0, self.page - self.from_page) / span)
+        return {"state": self.state, "percent": round(pct, 1), "page": self.page, "from_page": self.from_page,
+                "pages": self.pages, "chunks_done": self.chunks_done, "error": self.error, "skipped": self.skipped,
+                "seconds": round(time.time() - self.started, 1), "patient": self.patient,
+                "waiting_seconds": int(max(0.0, self.waiting_until - time.time()))}
+
+
 class NarratorService:
     def __init__(self, data_dir: Optional[str] = None, test_mode: Optional[bool] = None):
         self.data_dir = data_dir or config.data_dir()
@@ -75,6 +106,7 @@ class NarratorService:
         self.docs: Dict[str, DocState] = {}
         self._docs_lock = threading.RLock()
         self._inflight: Dict[str, asyncio.Future] = {}
+        self.prep_jobs: Dict[str, PrepJob] = {}
         self._prefetch_sem: Optional[asyncio.Semaphore] = None
         self._lexicon_version = 0
         self._builtin = load_builtin("he") + load_builtin("en")
@@ -432,7 +464,10 @@ class NarratorService:
     # ================================================================ units
     def _prep_options(self) -> Tuple[PrepOptions, str]:
         s = self.settings()
-        o = PrepOptions(max_chars=int(s.get("max_chunk_chars", 900)),
+        max_chars = int(s.get("max_chunk_chars", 900))
+        if any(str(v).startswith("gemini:") for v in (s.get("voices") or {}).values()):
+            max_chars = max(max_chars, GEMINI_CHUNK_CHARS)  # one long request costs the same allowance as a short one
+        o = PrepOptions(max_chars=max_chars,
                         switch_voice_min_words=4 if s.get("switch_voice_for_foreign", True) else 10 ** 6,
                         skip_citations=bool(s.get("skip_citations", True)),
                         skip_footnote_marks=bool(s.get("skip_footnote_marks", True)),
@@ -519,23 +554,63 @@ class NarratorService:
             self._schedule_prefetch(doc_id, unit_id, chunk)
         return result
 
-    async def _speak(self, text: str, voice: str, lang: str, rate: int, tokens, word_range) -> dict:
+    async def free_voice(self, lang: str) -> Optional[str]:
+        """The always-available free voice for a language (used when a limited voice runs out)."""
+        try:
+            vs = await self.providers["edge"].list_voices()
+        except Exception:
+            vs = []
+        pref = config.DEFAULT_SETTINGS["voices"].get(lang)
+        if pref and any(v.id == pref for v in vs):
+            return pref
+        cands = [v for v in vs if v.lang == lang]
+        if cands:
+            multi = [v for v in cands if "Multilingual" in v.id]
+            return (multi or cands)[0].id
+        return None
+
+    async def _speak(self, text: str, voice: str, lang: str, rate: int, tokens, word_range,
+                     allow_fallback: bool = True) -> dict:
         provider_id = voice.split(":", 1)[0]
         self._check_consent(provider_id)
         provider = self.providers[provider_id]
-        ok, reason = provider.available()
-        if not ok:
-            raise TTSError(reason, retryable=False)
-        key = cache_key(provider_id, provider.version, voice, rate, 0, text)
-        meta = self.cache.get(key)
-        if meta is None:
-            meta = await self._synth_dedup(key, provider, text, voice, lang, rate)
+        notice = None
+        try:
+            key = cache_key(provider_id, provider.version, voice, rate, 0, text)
+            meta = self.cache.get(key)  # already narrated (maybe days ago, in the background): free and instant
+            if meta is None:
+                ok, reason = provider.available()
+                if not ok:
+                    raise TTSError(reason, retryable=False, quota=provider.cooling() > 0)
+                meta = await self._synth_dedup(key, provider, text, voice, lang, rate)
+        except TTSError as exc:
+            if not (exc.quota and allow_fallback and self.settings().get("free_fallback", True) and provider_id != "edge"):
+                raise
+            fb = await self.free_voice(lang)
+            if not fb:
+                raise
+            log.info("%s allowance used up; using %s", provider_id, fb)
+            notice = (f"The {provider.info.name.split(' (')[0]} allowance is used up for now, so the free "
+                      f"Microsoft voice is reading instead. It switches back automatically later.")
+            voice, provider_id = fb, "edge"
+            self._check_consent(provider_id)
+            provider = self.providers[provider_id]
+            ok, reason = provider.available()
+            if not ok:
+                raise TTSError(reason, retryable=False)
+            key = cache_key(provider_id, provider.version, voice, rate, 0, text)
+            meta = self.cache.get(key)
+            if meta is None:
+                meta = await self._synth_dedup(key, provider, text, voice, lang, rate)
         bounds = [Boundary(b[0], b[1], b[2], b[3]) for b in meta.get("boundaries", [])]
         words, quality = align(text, tokens, bounds, meta["duration"], word_range)
         if not provider.info.word_timing:
             quality = "estimated"
-        return {"audio": f"/api/audio/{key}.{meta['ext']}", "key": key, "duration": meta["duration"], "words": words,
-                "timing": quality, "voice": voice, "lang": lang, "text": text}
+        out = {"audio": f"/api/audio/{key}.{meta['ext']}", "key": key, "duration": meta["duration"], "words": words,
+               "timing": quality, "voice": voice, "lang": lang, "text": text}
+        if notice:
+            out["notice"] = notice
+        return out
 
     async def _synth_dedup(self, key: str, provider: TTSProvider, text: str, voice: str, lang: str, rate: int) -> dict:
         fut = self._inflight.get(key)
@@ -600,6 +675,107 @@ class NarratorService:
                         return
         except Exception as exc:  # pragma: no cover - background best effort
             log.info("prefetch error: %s", exc)
+
+    # --------------------------------------------------- prepare ahead
+    def prepare_status(self, doc_id: str) -> dict:
+        job = self.prep_jobs.get(doc_id)
+        if not job:
+            return {"state": "none", "percent": 0}
+        return job.to_json()
+
+    def prepare_cancel(self, doc_id: str) -> dict:
+        job = self.prep_jobs.get(doc_id)
+        if job and job.state == "running":
+            job.cancel = True
+        return self.prepare_status(doc_id)
+
+    async def prepare_start(self, doc_id: str, unit_id: str, patient: bool = False) -> dict:
+        """Narrate everything from `unit_id` to the end in the background (a few chunks at a time),
+        so playback can start once enough is ready and then never has to wait."""
+        st = self.open(doc_id)
+        old = self.prep_jobs.get(doc_id)
+        if old and old.state == "running":
+            if old.unit_id == unit_id:
+                return old.to_json()
+            old.cancel = True
+        u = await asyncio.get_running_loop().run_in_executor(None, st.units.find_unit, unit_id)
+        if u is None:
+            raise KeyError(unit_id)
+        job = PrepJob(doc_id, unit_id, u.page, st.pdf.page_count, patient)
+        self.prep_jobs[doc_id] = job
+        job.task = asyncio.get_running_loop().create_task(self._prepare_run(job, st, u))
+        return job.to_json()
+
+    async def _prepare_run(self, job: "PrepJob", st: DocState, u) -> None:
+        loop = asyncio.get_running_loop()
+        sem = asyncio.Semaphore(1 if job.patient else 3)
+        outstanding: Dict[asyncio.Task, int] = {}
+
+        async def one(page: int, ch):
+            async with sem:
+                while not job.cancel:
+                    voice = await self.voice_for(ch.lang, job.doc_id)
+                    try:
+                        await self._speak(ch.text, voice, ch.lang, ch.rate, ch.tokens, ch.word_range,
+                                          allow_fallback=not job.patient)
+                        job.chunks_done += 1
+                        return
+                    except TTSError as exc:
+                        if not (job.patient and exc.quota):
+                            raise
+                        # out of free allowance: sleep until it is likely back, then carry on
+                        p = self.providers.get(voice.split(":", 1)[0])
+                        job.waiting_until = time.time() + max(PATIENT_MIN_WAIT, p.cooling() if p else 0.0)
+                        while time.time() < job.waiting_until and not job.cancel:
+                            await asyncio.sleep(min(2.0, max(0.01, job.waiting_until - time.time())))
+                        job.waiting_until = 0.0
+
+        def reap(done):
+            for t in done:
+                outstanding.pop(t, None)
+                if t.cancelled():
+                    continue
+                exc = t.exception()
+                if exc is not None and job.error is None:
+                    job.error = str(exc) if isinstance(exc, (TTSError, ConsentRequired)) else f"{type(exc).__name__}: {exc}"
+                    job.cancel = True
+
+        try:
+            read = self.settings().get("read_kinds", {})
+            first = True
+            while u is not None and not job.cancel:
+                job.page = min((p for p in outstanding.values()), default=u.page)
+                if read.get(u.kind, True):
+                    chunks = await loop.run_in_executor(None, self.prepared, st, u)
+                    for ch in chunks:
+                        voice = await self.voice_for(ch.lang, job.doc_id)
+                        lim = getattr(self.providers.get(voice.split(":", 1)[0]), "prefetch_limit", None)
+                        if lim is not None and first and not job.patient:
+                            job.skipped = "This voice has a small free allowance, so the app only prepares a little ahead."
+                            job.state = "done"
+                            return
+                        first = False
+                        outstanding[asyncio.ensure_future(one(u.page, ch))] = u.page
+                        while len(outstanding) >= 12 and not job.cancel:
+                            done, _ = await asyncio.wait(outstanding, return_when=asyncio.FIRST_COMPLETED)
+                            reap(done)
+                u = await loop.run_in_executor(None, st.units.next_unit, u.id)
+            while outstanding and not job.cancel:
+                job.page = min(outstanding.values())
+                done, _ = await asyncio.wait(outstanding, return_when=asyncio.FIRST_COMPLETED)
+                reap(done)
+            for t in list(outstanding):
+                t.cancel()
+            job.state = "error" if job.error else ("cancelled" if job.cancel else "done")
+            if job.state == "done":
+                job.page = job.pages
+        except Exception as exc:  # pragma: no cover - defensive
+            log.exception("prepare failed")
+            job.error = f"{type(exc).__name__}: {exc}"
+            job.state = "error"
+        finally:
+            for t in list(outstanding):
+                t.cancel()
 
     async def preview(self, text: str, voice: str, lang: str) -> dict:
         """Voice Lab: synthesize arbitrary text (not tied to a document)."""

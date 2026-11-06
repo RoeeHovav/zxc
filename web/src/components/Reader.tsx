@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, Bookmark, DocInfo, PageLayout, Position, Unit } from "../api";
+import { api, Bookmark, DocInfo, PageLayout, Position, PrepStatus, Unit } from "../api";
 import { NarrPos, Narrator, Status } from "../player/Narrator";
 import { useStore } from "../store";
 import { Icon } from "./Icons";
@@ -20,6 +20,7 @@ export default function Reader({ docId }: { docId: string }) {
   const { t, settings, update, toast, lang } = useStore();
   const [doc, setDoc] = useState<DocInfo | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [prep, setPrep] = useState<PrepStatus | null>(null);
   const narrator = useMemo(() => new Narrator(docId, 1), [docId]);
   const viewer = useRef<ViewerHandle>(null);
   const [status, setStatus] = useState<Status>("idle");
@@ -115,6 +116,9 @@ export default function Reader({ docId }: { docId: string }) {
     narrator.addEventListener("time", onTime);
     narrator.addEventListener("sleep", onSleep);
     narrator.addEventListener("sleepchange", onSleepChange);
+    const onPrep = (e: Event) => setPrep((e as CustomEvent).detail);
+    narrator.addEventListener("prep", onPrep);
+    narrator.noticeHandler = (m) => toast(m);
     narrator.consentHandler = (info) => new Promise<boolean>((resolve) => setConsent({ info, resolve }));
     const unload = () => narrator.saveBeacon();
     window.addEventListener("beforeunload", unload);
@@ -124,6 +128,7 @@ export default function Reader({ docId }: { docId: string }) {
       narrator.removeEventListener("time", onTime);
       narrator.removeEventListener("sleep", onSleep);
       narrator.removeEventListener("sleepchange", onSleepChange);
+      narrator.removeEventListener("prep", onPrep);
       window.removeEventListener("beforeunload", unload);
     };
   }, [narrator]);
@@ -132,8 +137,9 @@ export default function Reader({ docId }: { docId: string }) {
     if (!settings) return;
     narrator.pauseScale = settings.pause_scale;
     narrator.readKinds = settings.read_kinds;
+    narrator.bufferPercent = settings.buffer_percent ?? 0;
     narrator.teacherMode = !!settings.teacher_mode && !!settings.llm_model;
-  }, [settings?.pause_scale, settings?.read_kinds, settings?.teacher_mode, settings?.llm_model]);
+  }, [settings?.buffer_percent, settings?.pause_scale, settings?.read_kinds, settings?.teacher_mode, settings?.llm_model]);
 
   useEffect(() => {
     narrator.teacherHandler = (unit) => teacher.explain(unit.id, "section", true);
@@ -216,6 +222,22 @@ export default function Reader({ docId }: { docId: string }) {
     if (!u) return toast("Nothing to read here yet.", "error");
     narrator.rememberUnit(u);
     narrator.playFrom(u, 0);
+  };
+
+  /** Narrate the whole document from here in the background (patient = keep a limited premium voice). */
+  const prepareAll = async () => {
+    let u: Unit | undefined = pos?.unit;
+    if (!u) {
+      const r = await api.units(docId, page, 40);
+      u = r.units.find((x) => settings?.read_kinds[x.kind] !== false && x.chunks.length);
+    }
+    if (!u) return toast("Nothing to read here yet.", "error");
+    const premium = Object.values(settings?.voices || {}).some((v) => v.startsWith("gemini:"));
+    try {
+      await narrator.prepareFrom(u.id, premium);
+    } catch (e: any) {
+      toast(e?.message || String(e), "error");
+    }
   };
 
   const onPlay = () => {
@@ -579,6 +601,9 @@ export default function Reader({ docId }: { docId: string }) {
         sleepUntil={sleepUntil}
         onSleep={(m) => narrator.setSleep(m)}
         voiceLabel={voiceLabel}
+        prep={prep}
+        onPrepareAll={prepareAll}
+        onCancelPrep={() => narrator.cancelPrep()}
       />
 
       {selBar && selection && (

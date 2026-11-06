@@ -48,6 +48,8 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
       m.set(v.lang, arr);
     }
     for (const lg of Array.from(new Set(["he", "en", ...Object.keys(LANG_NAMES)]))) m.set(lg, [...(m.get(lg) || []), ...multilingual]);
+    // The "Multilingual" Microsoft voices are not tied to one language; offer them for Hebrew too (experimental).
+    m.set("he", [...(m.get("he") || []), ...(m.get("en") || []).filter((v) => v.provider === "edge" && v.id.includes("Multilingual"))]);
     return m;
   }, [voices]);
 
@@ -80,7 +82,7 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
                   {!settings.voices[lg] && <option value="">(automatic)</option>}
                   {opts.map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.name} — {v.locale} {v.gender ? `· ${v.gender}` : ""} {v.provider !== "edge" ? `[${v.provider}]` : ""}
+                      {v.name} — {v.locale} {v.gender ? `· ${v.gender}` : ""} {v.provider !== "edge" ? `[${v.provider}]` : ""}{lg === "he" && v.lang === "en" ? (he ? " (ניסיוני בעברית)" : " (experimental for Hebrew)") : ""}
                     </option>
                   ))}
                 </select>
@@ -192,6 +194,24 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
             </label>
           </div>
 
+          <div className="section-title">{he ? "הכנת קריינות מראש" : "Narrating ahead"}</div>
+          <div className="field">
+            <label>
+              {he ? "לפני ההשמעה הראשונה, להכין מראש" : "Before the first play, narrate up to"} <strong>{settings.buffer_percent ?? 0}%</strong>{" "}
+              {he ? "מהמסמך (0 = להתחיל מיד)" : "of the document (0 = start at once)"}
+            </label>
+            <input type="range" min={0} max={100} step={5} value={settings.buffer_percent ?? 0} onChange={(e) => set({ buffer_percent: Number(e.target.value) })} data-testid="buffer-percent" />
+            <div className="muted small">
+              {he
+                ? "ההכנה ממשיכה ברקע גם בזמן ההשמעה, ואפשר ללחוץ ״התחל עכשיו״. קול עם מכסה חינמית קטנה (Gemini) לא מוכן מראש בכמות גדולה; לשם כך יש את הכפתור ״הכנת הכול״ בנגן, שממשיך לאט לאורך ימים."
+                : "Preparing continues in the background while it plays, and you can press “Start now”. A voice with a small free allowance (Gemini) is not prepared in bulk before playing; use the player's “Prepare all” button instead, which carries on slowly over days."}
+            </div>
+          </div>
+          <label className="check">
+            <input type="checkbox" checked={settings.free_fallback !== false} onChange={(e) => set({ free_fallback: e.target.checked })} />
+            {he ? "כשהמכסה החינמית של קול מוגבל (Gemini) נגמרת, להמשיך עם הקול החינמי של מיקרוסופט" : "When a limited voice runs out, carry on with the free Microsoft voice"}
+          </label>
+
           <div className="section-title">{he ? "מנועי דיבור" : "Speech engines"}</div>
           {app.providers.map((p) => (
             <div className="provider-card" key={p.id}>
@@ -231,8 +251,8 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
                 <div style={{ marginTop: 8 }}>
                   <div className="small muted" style={{ marginBottom: 6 }}>
                     {he
-                      ? "הקול הזה הוא מודל שפה שקורא את המשפט כולו, ולכן בוחר את המילה הנכונה בעברית לפי ההקשר. מפתח חינמי: aistudio.google.com ← Get API key. אחרי השמירה בחרו קול Gemini (למשל Kore או Charon) בעברית ובאנגלית למעלה. המכסה החינמית מוגבלת, ההדגשה היא ברמת משפט."
-                      : "This voice is a language model that reads the whole sentence, so it picks the right Hebrew word from context. Get a free key at aistudio.google.com → Get API key, paste it here, then choose a Gemini voice (e.g. Kore or Charon) for Hebrew and English above. The free quota is limited and highlighting is per sentence."}
+                      ? "קול של מודל שפה: קורא את המשפט כולו ולכן בוחר את המילה הנכונה בעברית. מפתח חינמי: aistudio.google.com ← Get API key. אחרי השמירה בחרו קול Gemini (למשל Kore או Charon) בעברית ובאנגלית למעלה. המכסה החינמית של גוגל לדיבור קטנה: כשהיא נגמרת התוכנה ממשיכה בקול החינמי של מיקרוסופט וחוזרת ל-Gemini כשהמכסה מתחדשת (בדרך כלל סביב חצות בשעון האוקיינוס השקט). הכפתור ״הכנת הכול״ בנגן מקריין את המסמך בקול Gemini לאט, לאורך ימים, כל עוד התוכנה פתוחה. ההדגשה היא ברמת משפט."
+                      : "A language-model voice: it reads the whole sentence, so it picks the right Hebrew word from context. Get a free key at aistudio.google.com → Get API key, paste it here, then choose a Gemini voice (e.g. Kore or Charon) for Hebrew and English above. Google's free allowance for speech is small: when it runs out the app carries on with the free Microsoft voice and switches back when the allowance refills (usually around midnight Pacific time). The player's “Prepare all” button narrates the document in the Gemini voice slowly over days while the app stays open. Highlighting is per sentence."}
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <input

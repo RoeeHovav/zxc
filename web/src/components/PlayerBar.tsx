@@ -1,4 +1,5 @@
 import React from "react";
+import { PrepStatus } from "../api";
 import { NarrPos, Narrator, Status } from "../player/Narrator";
 import { useStore } from "../store";
 import { Icon } from "./Icons";
@@ -14,12 +15,16 @@ interface Props {
   sleepUntil: number | null;
   onSleep: (min: number) => void;
   voiceLabel: string;
+  prep: PrepStatus | null;
+  onPrepareAll: () => void;
+  onCancelPrep: () => void;
 }
 
 const SPEEDS = [0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5];
 
-export default function PlayerBar({ narrator, status, error, pos, rate, onRate, onPlay, sleepUntil, onSleep, voiceLabel }: Props) {
-  const { t, settings } = useStore();
+export default function PlayerBar({ narrator, status, error, pos, rate, onRate, onPlay, sleepUntil, onSleep, voiceLabel, prep, onPrepareAll, onCancelPrep }: Props) {
+  const { t, settings, lang } = useStore();
+  const he = lang === "he";
   const skip = settings?.skip_seconds || 10;
   const playing = status === "playing" || status === "loading";
   const sentText = pos ? pos.unit.text.split(" ").slice(pos.unit.sentences[pos.sentence]?.[0] ?? 0, pos.unit.sentences[pos.sentence]?.[1] ?? 0).join(" ") : "";
@@ -30,6 +35,32 @@ export default function PlayerBar({ narrator, status, error, pos, rate, onRate, 
       <div className="timebar" title={pos ? `${pos.time.toFixed(1)}s / ${pos.duration.toFixed(1)}s` : ""}>
         <div style={{ width: `${frac * 100}%` }} />
       </div>
+      {prep && (prep.state === "running" || prep.state === "error") && (
+        <div className="prep" data-testid="prep">
+          <div className="prepbar" title={`${prep.percent.toFixed(0)}%`}>
+            <div style={{ width: `${prep.percent}%` }} />
+          </div>
+          <span className="small">
+            {prep.state === "error"
+              ? (he ? "ההכנה נעצרה: " : "Preparing stopped: ") + (prep.error || "")
+              : prep.waiting_seconds > 0
+                ? he
+                  ? `ממתין לחידוש המכסה החינמית של הקול (כ-${Math.ceil(prep.waiting_seconds / 60)} דק׳). ההכנה תמשיך אוטומטית כל עוד התוכנה פתוחה.`
+                  : `Waiting for the voice's free allowance to refill (about ${Math.ceil(prep.waiting_seconds / 60)} min). It continues by itself while the app is open.`
+                : he
+                  ? `מכין קריינות… ${prep.percent.toFixed(0)}% (עמוד ${prep.page + 1} מתוך ${prep.pages})`
+                  : `Preparing narration… ${prep.percent.toFixed(0)}% (page ${prep.page + 1} of ${prep.pages})`}
+          </span>
+          {status === "loading" && prep.state === "running" && (
+            <button className="btn primary" onClick={() => narrator.startNow()} data-testid="start-now">
+              {he ? "התחל עכשיו" : "Start now"}
+            </button>
+          )}
+          <button className="btn" onClick={onCancelPrep}>
+            {he ? "הפסקת הכנה" : "Stop preparing"}
+          </button>
+        </div>
+      )}
       <div className="row">
         <button className="icon-btn" title={`${t.prevParagraph} ([)`} aria-label={t.prevParagraph} onClick={() => narrator.paragraph(-1)} disabled={!pos}>
           <Icon name="paraPrev" />
@@ -77,6 +108,11 @@ export default function PlayerBar({ narrator, status, error, pos, rate, onRate, 
           <span className={`pill ${pos.timing === "word" ? "ok" : "warn"}`} title={pos.timing === "word" ? t.timingWord : t.timingEstimated} data-testid="timing">
             {pos.timing === "word" ? "◉ word sync" : "◎ sentence sync"}
           </span>
+        )}
+        {(!prep || prep.state !== "running") && (
+          <button className="btn" onClick={onPrepareAll} title={he ? "הכנת הקריינות של כל המסמך ברקע, מהמקום הנוכחי" : "Narrate the whole document from here in the background, so it plays without waiting"} data-testid="prepare-all">
+            {he ? "הכנת הכול" : "Prepare all"}
+          </button>
         )}
         <span className="pill" title={t.voice}>
           {voiceLabel}

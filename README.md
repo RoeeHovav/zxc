@@ -122,6 +122,14 @@ python -m venv .venv
   highlighted on the PDF page, and the view auto-scrolls to follow them (toggle
   with **A**). When an engine gives no word timings, the player says so and
   highlights sentences only.
+- **Narrate ahead.** Before the first play, the app can narrate part of the document so playback never
+  waits (*Settings > Narrating ahead*, default 50% of what is left; "Start now" skips the wait). The rest keeps
+  being prepared in the background while it plays, and the **Prepare all** button in the player does the whole
+  document. Everything is cached, so replaying is instant.
+- **Large and scanned files.** Uploads of hundreds of MB are fine (a 377 MB, 1,042-page test file opened in
+  about a second). Scanned pages are recognised (OCR) in a **separate process**, so reading, scrolling and
+  playback stay responsive while that runs; on real Hebrew booklet pages it took about 3-4 s per page here.
+  A page that takes over 4 minutes is skipped and flagged.
 - **Resume anywhere.** The exact position is saved continuously. Reopen a
   document, even after closing the app, to continue from the same word.
 - **Reader features.** Contents (from PDF bookmarks or detected headings),
@@ -139,7 +147,7 @@ python -m venv .venv
 | Engine | Cost | Notes |
 |---|---|---|
 | **Microsoft neural voices via Edge "Read Aloud"** (default) | Free, no account | Hebrew: Hila, Avri. English: Ava, Andrew, Emma, Brian, Sonia, Ryan, and 100+ locales. Exact per-word timing. Unofficial endpoint, so it could change. Text being read is sent to Microsoft. |
-| **Google Gemini voices** (recommended for Hebrew, needs a free key) | Free tier (rate-limited); paid use only if you enable billing | Language-model voices that read the *whole sentence*, so unvowelled Hebrew words ("ספר": book / barber / counted) are resolved from context, with more natural intonation. Get a free key at <https://aistudio.google.com> > *Get API key*, paste it in **Settings > Speech engines > Google Gemini**, then pick a Gemini voice (e.g. Kore, Charon) for Hebrew/English under *Narrator voice per language*. No word-level timing: highlighting follows the sentence ("sentence sync"). On Google's free tier submitted text may be used to improve their products. **Written and tested against a simulated service only; not heard or tried live yet.** |
+| **Google Gemini voices** (best quality; needs a free key) | Free tier, but Google's allowance for speech is **small**; paid use only if you enable billing yourself | Language-model voices that read the whole sentence, so unvowelled Hebrew ("ספר": book / barber / counted) is resolved from context, with very natural intonation. Get a free key at <https://aistudio.google.com> > *Get API key* and paste it in **Settings > Speech engines > Google Gemini**, then pick a Gemini voice (e.g. Kore, Charon). When the free allowance runs out the app **continues with the free Microsoft voice and switches back by itself** when Google refills it (usually around midnight Pacific time). It asks for fewer, longer requests, tries every speech model your key can use (each has its own allowance), waits out per-minute limits, and tells you the real limit Google reports. The player's **Prepare all** button narrates the whole document in the Gemini voice slowly, over days, while the app stays open; whatever was narrated is cached and replays instantly. No word timing: highlighting follows the sentence. On Google's free tier submitted text may be used to improve their products. **Tested against a simulated service only; real limits and quality of long requests are unverified.** |
 | Azure AI Speech (same voices, official) | Free tier of 0.5 M characters/month (≈ 9 hours), then pay-as-you-go | Needs your key + `pip install -r requirements-optional.txt`. Not tested live yet. |
 
 An hour of narration is roughly 50–60 k characters. Details and the engine
