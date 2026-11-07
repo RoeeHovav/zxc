@@ -147,7 +147,8 @@ are.
 - **New language:** usually nothing to do (script / function-word detection plus a voice
   mapping). Optionally add `narrator/data/lexicon_<lang>.tsv` and load it in
   `service.py`.
-- **Better Hebrew vocalisation:** hook a diacritiser (e.g. Phonikud or
-  DictaBERT) into `prepare_unit` before normalisation. Apply niqqud only to
-  words the user marks or the model is uncertain about, and verify against
-  listening tests.
+- **Hebrew vowel marks** are added just before synthesis (`_vocalize_chunk`): Dicta's Nakdan for every word
+  (`llm/nakdan.py`), then the Gemini assistant's decisions on ambiguous words override those words
+  (`llm/pronounce.py`). Words that already carry marks (the user's own corrections) are left alone. Both are
+  cached per passage and asked for a dozen upcoming passages at once (`_warm_vowels`). An offline alternative
+  would be a local diacritiser (Phonikud / DictaBERT, several hundred MB); not done.

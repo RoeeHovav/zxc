@@ -239,8 +239,9 @@ _TERMINAL_RE = re.compile(r"[.!?…:;]['\"”’)\]»״׳]*$")
 _GEMATRIA = {c: v for c, v in zip("אבגדהוזחטיכלמנסעפצקרשת", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400])}
 _MONTHS = {"תשרי", "חשוון", "חשון", "מרחשוון", "מרחשון", "כסלו", "טבת", "שבט", "אדר", "ניסן", "אייר", "סיוון", "סיון", "תמוז",
            "אב", "אלול"}
-_DAY_WORDS = ["", "אחד", "שניים", "שלושה", "ארבעה", "חמישה", "שישה", "שבעה", "שמונה", "תשעה", "עשרה", "אחד עשר", "שנים עשר",
-              "שלושה עשר", "ארבעה עשר", "חמישה עשר", "שישה עשר", "שבעה עשר", "שמונה עשר", "תשעה עשר", "עשרים"]
+# Letter names, vowelled so the voice says them as Israelis do: ה' באייר is "hey be-Iyar", ט"ו בשבט "Tu bi-Shvat".
+_LETTER_NAMES = {"א": "אָלֶף", "ב": "בֵּית", "ג": "גִּימֶל", "ד": "דָּלֶת", "ה": "הֵי", "ו": "וָו", "ז": "זַיִן", "ח": "חֵית",
+                 "ט": "טֵית", "י": "יוּד", "כ": "כַּף", "ל": "לָמֶד"}
 _DAY_RE = re.compile("^([בלמהוש]{1,2}-)?([א-ל][\"'׳״]?[א-ט]?[\"'׳״]?)([,.;:!?)]*)$")
 
 
@@ -251,15 +252,16 @@ def _day_number(letters: str) -> int:
     return n if 1 <= n <= 30 and len(core) <= 2 else 0
 
 
-def _day_words(n: int) -> str:
-    if n <= 20:
-        return _DAY_WORDS[n]
-    return "שלושים" if n == 30 else "עשרים" + (" ו" + _DAY_WORDS[n - 20] if n > 20 else "")
+def _day_words(letters: str) -> str:
+    core = "".join(c for c in letters if c not in "\"'׳״")
+    if core == "טו":
+        return "טוּ"
+    return " ".join(_LETTER_NAMES[c] for c in core)
 
 
 def _hebrew_dates(toks: List[Tok], opts: NormOptions) -> List[Tok]:
     """A day of a Hebrew date is written as a letter: "ד' באייר", "י"ב בחשוון", "ב-כ"ט בתמוז". A voice reads the letter
-    ("ד" like the letter), so it is spoken as the number: ארבעה באייר, שנים עשר בחשוון, בעשרים ותשעה בתמוז."""
+    sound ("d"), so the letters are spoken by name, the way people say dates: דָּלֶת באייר, יוּד בֵּית בחשוון, טוּ בשבט."""
     if opts.lang != "he":
         return toks
     out = list(toks)
@@ -277,7 +279,7 @@ def _hebrew_dates(toks: List[Tok], opts: NormOptions) -> List[Tok]:
         if not n or (len(m.group(2).replace('"', "").replace("'", "").replace("׳", "").replace("״", "")) == 1 and n > 10 and n not in (20, 30)):
             continue
         prefix = (m.group(1) or "").rstrip("-")
-        words = _day_words(n)
+        words = _day_words(m.group(2))
         out[i] = Tok(prefix + words + m.group(3), out[i].a, out[i].b, True)
     return out
 

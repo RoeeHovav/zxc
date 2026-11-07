@@ -55,11 +55,14 @@ def test_call_out_labels_get_their_pause_and_unpunctuated_blocks_end_like_senten
     assert kinded("הפסקה נמשכת", "paragraph")[-1] == "נמשכת"           # a paragraph may continue on the next page
 
 
-def test_hebrew_date_days_are_spoken_as_numbers_not_as_letters():
-    assert norm("ד' באייר הוא יום") == ["ארבעה", "באייר", "הוא", "יום"]
-    assert norm("חל ב-י' באייר")[1:] == ["בעשרה", "באייר"]
-    assert norm('חל ב-כ"ט בחשוון, חמישים')[1:3] == ["בעשרים ותשעה", "בחשוון,"]
-    assert norm('י"ב בחשוון')[0] == "שנים עשר" and norm('ט"ו בשבט')[0] == "חמישה עשר" and norm("ל' בניסן")[0] == "שלושים"
+def test_hebrew_date_days_are_spoken_by_letter_name_not_as_a_bare_sound():
+    assert norm("ד' באייר הוא יום") == ["דָּלֶת", "באייר", "הוא", "יום"]
+    assert norm("חל ב-י' באייר")[1:] == ["ביוּד", "באייר"]
+    assert norm('ט"ו בשבט')[0] == "טוּ"
+    assert norm('כ"ט בנובמבר') == ['כ"ט', "בנובמבר"]  # not a Hebrew month: left alone
+    assert norm('י"ב בחשוון')[:2] == ["יוּד בֵּית", "בחשוון"]
+    assert norm('חל ב-כ"ט בחשוון, חמישים')[1:3] == ["בכַּף טֵית", "בחשוון,"]
+    assert norm('ט"ז בשבט')[0] == "טֵית זַיִן" and norm("ל' בניסן")[0] == "לָמֶד" and norm("ה' באייר")[0] == "הֵי"
     assert norm("פרק ד' באמצע")[1] == "ד'" and norm("סעיף ב' לחוק")[1] == "ב'"  # a letter that is not a date day is left alone
 
 

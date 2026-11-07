@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import config
-from .service import ConsentRequired, NarratorService
+from .service import OPTIONAL_CONSENTS, ConsentRequired, NarratorService
 from .tts.base import TTSError
 from .llm.client import LLMError
 from .llm.pronounce import PronounceError
@@ -43,7 +43,8 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
     async def _consent(_req: Request, exc: ConsentRequired):
         i = exc.info
         return JSONResponse(status_code=409, content={"error": "consent_required", "provider": exc.provider,
-                                                      "name": i.name, "privacy": i.privacy})
+                                                      "name": i.name, "privacy": i.privacy,
+                                                      "optional": exc.provider in OPTIONAL_CONSENTS})
 
     @app.exception_handler(TTSError)
     async def _tts(_req: Request, exc: TTSError):
@@ -98,6 +99,10 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
 
     @app.post("/api/consent")
     async def consent(body: dict = Body(...)):
+        if body.get("decline"):
+            if not svc.decline_consent(body["provider"]):
+                raise HTTPException(400, "this service is needed for narration and cannot be switched off this way")
+            return {"ok": True, "settings": svc.settings()}
         svc.give_consent(body["provider"])
         return {"ok": True, "settings": svc.settings()}
 

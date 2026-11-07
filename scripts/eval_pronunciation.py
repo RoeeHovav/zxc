@@ -5,6 +5,8 @@ Each case is a sentence, the ambiguous word in it, and the accepted vowelled for
 into DEV (used while tuning the prompt) and TEST (never used for tuning), so the TEST score is honest.
 
     python scripts/eval_pronunciation.py --model gemini-3.8-flash [--runs 1] [--only dev|test]
+    python scripts/eval_pronunciation.py --engine dicta          # Dicta's Nakdan alone (no key, no allowance)
+    python scripts/eval_pronunciation.py --engine both --model gemini-3.1-flash-lite   # what the app does
 
 Uses Google's OpenAI-compatible endpoint with the same system prompt and message format as the app.
 The key comes from --key or GEMINI_API_KEY (in the cloud sandbox a proxy injects it, any placeholder works).
@@ -160,6 +162,8 @@ def main() -> int:
     ap.add_argument("--key", default=os.environ.get("GEMINI_API_KEY", "proxy-injected"))
     ap.add_argument("--shuffle", type=int, help="shuffle the cases with this seed (changes which sentences share a request)")
     ap.add_argument("--json", help="write the detailed results here")
+    ap.add_argument("--engine", choices=["gemini", "dicta", "both"], default="gemini",
+                    help="both = Dicta for every word, the Gemini assistant's reading where it gave one (as the app does)")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args()
     cases = [c for c in CASES if not a.only or c[0] == a.only]
@@ -168,15 +172,27 @@ def main() -> int:
         random.Random(a.shuffle).shuffle(cases)
     allres = []
     for r in range(a.runs):
-        res = run_once(a.model, cases, a.key)
+        res = run_once(a.model, cases, a.key) if a.engine != "dicta" else [
+            {"kind": c[0], "sentence": c[1], "word": c[2], "accepted": c[3], "got": None, "ok": False, "candidates": [], "why": ""} for c in cases]
+        if a.engine != "gemini":
+            import asyncio
+            import tempfile
+            from narrator.llm.nakdan import Nakdan
+            nk = Nakdan(tempfile.mkdtemp())
+            spans = asyncio.run(nk.vowel_many([x["sentence"] for x in res]))
+            for x, sp in zip(res, spans):
+                d = next((v for s, e, v in sp or [] if x["sentence"][s:e] == x["word"]), None)
+                got = x["got"] if (a.engine == "both" and x["got"]) else d
+                x.update(got=got, ok=got is not None and skeleton(got) in {skeleton(v) for v in x["accepted"]}, dicta=d)
         allres += res
+    label = {"gemini": a.model, "dicta": "dicta", "both": "dicta+" + a.model}[a.engine]
     for kind in ("dev", "test"):
         sub = [x for x in allres if x["kind"] == kind]
         if sub:
             ok = sum(x["ok"] for x in sub)
-            print(f"{a.model}  {kind:4s}: {ok}/{len(sub)} = {100 * ok / len(sub):.0f}%")
+            print(f"{label}  {kind:4s}: {ok}/{len(sub)} = {100 * ok / len(sub):.0f}%")
     tot = sum(x["ok"] for x in allres)
-    print(f"{a.model}  all : {tot}/{len(allres)} = {100 * tot / len(allres):.0f}%")
+    print(f"{label}  all : {tot}/{len(allres)} = {100 * tot / len(allres):.0f}%")
     if a.verbose:
         for x in allres:
             if not x["ok"]:

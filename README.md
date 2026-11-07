@@ -107,10 +107,18 @@ python -m venv .venv
     not read, a year range that a right-to-left page put back to front is read in order ("(1575-1488)" is spoken
     1488-1575), a call-out label such as "למחשבה" gets its pause, brackets stuck to the previous word are separated,
     and a heading or list item without a full stop gets one so the voice ends it like a sentence;
-  - the day in a Hebrew date is spoken as a number, not as a letter ("ד' באייר" → "ארבעה באייר",
-    "ב-כ"ט בחשוון" → "בעשרים ותשעה בחשוון").
+  - the day in a Hebrew date is spoken by its letter names, as people say it, instead of as a bare sound
+    ("ד' באייר" → "dalet be-Iyar", "ט"ו בשבט" → "Tu bi-Shvat", "ב-כ"ט בחשוון" → "be-kaf tet be-Heshvan").
 
   The original text is never rewritten. Only how it is spoken changes.
+- **Vowel marks for every Hebrew word (Dicta Nakdan).** The voice is given the passage with full niqqud from Dicta's
+  free Nakdan service (dicta.org.il, an Israeli non-profit; no key or account; only the text being read is sent, after
+  you agree). The Microsoft voices follow the marks: by listening, plain "הספר במספרה ספר" came out as "the book …
+  counted" and with marks as "the barber … counted". Measured on the 48 test sentences below, Dicta picks the right
+  reading 96% of the time (46/48), and with the Gemini assistant deciding the ambiguous words 98% (47/48)
+  (`python scripts/eval_pronunciation.py --engine dicta` / `--engine both`). It has no daily allowance and answers in
+  about half a second. "o" vowels that a voice could read as "a" (כׇּל) are written as holam. Switch it off in
+  Settings → Pronunciation assistant; saying "no" when asked also switches it off and reading carries on without it.
 - **Pronunciation assistant (Hebrew).** Unvowelled Hebrew has words that are written the same but read
   differently (שמן = oil / "their name", ספר = book / barber / counted). With a Gemini key (free; text only, whose
   allowance is far larger than its voice's) a language model reads each passage and gives the voice vowel marks
@@ -119,8 +127,8 @@ python -m venv .venv
   right reading about 88-94% of the time (`python scripts/eval_pronunciation.py --model gemini-3.1-flash-lite`;
   see docs/STATUS.md for the caveats). Google's free tier allows 20 requests per day per model, so the app asks
   about 12 passages per request and moves on to the next model when one is used up. Try it in the **Voice lab** (sample "שמן").
-  **Whether a given voice follows vowel marks is not known until you listen**; if a voice ignores them, the
-  assistant cannot help with that voice.
+  Where it answers, its reading of an ambiguous word replaces Dicta's (on the test set the two make different
+  mistakes); everything else keeps Dicta's marks.
 - **Comprehension checkpoints.** After a stretch of listening (the end of a section, a page, or every N minutes,
   your choice in the player bar) the reading waits and asks about what you just heard: two multiple-choice questions
   and one open one ("explain in your own words", then you check yourself against the key points). Each question is

@@ -241,7 +241,7 @@ export class Narrator extends EventTarget {
   }
 
   private async fetchSpeech(u: Unit, chunk: number): Promise<Speech> {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 4; attempt++) {
       try {
         const sp = await api.speech(this.docId, u.id, chunk);
         if (sp.notice && sp.notice !== this.lastNotice) {
@@ -252,12 +252,16 @@ export class Narrator extends EventTarget {
       } catch (e) {
         if (e instanceof ApiError && e.status === 409 && e.body?.error === "consent_required") {
           const ok = this.consentHandler ? await this.consentHandler(e.body) : false;
+          if (!ok && e.body.optional) {
+            await api.consent(e.body.provider, true); // an optional helper: switch it off and keep reading
+            continue;
+          }
           if (!ok) throw new Error("Narration needs your permission to use the online voice service.");
           await api.consent(e.body.provider);
           continue;
         }
         if (e instanceof ApiError && e.status === 502 && e.body?.retryable === false) throw e;
-        if (attempt === 2) throw e;
+        if (attempt === 3) throw e;
         await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
       }
     }

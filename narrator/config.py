@@ -6,7 +6,7 @@ import os
 import sys
 
 APP_NAME = "PDF Narrator"
-VERSION = "0.10.0"
+VERSION = "0.11.0"
 
 
 def data_dir() -> str:
@@ -62,6 +62,8 @@ DEFAULT_SETTINGS = {
     "buffer_minutes": 10,  # ...but never wait for more than about this many minutes of narration (0 = no cap)
     # When a limited online voice (e.g. Gemini free tier) runs out, continue with the free voice.
     "free_fallback": True,
+    # Vowel marks for every Hebrew word from Dicta's free Nakdan service (no key; text only; asks consent first).
+    "nakdan": True,
     # Pronunciation assistant: a language model reads each Hebrew passage and adds vowel marks to
     # the words that can be read several ways (שמן, ספר, ...).  Needs the Gemini key; text only.
     "ai_pronunciation": True,

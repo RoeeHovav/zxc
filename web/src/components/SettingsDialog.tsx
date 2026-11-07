@@ -218,6 +218,12 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
 
           <div className="section-title">{he ? "עוזר ההגייה (עברית)" : "Pronunciation assistant (Hebrew)"}</div>
           <label className="check">
+            <input type="checkbox" checked={settings.nakdan !== false} onChange={(e) => set({ nakdan: e.target.checked })} data-testid="nakdan" />
+            {he
+              ? "ניקוד לכל מילה בעזרת ה״נקדן״ החינמי של דיקטה (dicta.org.il), כדי שהקול יגה נכון גם מילים רגילות. ללא מפתח; נשלח טקסט בלבד."
+              : "Vowel marks for every word from Dicta's free Nakdan (dicta.org.il), so the voice also says ordinary words right. No key needed; only text is sent."}
+          </label>
+          <label className="check">
             <input type="checkbox" checked={settings.ai_pronunciation !== false} onChange={(e) => set({ ai_pronunciation: e.target.checked })} data-testid="ai-pronunciation" />
             {he
               ? "לתת לבינה מלאכותית (Gemini) להכריע, לפי המשפט כולו, איך לקרוא מילים דו-משמעיות (שמן, ספר, מלך…) ולתת לקול ניקוד רק עליהן"

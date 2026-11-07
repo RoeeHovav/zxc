@@ -27,6 +27,7 @@ from .pdf.ocr import OcrEngine
 from .text.normalize import LexEntry, Lexicon, load_builtin, strip_niqqud, unify_quotes
 from .tts.azure import AzureProvider
 from .tts.base import ProviderInfo, TTSError, TTSProvider, Voice
+from .llm.nakdan import Nakdan
 from .llm.pronounce import HEB_WORD as HEB_WORD_RE, PronounceError, Vocalizer, apply as apply_vowels
 from .llm.quiz import STYLES as QUIZ_STYLES, Passage, QuizError, QuizMaker, assemble as assemble_questions, reshuffle as reshuffle_question
 from .llm.testquiz import TestQuizModel
@@ -48,6 +49,19 @@ PRONUNCIATION_INFO = ProviderInfo(
              " pronunciation of ambiguous words from the sentence. Only text is sent, never the PDF. On Google's free tier"
              " Google may use submitted content to improve its products."),
     verified="Request handling and validation are tested against a simulated service; live results are unverified.")
+
+
+NAKDAN_CONSENT = "dicta-nakdan"
+NAKDAN_INFO = ProviderInfo(
+    id=NAKDAN_CONSENT, name="Dicta Nakdan (Hebrew vowel marks)", free=True, cloud=True, requires_key=False, word_timing=False,
+    privacy=("So the voice pronounces every Hebrew word correctly, the Hebrew passages being read are sent to Dicta's free"
+             " Nakdan service (dicta.org.il, an Israeli non-profit), which adds the vowel marks (niqqud). Only text is sent,"
+             " never the PDF. No account is needed; this is Dicta's public web service, which Dicta could change or limit."
+             " If you say no, the passages are read without it."),
+    verified=("Measured: the right reading for 46 of 48 ambiguous words (96%); 47 of 48 together with the Gemini assistant."
+              " Checked by listening that the Microsoft voices follow the marks. See docs/STATUS.md."))
+# Optional helpers: saying no to them switches them off instead of stopping the narration.
+OPTIONAL_CONSENTS = {NAKDAN_CONSENT: "nakdan", "gemini-text": "ai_pronunciation"}
 
 
 QUIZ_CONSENT = "gemini-quiz"
@@ -137,6 +151,7 @@ class NarratorService:
         self._secrets_path = os.path.join(self.data_dir, "secrets.json")
         self.explanations = ExplanationCache(os.path.join(self.data_dir, "explanations"))
         self.vocalizer = Vocalizer(os.path.join(self.data_dir, "pronunciation"))
+        self.nakdan = Nakdan(os.path.join(self.data_dir, "vowels"))
         self.quiz = QuizMaker(TestQuizModel() if self.test_mode else self.vocalizer, os.path.join(self.data_dir, "quiz"))
         self._pron_notice_at = 0.0
         self._apply_provider_settings()
@@ -226,6 +241,14 @@ class NarratorService:
         consent = self.settings().get("cloud_consent", {})
         consent[provider] = time.time()
         self.db.set_setting("cloud_consent", consent)
+
+    def decline_consent(self, provider: str) -> bool:
+        """The listener said no to an optional helper: switch it off (it can be switched on again in Settings)."""
+        setting = OPTIONAL_CONSENTS.get(provider)
+        if not setting:
+            return False
+        self.db.set_setting(setting, False)
+        return True
 
     def _check_consent(self, provider: str) -> None:
         p = self.providers.get(provider)
@@ -578,7 +601,7 @@ class NarratorService:
             raise KeyError(f"chunk {chunk}")
         ch = chunks[chunk]
         voice = await self.voice_for(ch.lang, doc_id)
-        if ch.lang == "he" and self._assistant_enabled(ch, voice, False) is None:
+        if ch.lang == "he" and self._vowels_wanted(ch, voice):
             ahead = await self._chunks_ahead(st, u, chunk, 11)
             await self._warm_vowels([ch] + ahead, voice)
         result = await self._speak_chunk(ch, voice)
@@ -602,51 +625,96 @@ class NarratorService:
         if PRONUNCIATION_CONSENT not in self.settings().get("cloud_consent", {}):
             raise ConsentRequired(PRONUNCIATION_CONSENT, PRONUNCIATION_INFO)
 
+    def _nakdan_enabled(self, ch: PreparedChunk, voice: str, force: bool) -> Optional[str]:
+        """None when Dicta's vowel marks should be added to this chunk, else why not."""
+        if ch.lang != "he":
+            return "not-hebrew"
+        if voice.startswith("gemini:"):
+            return "voice-understands-context"
+        if not (force or self.settings().get("nakdan", True)):
+            return "off"
+        if self.test_mode and self.nakdan.transport is None:
+            return "test-mode"  # the offline test run never calls the real service
+        return None
+
+    def _vowels_wanted(self, ch: PreparedChunk, voice: str) -> bool:
+        return self._nakdan_enabled(ch, voice, False) is None or self._assistant_enabled(ch, voice, False) is None
+
     async def _warm_vowels(self, chunks: List[PreparedChunk], voice: str) -> None:
-        """Ask for the vowel marks of several upcoming passages in ONE request (small free request allowance)."""
+        """Vowel marks for several upcoming passages in ONE request to each service (Gemini's free request allowance
+        is small; Dicta is asked politely)."""
+        dicta = [c.text for c in chunks if self._nakdan_enabled(c, voice, False) is None]
+        if dicta and NAKDAN_CONSENT in self.settings().get("cloud_consent", {}):
+            await self.nakdan.vowel_many(dicta)
         todo, ctx = [], []
         for i, c in enumerate(chunks):
             if self._assistant_enabled(c, voice, False) is None:
                 todo.append(c.text)
                 ctx.append((chunks[i - 1].text[-200:] if i > 0 else "", chunks[i + 1].text[:200] if i + 1 < len(chunks) else ""))
-        if not todo:
+        if not todo or PRONUNCIATION_CONSENT not in self.settings().get("cloud_consent", {}):
             return
-        self._check_pronunciation_consent()
         try:
             await self.vocalizer.vocalize_many(todo, ctx)
         except PronounceError as exc:
             log.info("pronunciation assistant could not prepare passages: %s", exc)
 
     async def _vocalize_chunk(self, ch: PreparedChunk, voice: str, force: bool = False):
-        """Add vowel marks to the ambiguous Hebrew words of a chunk (context-aware).
-        -> (text, tokens, notice, info)"""
-        why = self._assistant_enabled(ch, voice, force)
-        if why:
-            return ch.text, ch.tokens, None, {"state": why, "changed": []}
-        self._check_pronunciation_consent()
-        try:
-            words, chosen, _, details = await self.vocalizer.vocalize(ch.text)
-        except PronounceError as exc:
-            log.info("pronunciation assistant skipped a passage: %s", exc)
-            notice = None
-            if exc.quota and time.time() - self._pron_notice_at > 600:
-                self._pron_notice_at = time.time()
-                notice = ("The pronunciation assistant is resting (Google's free allowance is used up), so words that can be "
-                          "read several ways are read the usual way for now. It resumes automatically.")
-            return ch.text, ch.tokens, notice, {"state": "paused" if exc.quota else "error", "changed": [], "detail": str(exc)}
-        if not chosen:
-            return ch.text, ch.tokens, None, {"state": "none-needed", "changed": []}
-        text, tokens = apply_vowels(ch.text, words, chosen, ch.tokens)
-        changed = []
+        """Vowel marks for the Hebrew words of a chunk: Dicta's for every word, and the Gemini assistant's decision for
+        the ambiguous ones (it reads the whole sentence) where it is available.  -> (text, tokens, notice, info)"""
+        dicta_why = self._nakdan_enabled(ch, voice, force)
+        gem_why = self._assistant_enabled(ch, voice, force)
+        if dicta_why and gem_why:
+            return ch.text, ch.tokens, None, {"state": gem_why if dicta_why in ("off", "test-mode") else dicta_why, "changed": []}
+        dicta_spans = None
+        if not dicta_why:
+            if NAKDAN_CONSENT not in self.settings().get("cloud_consent", {}):
+                raise ConsentRequired(NAKDAN_CONSENT, NAKDAN_INFO)
+            dicta_spans = await self.nakdan.vowel(ch.text)
+        words, chosen, details, notice = [], {}, {}, None
+        state = gem_why or "ok"
+        detail = ""
+        if not gem_why:
+            self._check_pronunciation_consent()
+            try:
+                words, chosen, _, details = await self.vocalizer.vocalize(ch.text)
+                state = "ok" if chosen else "none-needed"
+            except PronounceError as exc:
+                log.info("pronunciation assistant skipped a passage: %s", exc)
+                state, detail = ("paused" if exc.quota else "error"), str(exc)
+                if exc.quota and time.time() - self._pron_notice_at > 600 and not dicta_spans:
+                    self._pron_notice_at = time.time()
+                    notice = ("The pronunciation assistant is resting (Google's free allowance is used up), so words that can be "
+                              "read several ways are read the usual way for now. It resumes automatically.")
+        # one list of edits: the assistant's words first, then Dicta's for every other word
+        edits = [(words[i][0], words[i][1], words[i][2]) for i in sorted(chosen)]
+        final = {k: chosen[i] for k, i in enumerate(sorted(chosen))}
+        taken = [(a, b) for a, b, _ in edits]
+        n_dicta = 0
+        for a, b, v in dicta_spans or []:
+            if any(a < tb and ta < b for ta, tb in taken):
+                continue
+            final[len(edits)] = v
+            edits.append((a, b, ch.text[a:b]))
+            n_dicta += 1
+        info = {"state": state, "changed": [], "vowelled": len(edits), "dicta": n_dicta}
+        if detail:
+            info["detail"] = detail
+        if dicta_why is None:
+            info["engine"] = "dicta+gemini" if chosen else "dicta"
+            if dicta_spans is None:
+                info["dicta_error"] = self.nakdan.last_error or "unavailable"
+        if not edits:
+            return ch.text, ch.tokens, notice, info
+        text, tokens = apply_vowels(ch.text, edits, final, ch.tokens)
         for i, v in sorted(chosen.items()):
             st_, en_, w = words[i]
             left = ch.text[:st_].split()[-1:] or [""]
             right = ch.text[en_:].split()[:1] or [""]
             d = details.get(i, {})
-            changed.append({"word": w, "chosen": v, "why": d.get("why", ""), "left": left[0], "right": right[0],
-                            "alternatives": [{"v": c, "g": (d.get("g") or [""] * 3)[k] if k < len(d.get("g", [])) else ""}
-                                             for k, c in enumerate(d.get("c", [v]))]})
-        return text, tokens, None, {"state": "ok", "changed": changed}
+            info["changed"].append({"word": w, "chosen": v, "why": d.get("why", ""), "left": left[0], "right": right[0],
+                                    "alternatives": [{"v": c, "g": (d.get("g") or [""] * 3)[k] if k < len(d.get("g", [])) else ""}
+                                                     for k, c in enumerate(d.get("c", [v]))]})
+        return text, tokens, notice, info
 
     async def _speak_chunk(self, ch: PreparedChunk, voice: str, allow_fallback: bool = True, force_vowels: bool = False) -> dict:
         text, tokens, notice, info = await self._vocalize_chunk(ch, voice, force_vowels)
@@ -876,7 +944,7 @@ class NarratorService:
                             job.state = "done"
                             return
                         first = False
-                        if since_warm == 0 and self._assistant_enabled(ch, voice, False) is None:
+                        if since_warm == 0 and self._vowels_wanted(ch, voice):
                             # vowel marks for the next dozen passages in one request
                             await self._warm_vowels([ch] + await self._chunks_ahead(st, u, ch.index, 11), voice)
                         since_warm = (since_warm + 1) % 12

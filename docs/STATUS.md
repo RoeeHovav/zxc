@@ -64,10 +64,28 @@ Chromium. It uses the test-tone engine for audio and passes:
   test-tone engine (completion, cancel, patient mode waiting out a quota, instant replay) and in the browser
   acceptance run; never run against real Edge/Gemini audio. The default of 50% before the first play can mean
   a long wait on a very long document with a real engine; "Start now" skips it.
+- **Do the voices follow vowel marks? Yes (measured 2026-11-07).** Clips from William (Multilingual), Andrew
+  (Multilingual), Avri and Hila were transcribed by a Gemini model told to write only what it heard. Plain
+  "הספר במספרה ספר את הכסף" came out "ha-sefer … safar" (the book) from every voice; with niqqud "hasapar … safar"
+  (the barber) from William, Andrew and Avri. Plain "שמן של חוברות" came out "shamen" (fat) from all four; with
+  שְׁמָן it changed. In a fully vowelled paragraph everything matched the plain reading except the corrected word,
+  and "כָּל" with a plain qamats was read "kal"; Dicta is therefore asked to mark qamats qatan, which the app writes
+  as holam ("kol"). Caveats: the listener is itself a model (a lighter one was noisy on the shva), and no person has
+  listened.
+- **Dicta Nakdan** (`narrator/llm/nakdan.py`, merged in `_vocalize_chunk`). Measured live: 46/48 = 96% on the
+  ambiguous-word set (dev 22/23, held-out 24/25), the same with all 48 sentences in one request; together with
+  gemini-3.1-flash-lite (46/48 alone) 47/48. Its errors seen so far: הספר (barber) in "הספר גזז לי את השיער", אספר
+  (count vs tell), and "ושמן נקבע" in a longer passage (read as "and oil"; the Gemini assistant's own examples cover
+  this case). Its "confident" flag is not useful (it marked about 70% of ordinary words not confident).
+  Tested against a simulated service: parsing, letter validation (a vowelled spelling may drop a ו/י vowel letter,
+  e.g. סִפּוּרִים), caching, one request for many passages, failure = plain reading with a 60 s pause, consent,
+  decline switches it off, the offline test mode never calls it. Live end to end (real server → Dicta → William):
+  14 of 14 words vowelled, word-exact timing kept. Unverified: Dicta's terms for this use of its public service and
+  how it copes with a whole book in one evening; nobody has listened to a long fully vowelled passage.
 - **Pronunciation assistant** (`narrator/llm/pronounce.py`, `_vocalize_chunk` in `service.py`). Tested
   against a simulated Gemini service (validation, token alignment, caching, consent, quota). Unverified:
-  (1) whether the Microsoft voices (Hila/Avri/Multilingual "William", "Andrew") actually follow vowel marks,
-  (2) how accurate Gemini's choices are on real text, (3) the free text-model allowance in practice.
+  how accurate Gemini's choices are on real text, and the free text-model allowance in practice (the
+  comprehension questions use the same allowance).
   Reported by the user: the multilingual voices sound very good but misread homographs (שמן as "oil").
 - **Pronunciation assistant, batching and status.** Passages are asked in groups of up to 12 per request
   (one request covers the current passage and the next ones; the free request allowance may be only a few per

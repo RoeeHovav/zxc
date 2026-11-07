@@ -61,16 +61,18 @@ export function usePreviewPlayer() {
   const play = async (text: string, voice: string, lang: string, vowels = false): Promise<Speech | null> => {
     setBusy(true);
     try {
-      let sp: Speech;
-      try {
-        sp = await api.preview(text, voice, lang, vowels);
-      } catch (e: any) {
-        if (e instanceof ApiError && e.status === 409 && e.body?.error === "consent_required") {
-          if (!window.confirm(`${e.body.name}\n\n${e.body.privacy}\n\nAllow this?`)) throw new Error("Not allowed.");
-          await api.consent(e.body.provider);
+      let sp: Speech | null = null;
+      for (let attempt = 0; !sp && attempt < 3; attempt++) {
+        try {
           sp = await api.preview(text, voice, lang, vowels);
-        } else throw e;
+        } catch (e: any) {
+          if (!(e instanceof ApiError && e.status === 409 && e.body?.error === "consent_required")) throw e;
+          const ok = window.confirm(`${e.body.name}\n\n${e.body.privacy}\n\nAllow this?`);
+          if (!ok && !e.body.optional) throw new Error("Not allowed.");
+          await api.consent(e.body.provider, !ok);
+        }
       }
+      if (!sp) throw new Error("Not allowed.");
       audio.current?.pause();
       audio.current = new Audio(sp.audio);
       await audio.current.play();
@@ -281,9 +283,20 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
       toast(e.message, "error");
     }
   };
+  const dictaLine = () => {
+    const a: any = assistant;
+    if (!a?.engine) return null;
+    if (a.dicta_error) return <div>Dicta could not be reached ({a.dicta_error}), so it added no vowel marks this time.</div>;
+    return <div>Dicta added vowel marks to {a.dicta} word{a.dicta === 1 ? "" : "s"} (shown above in “What the voice was given”).</div>;
+  };
   const assistantLine = () => {
     const a = assistant;
     if (!a) return null;
+    const dicta = (a as any).engine;
+    if (dicta && ["no-key", "off", "paused", "error"].includes(a.state)) {
+      const why = { "no-key": "no Gemini key is saved", off: "it is switched off", paused: "Google's free allowance is used up", error: "it could not answer" }[a.state as "no-key"];
+      return <div>Gemini assistant not used ({why}); Dicta's marks alone were given to the voice.</div>;
+    }
     switch (a.state) {
       case "ok":
         return (
@@ -361,8 +374,7 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
       {sample.lang === "he" && (
         <label className="check" style={{ margin: "6px 0" }}>
           <input type="checkbox" checked={vowels} onChange={(e) => setVowels(e.target.checked)} data-testid="lab-vowels" />
-          Pronunciation assistant: let Gemini choose the right reading of ambiguous words from the sentence and give the voice vowel marks
-          (needs the Gemini key from Settings)
+          Vowel marks: Dicta adds niqqud to every word, and Gemini (if its key is saved) decides the ambiguous ones from the sentence
         </label>
       )}
       {given && (
@@ -373,6 +385,7 @@ export function VoiceLab({ onClose }: { onClose: () => void }) {
       )}
       {assistant && (
         <div className="small muted" dir="ltr" style={{ margin: "0 0 8px" }} data-testid="lab-assistant">
+          {dictaLine()}
           {assistantLine()}
         </div>
       )}

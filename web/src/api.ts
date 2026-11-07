@@ -126,6 +126,7 @@ export interface Settings {
   ui_lang: "auto" | "en" | "he";
   zoom: number;
   cloud_consent: Record<string, number>;
+  nakdan?: boolean;
   azure_region: string;
   prefetch_chunks: number;
   buffer_percent: number;
@@ -285,7 +286,7 @@ export const api = {
   state: () => req<AppState>("GET", "/api/state"),
   putSettings: (patch: Partial<Settings>) => req<Settings>("PUT", "/api/settings", patch),
   putSecret: (key: string, value: string) => req<any>("POST", "/api/secrets", { key, value }),
-  consent: (provider: string) => req<any>("POST", "/api/consent", { provider }),
+  consent: (provider: string, decline = false) => req<any>("POST", "/api/consent", decline ? { provider, decline: true } : { provider }),
   voices: (provider?: string) => req<{ voices: Voice[] }>("GET", `/api/voices${provider ? `?provider=${enc(provider)}` : ""}`),
   documents: () => req<{ documents: DocInfo[] }>("GET", "/api/documents"),
   upload: (files: File[], combine: boolean, onProgress?: (f: number) => void) =>
