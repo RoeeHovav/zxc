@@ -261,7 +261,7 @@ export default function Reader({ docId }: { docId: string }) {
     playFromCurrentPage();
   };
 
-  const setQuizMode = async (mode: "off" | "section" | "page" | "minutes") => {
+  const setQuizMode = async (mode: "off" | "paragraph" | "section" | "page" | "minutes") => {
     if (mode !== "off") {
       if (!useStore.getState().app?.secrets.gemini_api_key && !useStore.getState().app?.test_mode) {
         toast(lang === "he" ? "בדיקות הבנה צריכות מפתח Gemini חינמי: הגדרות ← מנועי דיבור." : "Checkpoints need your free Gemini key: Settings → Speech engines.", "error");
@@ -278,7 +278,7 @@ export default function Reader({ docId }: { docId: string }) {
         }
       }
     }
-    await update({ quiz_mode: mode });
+    await update(mode === "paragraph" ? { quiz_mode: mode, quiz_style: "choice" } : { quiz_mode: mode });
     narrator.resetQuiz();
   };
 

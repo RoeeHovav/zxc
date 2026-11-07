@@ -246,8 +246,9 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
           <div className="section-title">{he ? "בדיקות הבנה" : "Comprehension checkpoints"}</div>
           <div className="field">
             <label>{he ? "מתי לשאול" : "When to ask"}</label>
-            <select value={settings.quiz_mode || "off"} onChange={(e) => set({ quiz_mode: e.target.value as any })} data-testid="quiz-mode-setting">
+            <select value={settings.quiz_mode || "off"} onChange={(e) => set(e.target.value === "paragraph" ? { quiz_mode: "paragraph", quiz_style: "choice" } : { quiz_mode: e.target.value as any })} data-testid="quiz-mode-setting">
               <option value="off">{he ? "אף פעם" : "Never"}</option>
+              <option value="paragraph">{he ? "אחרי כל פסקה — 3 שאלות רב־ברירה" : "After each paragraph — 3 multiple-choice questions"}</option>
               <option value="section">{he ? "בסוף כל פרק (כשיש מספיק חומר)" : "At the end of each section (when there is enough to ask about)"}</option>
               <option value="page">{he ? "בסוף כל עמוד" : "At the end of each page"}</option>
               <option value="minutes">{he ? "כל כמה דקות הקשבה" : "Every few minutes of listening"}</option>
@@ -261,10 +262,10 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
           )}
           <div className="field">
             <label>{he ? "סוג השאלות" : "Kind of questions"}</label>
-            <select value={settings.quiz_style || "mixed"} onChange={(e) => set({ quiz_style: e.target.value as any })} data-testid="quiz-style">
+            <select value={settings.quiz_style || "choice"} onChange={(e) => set({ quiz_style: e.target.value as any })} data-testid="quiz-style">
+              <option value="choice">{he ? "רב־ברירה בלבד (3 שאלות)" : "Multiple choice only (3 questions)"}</option>
               <option value="mixed">{he ? "שתי שאלות רב־ברירה ושאלה פתוחה אחת" : "Two multiple-choice and one open question"}</option>
               <option value="recall">{he ? "שאלות פתוחות בלבד — המחמיר ביותר, אי אפשר לנחש" : "Open questions only — the strictest, cannot be guessed"}</option>
-              <option value="choice">{he ? "רב־ברירה בלבד — מהיר" : "Multiple choice only — quick"}</option>
             </select>
           </div>
           <label className="check">

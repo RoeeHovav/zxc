@@ -135,9 +135,11 @@ python -m venv .venv
   about 12 passages per request and moves on to the next model when one is used up. Try it in the **Voice lab** (sample "שמן").
   Where it answers, its reading of an ambiguous word replaces Dicta's (on the test set the two make different
   mistakes); everything else keeps Dicta's marks.
-- **Comprehension checkpoints.** After a stretch of listening (the end of a section, a page, or every N minutes,
-  your choice in the player bar) the reading waits and asks about what you just heard: two multiple-choice questions
-  and one open one ("explain in your own words", then you check yourself against the key points). Each question is
+- **Comprehension checkpoints.** Off until you choose when to ask, in the player bar ("Quiz: …") or in Settings →
+  Comprehension checkpoints: **after each paragraph** (3 multiple-choice questions; a very short paragraph is joined
+  to the next so there is enough to ask about), at the end of a section, a page, or every N minutes. The reading
+  waits and asks about what you just heard: by default 3 multiple-choice questions; Settings can also mix in an open
+  question ("explain in your own words", then you check yourself against the key points). Each question is
   written from the text you actually heard and comes with a quotation from it that the app verifies is really in the
   text; a question whose quotation cannot be found is thrown away. Wrong answers are built from the passage's own
   material instead of silly options, and the app asks a second time (without the text) which questions a person
@@ -146,7 +148,8 @@ python -m venv .venv
   checkpoint. Press **1-4** to answer, **Esc** or the play button to skip. The questions are written while you listen,
   so there is normally no wait. Needs the free Gemini key; only the text of the stretch you heard is sent, only
   after you agree; answers and scores stay on this computer. Each checkpoint costs two of Google's free daily
-  requests. **Honest limit:** multiple-choice questions can often be answered without listening when the subject is
+  requests (one after each paragraph, where the guessability check is skipped; that many checkpoints still use up
+  the free allowance much sooner, and the pronunciation assistant shares it). **Honest limit:** multiple-choice questions can often be answered without listening when the subject is
   familiar (a strong model answered 83-90% of the questions on the sample history booklet without seeing it); open
   questions cannot be guessed, so Settings offers "open questions only". See docs/STATUS.md.
 - **Your pronunciation fixes.** Right-click a word, then choose **Fix

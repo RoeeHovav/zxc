@@ -34,13 +34,15 @@ const put = (body) => fetch(URL + 'api/settings', { method: 'PUT', headers: { 'c
     await page.waitForSelector('[data-testid=viewer] .page img', { timeout: 60000 });
 
     // turning checkpoints on asks permission first (text of the stretch goes to Gemini)
-    await page.selectOption('[data-testid=quiz-mode]', 'minutes');
+    await page.selectOption('[data-testid=quiz-mode]', 'paragraph');
     await page.waitForSelector('[data-testid=consent]', { timeout: 5000 });
     const consentText = await page.textContent('body');
     check(/Gemini/.test(consentText), 'permission is asked before any text is sent');
     await page.click('[data-testid=consent-allow]');
     await sleep(500);
-    check((await (await fetch(URL + 'api/state')).json()).settings.quiz_mode === 'minutes', 'the mode is saved');
+    const saved = (await (await fetch(URL + 'api/state')).json()).settings;
+    check(saved.quiz_mode === 'paragraph' && saved.quiz_style === 'choice', 'the mode is saved, with multiple-choice questions');
+    await put({ quiz_style: 'mixed' }); // the rest of this run also checks the open question
 
     // listen: at the end of the page the narration waits and the questions appear
     await page.click('[data-testid=play]');

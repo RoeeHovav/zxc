@@ -61,6 +61,15 @@ def test_minutes_mode_and_unread_kinds():
     assert C.plan(notes[0], chain(notes), {}, "off") is None
 
 
+def test_paragraph_mode_asks_after_each_paragraph_and_joins_very_short_ones():
+    units = [U("1.0", "heading", "פרק"), body(1, words=90), body(2, words=90), U("1.3", "paragraph", "שורה קצרה."), body(4, words=90)]
+    p = C.plan(units[0], chain(units), {}, "paragraph")
+    assert [u["id"] for u in p["units"]] == ["1.0", "1.1"] and p["ask"] and p["why"] == "paragraph"
+    p = C.plan(units[3], chain(units), {}, "paragraph")
+    assert [u["id"] for u in p["units"]] == ["1.3", "1.4"]  # a one-line paragraph is asked about with the next one
+    assert C.min_chars("paragraph") < C.min_chars("section")
+
+
 def test_short_stretch_is_not_worth_a_quiz():
     p = C.plan(U("1.0", "paragraph", "משפט אחד קצר."), lambda uid: None, {}, "section")
     assert p["ask"] is False
@@ -230,7 +239,7 @@ def test_http_flow_plan_questions_answers_and_revisit(client, he_pdf):
     first = next(u["id"] for u in client.get(f"/api/documents/{doc}/units", params={"page": 0, "count": 30}).json()["units"]
                  if u["kind"] in ("heading", "paragraph"))
     assert client.post(f"/api/documents/{doc}/quiz/plan", json={"unit_id": first}).json() == {"plan": None}
-    client.put("/api/settings", json={"quiz_mode": "page", "quiz_minutes": 2})
+    client.put("/api/settings", json={"quiz_mode": "page", "quiz_minutes": 2, "quiz_style": "mixed"})
     svc.vocalizer.key = "K"  # (saving settings re-reads the stored key, which this test does not have)
     plan = client.post(f"/api/documents/{doc}/quiz/plan", json={"unit_id": first}).json()["plan"]
     assert plan and plan["units"][0]["id"] == first and plan["end"]

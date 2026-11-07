@@ -72,6 +72,12 @@ Chromium. It uses the test-tone engine for audio and passes:
   and "כָּל" with a plain qamats was read "kal"; Dicta is therefore asked to mark qamats qatan, which the app writes
   as holam ("kol"). Caveats: the listener is itself a model (a lighter one was noisy on the shva), and no person has
   listened.
+- **"After each paragraph" checkpoints (0.12.0)** with 3 multiple-choice questions (now the default kind). Tested:
+  the plan cuts after each paragraph of at least ~400 characters and joins shorter ones (unit test), the browser run
+  selects the mode in the player bar and gets a checkpoint (test-tone voice and a pretend question writer). In this
+  mode the second, guessability request is skipped to save Google's free allowance, so these questions are not
+  filtered for being answerable without listening. Unverified: question quality on single short paragraphs with the
+  real model, and how many paragraphs a day the free allowance covers.
 - **Fixed in 0.11.1:** a passage containing any word that already had marks (the app's own expansion of an
   abbreviation such as צה"ל → צַהַל, or a user correction) got NO Dicta marks at all in 0.11.0 (Dicta re-vowels its
   input, so its answer no longer matched and was discarded). Dicta is now sent the text without marks and those words

@@ -499,7 +499,8 @@ export class Narrator extends EventTarget {
       this.qHeard.add(unit.id);
       this.qHeardChars += entry.chars;
     }
-    if (!this.qPrefetched && this.qHeardChars >= 0.5 * plan.chars && this.quizPrefetch) {
+    // a short stretch (one paragraph) is over in under a minute: start writing its questions at once
+    if (!this.qPrefetched && this.qHeardChars >= (plan.chars < 1500 ? 0 : 0.5 * plan.chars) && this.quizPrefetch) {
       this.qPrefetched = true; // by now the listener is half way through: start writing the questions
       this.quizPrefetch(plan.units.map((u) => u.id));
     }

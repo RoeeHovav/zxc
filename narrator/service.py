@@ -1112,8 +1112,10 @@ class NarratorService:
         self._check_quiz_consent()
         st = self.open(doc_id)
         _units, passage, heading, lang = await self._quiz_passage(st, unit_ids)
-        if len(passage.text) < int(0.7 * checkpoints.MIN_CHARS):
+        mode = self.settings().get("quiz_mode", "section")
+        if len(passage.text) < int(0.7 * checkpoints.min_chars(mode)):
             return {"status": "too-short", "questions": []}
+        self.quiz.verify = mode != "paragraph"
         title = (self.db.document(doc_id) or {}).get("title", "")
         rows = self.db.quiz_rows(doc_id)
         asked = [r["question"].get("q", "") for r in rows[-8:]]
@@ -1127,7 +1129,7 @@ class NarratorService:
         except QuizError as exc:
             log.info("quiz unavailable: %s", exc)
             return {"status": "paused" if exc.quota else "error", "message": str(exc), "questions": []}
-        style = self.settings().get("quiz_style", "mixed")
+        style = self.settings().get("quiz_style", "choice")
         questions = assemble_questions(res, style if style in QUIZ_STYLES else "mixed")
         # a question that was missed earlier comes back first, with its answers in a different order
         have = {q["qid"] for q in questions}

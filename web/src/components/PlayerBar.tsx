@@ -138,6 +138,7 @@ export default function PlayerBar({ narrator, status, error, pos, rate, onRate, 
             e.target.blur();
           }} title={he ? "בדיקות הבנה: שאלות על מה ששמעתם" : "Checkpoints: questions about what you just heard"} aria-label="Checkpoints" style={{ padding: "3px 4px", marginInlineStart: 6 }} data-testid="quiz-mode">
           <option value="off">{he ? "בדיקת הבנה: כבויה" : "Quiz: off"}</option>
+          <option value="paragraph">{he ? "בדיקת הבנה: כל פסקה" : "Quiz: each paragraph"}</option>
           <option value="section">{he ? "בדיקת הבנה: כל פרק" : "Quiz: each section"}</option>
           <option value="page">{he ? "בדיקת הבנה: כל עמוד" : "Quiz: each page"}</option>
           <option value="minutes">{he ? `בדיקת הבנה: כל ${settings?.quiz_minutes || 6} דק׳` : `Quiz: every ${settings?.quiz_minutes || 6} min`}</option>

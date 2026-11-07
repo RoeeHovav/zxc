@@ -432,6 +432,9 @@ class QuizMaker:
         os.makedirs(cache_dir, exist_ok=True)
         self._inflight: Dict[str, asyncio.Future] = {}
         self.stats: Counter = Counter()
+        # the second request that checks how guessable the questions are; off for "after each paragraph", which
+        # would otherwise spend two of Google's small free daily requests on every paragraph
+        self.verify = True
 
     def key(self, passage: Passage, lang: str) -> str:
         return hashlib.sha256(("%s|%s|%s" % (QUIZ_VERSION, lang, passage.text)).encode("utf-8")).hexdigest()[:40]
@@ -483,7 +486,7 @@ class QuizMaker:
             raise QuizError("no Gemini key")
         if time.time() < getattr(self.asker, "cooldown_until", 0.0):
             raise QuizError(getattr(self.asker, "cool_message", "") or "cooling down", quota=bool(getattr(self.asker, "cool_quota", False)))
-        result = await build(self._ask, passage, lang, title, heading, asked)
+        result = await build(self._ask, passage, lang, title, heading, asked, verify=self.verify)
         result.pop("_candidates", None)
         result.pop("questions", None)  # assembled when asked, because the style is a setting
         self.stats["asked"] += result["requests"]

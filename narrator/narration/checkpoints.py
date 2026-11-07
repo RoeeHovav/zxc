@@ -1,7 +1,7 @@
 """Where a comprehension checkpoint goes.
 
 A checkpoint covers the stretch of narration the listener has just heard.  The stretch ends at a natural
-break -- the end of a section, the end of a page, or after about N minutes -- and never in the middle of a
+break -- the end of a paragraph, a section or a page, or after about N minutes -- and never in the middle of a
 paragraph, right after a heading, or after a line that introduces a list ("...as follows:").
 
 The plan is made on the server, from the same units the narrator reads, so the questions for a stretch can be
@@ -14,9 +14,14 @@ from typing import Callable, Dict, List, Optional
 CHARS_PER_MINUTE = 900   # the same figure the "narrated so far" meter uses
 MIN_CHARS = 1100         # about a minute and a quarter: less than this is not worth a quiz
 CAP_CHARS = 9000         # about ten minutes: a document without headings is still checked now and then
+PARA_CHARS = 400         # "after each paragraph": a very short paragraph is joined to the next (3 questions need material)
 BODY = ("paragraph", "list_item", "note")
 NEVER = ("header", "footer", "page_number", "toc", "figure_text", "artifact")
-MODES = ("off", "section", "page", "minutes")
+MODES = ("off", "paragraph", "section", "page", "minutes")
+
+
+def min_chars(mode: str) -> int:
+    return PARA_CHARS if mode == "paragraph" else MIN_CHARS
 
 
 def _last_page(u) -> int:
@@ -55,7 +60,10 @@ def plan(first, next_unit: Callable[[str], Optional[object]], read_kinds: Dict[s
         keep_going = u.kind == "heading" or u.text().rstrip().endswith(":")
         cut = None
         if not keep_going and units:
-            if mode == "section":
+            if mode == "paragraph":
+                if u.kind in BODY and chars >= PARA_CHARS:
+                    cut = "paragraph"
+            elif mode == "section":
                 if nxt.kind == "heading" and chars >= MIN_CHARS:
                     cut = "section"
                 elif chars >= CAP_CHARS:
@@ -79,4 +87,4 @@ def plan(first, next_unit: Callable[[str], Optional[object]], read_kinds: Dict[s
     if not units:
         return None
     return {"units": units, "end": units[-1]["id"], "chars": chars, "minutes": round(chars / CHARS_PER_MINUTE, 1),
-            "ask": chars >= MIN_CHARS, "why": why}
+            "ask": chars >= min_chars(mode), "why": why}

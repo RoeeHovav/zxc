@@ -134,7 +134,7 @@ export interface Settings {
   ai_pronunciation: boolean;
   pronunciation_model: string;
   free_fallback: boolean;
-  quiz_mode: "off" | "section" | "page" | "minutes";
+  quiz_mode: "off" | "paragraph" | "section" | "page" | "minutes";
   quiz_minutes: number;
   quiz_style: "mixed" | "recall" | "choice";
   quiz_read_aloud: boolean;
