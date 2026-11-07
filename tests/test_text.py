@@ -66,6 +66,27 @@ def test_hebrew_date_days_are_spoken_by_letter_name_not_as_a_bare_sound():
     assert norm("פרק ד' באמצע")[1] == "ד'" and norm("סעיף ב' לחוק")[1] == "ב'"  # a letter that is not a date day is left alone
 
 
+def test_dates_written_with_digits_are_spoken_as_dates():
+    assert norm("ב-17.11.1947 החליטה") == ["בשבעה עשר בנובמבר 1947", "החליטה"]
+    assert norm("עד ה-1.1, והתשלום")[1] == "האחד בינואר,"
+    assert norm("הכנס ב-3.2 בשעה")[1] == "בשלושה בפברואר"
+    assert norm("בין 1.1 ל-17.11 נסגר")[1:3] == ["אחד בינואר", "לשבעה עשר בנובמבר"]
+    assert norm("בין 1.1-17.11 סגור")[1] == "אחד בינואר לשבעה עשר בנובמבר"
+    assert norm("בתאריך 17/11/47 נחתם")[1] == "שבעה עשר בנובמבר 1947"
+    assert norm("נולד ב-31.12.1999.")[1] == "בשלושים ואחד בדצמבר 1999."
+    assert norm("ומ-1.1.1948 החלו")[0] == "ומהאחד בינואר 1948"
+    # not dates: section numbers, decimals, versions, impossible days or months
+    for s in ("ראו סעיף 1.1 ופרק 2.3", "1.1 פתיחה", "המחיר עלה ב-2.5%.", "עלה ב-2.5 אחוז", "גרסה 1.2.3 יצאה", "ב-32.13 משהו"):
+        assert norm(s) == s.split()
+
+
+def test_both_gender_slash_forms_are_read_as_two_words():
+    assert norm("כל תלמיד/ה יקבל/תקבל חוברת.")[1:3] == ["תלמיד או תלמידה", "יקבל או תקבל"]
+    assert norm("המורים/ות הגיעו")[0] == "המורים או המורות"
+    assert norm("סטודנטי/ת השנה")[0] == "סטודנטי או סטודנטית"
+    assert norm("and/or") == ["and/or"]
+
+
 def test_acronym_context_rules():
     out = norm('5 מ"מ וגם מ"מ ומ"פ')
     assert out[1] == "מִילִימֶטֶר"          # after a number: millimetre

@@ -72,6 +72,11 @@ Chromium. It uses the test-tone engine for audio and passes:
   and "כָּל" with a plain qamats was read "kal"; Dicta is therefore asked to mark qamats qatan, which the app writes
   as holam ("kol"). Caveats: the listener is itself a model (a lighter one was noisy on the shva), and no person has
   listened.
+- **Fixed in 0.11.1:** a passage containing any word that already had marks (the app's own expansion of an
+  abbreviation such as צה"ל → צַהַל, or a user correction) got NO Dicta marks at all in 0.11.0 (Dicta re-vowels its
+  input, so its answer no longer matched and was discarded). Dicta is now sent the text without marks and those words
+  keep their own. Also left unmarked now: one-letter prefixes before a number ("בִּ-2.5%" was produced) and words with
+  a geresh (ג'ירפה came back as "הַגִּ'ירָפָה"). Checked on sentences written for the purpose (not the user's PDF).
 - **Dicta Nakdan** (`narrator/llm/nakdan.py`, merged in `_vocalize_chunk`). Measured live: 46/48 = 96% on the
   ambiguous-word set (dev 22/23, held-out 24/25), the same with all 48 sentences in one request; together with
   gemini-3.1-flash-lite (46/48 alone) 47/48. Its errors seen so far: הספר (barber) in "הספר גזז לי את השיער", אספר

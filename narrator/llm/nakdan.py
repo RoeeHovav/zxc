@@ -33,7 +33,7 @@ import httpx
 log = logging.getLogger(__name__)
 
 URL = "https://nakdan-2-0.loadbalancer.dicta.org.il/api"
-VERSION = "d1"
+VERSION = "d2"
 TIMEOUT = 12.0
 MAX_CHARS = 9000  # Dicta's own page splits at 10 000 characters
 
@@ -68,6 +68,21 @@ def clean(v: str) -> str:
     return unicodedata.normalize("NFC", v)
 
 
+GERESH = re.compile("[\"'׳״]")
+
+
+def without_marks(text: str) -> Tuple[str, List[int]]:
+    """The text with its vowel marks removed (Dicta re-vowels whatever it is given, so a word the app or the user
+    already marked would come back changed and spoil the whole answer), and for each remaining character its
+    position in `text`."""
+    plain, back = [], []
+    for i, c in enumerate(text):
+        if not NIQQUD.match(c):
+            plain.append(c)
+            back.append(i)
+    return "".join(plain), back
+
+
 def _first(option) -> str:
     return option[0] if isinstance(option, list) and option else option if isinstance(option, str) else ""
 
@@ -87,6 +102,10 @@ def parse(reply: object, text: str) -> Optional[List[Tuple[int, int, str]]]:
             return None
         start, pos = pos, pos + len(word)
         if w.get("sep") or not HEBREW.search(word) or HAS_NIQQUD.search(word):
+            continue
+        if len(word) < 2 or GERESH.search(word):
+            # a one-letter prefix before a number ("ב-1948") and abbreviations or foreign sounds written with a
+            # geresh (צה"ל, ג'ירפה) are left to the voice, which reads them better without marks
             continue
         opts = w.get("options") or []
         v = clean(_first(opts[0])) if opts else ""
@@ -146,7 +165,26 @@ class Nakdan:
 
     async def vowel_many(self, texts: List[str]) -> List[Optional[List[Tuple[int, int, str]]]]:
         """Vowelled spans for each text (None where Dicta could not be asked).  Texts not yet remembered are sent
-        together, one request per ~9000 characters."""
+        together, one request per ~9000 characters.  Words that already carry vowel marks keep them."""
+        maps = {t: without_marks(t) for t in texts}
+        res = await self._vowel_plain([maps[t][0] for t in texts])
+        out: List[Optional[list]] = []
+        for t, spans in zip(texts, res):
+            if spans is None:
+                out.append(None)
+                continue
+            plain, back = maps[t]
+            mine = []
+            for a, b, v in spans:
+                oa, ob = back[a], back[b - 1] + 1
+                if NIQQUD.search(t[oa:ob]) or NIQQUD.match(t[ob:ob + 1]):
+                    continue  # already marked in the text: keep those marks
+                mine.append((oa, ob, v))
+            out.append(mine)
+        return out
+
+    async def _vowel_plain(self, texts: List[str]) -> List[Optional[List[Tuple[int, int, str]]]]:
+        """Dicta's spans for texts without vowel marks (remembered on disk per text)."""
         out: List[Optional[list]] = [None] * len(texts)
         todo: Dict[str, List[int]] = {}
         for i, t in enumerate(texts):

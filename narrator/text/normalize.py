@@ -179,6 +179,8 @@ def normalize_words(words: Sequence[str], flags: Sequence[int], opts: NormOption
     toks = _tidy_for_speech(toks, opts)
     toks = _hebrew_joins(toks, opts)
     toks = _hebrew_dates(toks, opts)
+    toks = _numeric_dates(toks, opts)
+    toks = _slash_forms(toks, opts)
     toks = _english_hyphenation(toks, opts)
     if opts.skip_citations:
         toks = [t for t in toks if not _CITATION_RE.match(t.text)]
@@ -281,6 +283,113 @@ def _hebrew_dates(toks: List[Tok], opts: NormOptions) -> List[Tok]:
         prefix = (m.group(1) or "").rstrip("-")
         words = _day_words(m.group(2))
         out[i] = Tok(prefix + words + m.group(3), out[i].a, out[i].b, True)
+    return out
+
+
+_CARDINAL_M = ["", "אחד", "שניים", "שלושה", "ארבעה", "חמישה", "שישה", "שבעה", "שמונה", "תשעה", "עשרה", "אחד עשר",
+               "שנים עשר", "שלושה עשר", "ארבעה עשר", "חמישה עשר", "שישה עשר", "שבעה עשר", "שמונה עשר", "תשעה עשר"]
+_IN_MONTH = ["", "בינואר", "בפברואר", "במרץ", "באפריל", "במאי", "ביוני", "ביולי", "באוגוסט", "בספטמבר", "באוקטובר",
+             "בנובמבר", "בדצמבר"]
+_DATE_RE = re.compile(r"^(\W*?)((?:[והבלמש]{1,3})-)?(\d{1,2})([./])(\d{1,2})(?:\4(\d{4}|\d{2}))?"
+                      r"(?:[-–](\d{1,2})\4(\d{1,2})(?:\4(\d{4}|\d{2}))?)?([,.;:!?)\]\"'״]*)$")
+# a bare "1.1" is far more often a section number or a decimal; it is read as a date only next to a date word
+_DATE_CUES = {"בין", "יום", "ביום", "מיום", "ליום", "עד", "ועד", "תאריך", "בתאריך", "מתאריך", "לתאריך", "החל", "החל מ",
+              "מאז", "לפני", "אחרי", "לאחר", "נולד", "נולדה", "נפטר", "נפטרה", "נחתם", "נחתמה", "ראשון", "שני", "שלישי",
+              "רביעי", "חמישי", "שישי", "שבת", "מוצאי"}
+_NOT_DATE_AFTER = {"%", "אחוז", "אחוזים", "מיליון", "מיליארד", "אלף", "שקל", "שקלים", 'ש"ח', "מטר", "מטרים", 'ק"מ',
+                   'ס"מ', "קילו", "ק\"ג", "דולר", "נקודות", "פעמים", "שעות", "דקות", "שניות"}
+_NOT_DATE_BEFORE = {"סעיף", "סעיפים", "פרק", "פרקים", "עמ'", "עמוד", "עמודים", "טבלה", "איור", "תרשים", "שאלה", "משימה",
+                    "תרגיל", "גרסה", "גרסא", "פי", "עלה", "עלתה", "עלו", "ירד", "ירדה", "ירדו", "גדל", "גדלה", "גדלו",
+                    "קטן", "קטנה", "הוכפל", "הוכפלה", "צמח", "צמחה", "ממוצע", "ציון", "דירוג"}
+
+
+def _day_cardinal(n: int) -> str:
+    if n < 20:
+        return _CARDINAL_M[n]
+    tens = "עשרים" if n < 30 else "שלושים"
+    return tens + (" ו" + _CARDINAL_M[n % 10] if n % 10 else "")
+
+
+def _spoken_date(day: str, month: str, year: Optional[str]) -> Optional[str]:
+    d, m = int(day), int(month)
+    if not (1 <= d <= 31 and 1 <= m <= 12):
+        return None
+    out = _day_cardinal(d) + " " + _IN_MONTH[m]
+    if year:
+        y = int(year)
+        if len(year) == 2:
+            y += 2000 if y <= 30 else 1900
+        out += " " + str(y)
+    return out
+
+
+def _numeric_dates(toks: List[Tok], opts: NormOptions) -> List[Tok]:
+    """Dates written with digits, "17.11.1947", "ב-3.2", "עד ה-1.1", "1.1-17.11", are spoken as dates ("בשבעה עשר
+    בנובמבר 1947") instead of being left to the voice, which reads them as decimal numbers.  A two-part number such
+    as 1.1 is a date only when a Hebrew prefix is attached to it (ב-, ה-, מ-, עד ה-) or a date word stands next to it,
+    and never after "סעיף", "פרק", a verb of change ("עלה ב-2.5") or before a unit ("2.5 אחוז")."""
+    if opts.lang != "he":
+        return toks
+    out = list(toks)
+    for i, t in enumerate(out):
+        if t.replaced or not any(c.isdigit() for c in t.text):
+            continue
+        m = _DATE_RE.match(t.text)
+        if not m:
+            continue
+        lead, prefix, d1, sep, m1, y1, d2, m2, y2, trail = m.groups()
+        prev = re.sub(r"[,.;:!?()\"']+$", "", out[i - 1].text) if i else ""
+        nxt = re.sub(r"^[(\"']+|[,.;:!?)]+$", "", out[i + 1].text) if i + 1 < len(out) else ""
+        full = bool(y1 or y2)
+        if not full:
+            if prev in _NOT_DATE_BEFORE or nxt in _NOT_DATE_AFTER or (trail and "%" in trail):
+                continue
+            if not (prefix or d2 or prev in _DATE_CUES or prev.lstrip("ו") in _DATE_CUES or sep == "/"):
+                continue
+        first = _spoken_date(d1, m1, y1 if not d2 else y1)
+        if not first:
+            continue
+        spoken = first
+        if d2:
+            second = _spoken_date(d2, m2, y2)
+            if not second:
+                continue
+            spoken = first + (" ל" if prev == "בין" else " עד ") + second
+        pre = (prefix or "").rstrip("-")
+        if pre.endswith("מ"):
+            pre += "ה"  # "מ-1.1" is said "מהאחד בינואר" ("מאחד" would be read as the construct form)
+        out[i] = Tok(lead + pre + spoken + trail, t.a, t.b, True)
+    return out
+
+
+_SLASH_SUFFIX_RE = re.compile(r"^(\W*)([א-ת]{2,})/(ה|ית|ות|ת|ים)([,.;:!?)\]\"']*)$")
+_SLASH_WORDS_RE = re.compile(r"^(\W*)([א-ת]{2,})/([א-ת]{2,})([,.;:!?)\]\"']*)$")
+
+
+def _slash_forms(toks: List[Tok], opts: NormOptions) -> List[Tok]:
+    """Forms written for both genders, "תלמיד/ה", "מורים/ות", "יקבל/תקבל", are spoken as two words joined by "או"
+    ("תלמיד או תלמידה") instead of leaving the voice to read the slash or stumble over the ending."""
+    if opts.lang != "he":
+        return toks
+    out = list(toks)
+    for i, t in enumerate(out):
+        if t.replaced or "/" not in t.text:
+            continue
+        m = _SLASH_SUFFIX_RE.match(t.text)
+        if m:
+            lead, word, suf, trail = m.groups()
+            if suf == "ות" and word.endswith("ים"):
+                other = word[:-2] + "ות"
+            elif suf == "ית" and word.endswith("י"):
+                other = word + "ת"
+            else:
+                other = word + suf
+            out[i] = Tok(lead + word + " או " + other + trail, t.a, t.b, True)
+            continue
+        m = _SLASH_WORDS_RE.match(t.text)
+        if m:
+            lead, a, b, trail = m.groups()
+            out[i] = Tok(lead + a + " או " + b + trail, t.a, t.b, True)
     return out
 
 

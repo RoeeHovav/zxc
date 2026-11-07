@@ -107,6 +107,10 @@ python -m venv .venv
     not read, a year range that a right-to-left page put back to front is read in order ("(1575-1488)" is spoken
     1488-1575), a call-out label such as "למחשבה" gets its pause, brackets stuck to the previous word are separated,
     and a heading or list item without a full stop gets one so the voice ends it like a sentence;
+  - dates written with digits are spoken as dates: "ב-17.11.1947" → "בשבעה עשר בנובמבר 1947", "עד ה-1.1" → "עד האחד
+    בינואר" (a bare "1.1" counts as a date only with a prefix such as ב-/ה-/מ- or a date word next to it, never after
+    "סעיף"/"פרק", after "עלה ב-" or before "%"/"אחוז", so section numbers and decimals are left alone);
+  - forms for both genders are read as two words: "תלמיד/ה" → "תלמיד או תלמידה", "יקבל/תקבל" → "יקבל או תקבל";
   - the day in a Hebrew date is spoken by its letter names, as people say it, instead of as a bare sound
     ("ד' באייר" → "dalet be-Iyar", "ט"ו בשבט" → "Tu bi-Shvat", "ב-כ"ט בחשוון" → "be-kaf tet be-Heshvan").
 
@@ -117,7 +121,9 @@ python -m venv .venv
   counted" and with marks as "the barber … counted". Measured on the 48 test sentences below, Dicta picks the right
   reading 96% of the time (46/48), and with the Gemini assistant deciding the ambiguous words 98% (47/48)
   (`python scripts/eval_pronunciation.py --engine dicta` / `--engine both`). It has no daily allowance and answers in
-  about half a second. "o" vowels that a voice could read as "a" (כׇּל) are written as holam. Switch it off in
+  about half a second. "o" vowels that a voice could read as "a" (כׇּל) are written as holam. Words that already carry
+  marks (the app's expansions of abbreviations, your own corrections) keep them; one-letter prefixes before a number
+  ("ב-1948") and words written with ׳ or ״ (צה"ל, ג'ירפה) are left to the voice, which reads them better unmarked. Switch it off in
   Settings → Pronunciation assistant; saying "no" when asked also switches it off and reading carries on without it.
 - **Pronunciation assistant (Hebrew).** Unvowelled Hebrew has words that are written the same but read
   differently (שמן = oil / "their name", ספר = book / barber / counted). With a Gemini key (free; text only, whose

@@ -64,6 +64,24 @@ def test_parse_maps_every_word_and_rejects_changed_letters():
     assert N.parse({"error": 1}, SENT) is None
 
 
+def test_words_already_marked_keep_their_marks_and_the_rest_is_still_vowelled(tmp_path):
+    calls = []
+    v = make(tmp_path, handler_for(calls, table={**VOWELLED, "צהל": "צַהַל"}))
+    text = "מקראות צַהַל ישראל"  # the app's own expansion of צה"ל already carries marks
+    spans = asyncio.run(v.vowel(text))
+    assert "ֿ" not in calls[0]["data"] and calls[0]["data"] == "מקראות צהל ישראל"  # Dicta gets plain letters
+    got = {text[a:b]: w for a, b, w in spans}
+    assert got == {"מקראות": "מִקְרָאוֹת", "ישראל": "יִשְׂרָאֵל"}  # the marked word is left as it was
+
+
+def test_one_letter_prefixes_and_geresh_words_are_left_to_the_voice(tmp_path):
+    reply = [{"word": "ב", "sep": False, "options": [["בִּ", []]]}, {"word": "-2.5% ", "sep": True, "options": []},
+             {"word": "הג'ירפה", "sep": False, "options": [["הַגִּ'ירָפָה", []]]}, {"word": " ", "sep": True, "options": []},
+             {"word": "גדלה", "sep": False, "options": [["גָּדְלָה", []]]}]
+    text = "ב-2.5% הג'ירפה גדלה"
+    assert [text[a:b] for a, b, _ in N.parse(reply, text)] == ["גדלה"]
+
+
 def test_one_request_for_many_passages_and_cached(tmp_path):
     calls = []
     v = make(tmp_path, handler_for(calls))
@@ -72,7 +90,7 @@ def test_one_request_for_many_passages_and_cached(tmp_path):
     assert len(calls) == 1 and calls[0]["keepqq"] is True and calls[0]["data"].count("\n") == 1  # duplicates and English not sent
     assert out[1] == [] and out[0] == out[3]
     third = {texts[2][a:b]: w for a, b, w in out[2]}
-    assert third["כל"] == "כֹּל" and N.strip_marks(third["הספר"]) == "הספר" and third['צה"ל'] == 'צַהַ"ל'
+    assert third["כל"] == "כֹּל" and N.strip_marks(third["הספר"]) == "הספר" and 'צה"ל' not in third  # left to the voice
     again = asyncio.run(v.vowel_many(texts))
     assert again == out and len(calls) == 1  # remembered on disk
 
