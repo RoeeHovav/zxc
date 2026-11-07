@@ -102,7 +102,13 @@ python -m venv .venv
   - Hebrew prefixes are handled (בצה"ל, והרמטכ"ל);
   - math is spoken as words (`x² + y² = z²` → "x squared plus y squared equals z squared");
   - citations and footnote markers are skipped;
-  - whole sentences in another language get a matching voice.
+  - whole sentences in another language get a matching voice;
+  - what a page's layout leaves behind is cleaned up for the *voice only*: list bullets and footnote asterisks are
+    not read, a year range that a right-to-left page put back to front is read in order ("(1575-1488)" is spoken
+    1488-1575), a call-out label such as "למחשבה" gets its pause, brackets stuck to the previous word are separated,
+    and a heading or list item without a full stop gets one so the voice ends it like a sentence;
+  - the day in a Hebrew date is spoken as a number, not as a letter ("ד' באייר" → "ארבעה באייר",
+    "ב-כ"ט בחשוון" → "בעשרים ותשעה בחשוון").
 
   The original text is never rewritten. Only how it is spoken changes.
 - **Pronunciation assistant (Hebrew).** Unvowelled Hebrew has words that are written the same but read
@@ -115,6 +121,20 @@ python -m venv .venv
   about 12 passages per request and moves on to the next model when one is used up. Try it in the **Voice lab** (sample "שמן").
   **Whether a given voice follows vowel marks is not known until you listen**; if a voice ignores them, the
   assistant cannot help with that voice.
+- **Comprehension checkpoints.** After a stretch of listening (the end of a section, a page, or every N minutes,
+  your choice in the player bar) the reading waits and asks about what you just heard: two multiple-choice questions
+  and one open one ("explain in your own words", then you check yourself against the key points). Each question is
+  written from the text you actually heard and comes with a quotation from it that the app verifies is really in the
+  text; a question whose quotation cannot be found is thrown away. Wrong answers are built from the passage's own
+  material instead of silly options, and the app asks a second time (without the text) which questions a person
+  could answer without listening and prefers the ones they could not. Answered wrong? **Hear that part again** plays
+  the sentence where the answer was said and then carries on where you were; the question returns at the next
+  checkpoint. Press **1-4** to answer, **Esc** or the play button to skip. The questions are written while you listen,
+  so there is normally no wait. Needs the free Gemini key; only the text of the stretch you heard is sent, only
+  after you agree; answers and scores stay on this computer. Each checkpoint costs two of Google's free daily
+  requests. **Honest limit:** multiple-choice questions can often be answered without listening when the subject is
+  familiar (a strong model answered 83-90% of the questions on the sample history booklet without seeing it); open
+  questions cannot be guessed, so Settings offers "open questions only". See docs/STATUS.md.
 - **Your pronunciation fixes.** Right-click a word, then choose **Fix
   pronunciation…** and enter niqqud or a respelling. The fix can apply to that
   occurrence, to the whole document, or to all documents. Multi-word entries act

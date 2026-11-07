@@ -1,4 +1,4 @@
-import { api, ApiError, PrepStatus, Speech, Unit } from "../api";
+import { api, ApiError, PrepStatus, QuizPlan, Speech, Unit } from "../api";
 
 export type Status = "idle" | "loading" | "playing" | "paused" | "error";
 
@@ -27,6 +27,13 @@ export interface StopAt {
 }
 
 type Start = { word?: number; time?: number; fromEnd?: number };
+
+/** Document order of two unit ids ("page.block"). */
+export function cmpUnit(a: string, b: string) {
+  const [pa, ba] = a.split(".").map(Number);
+  const [pb, bb] = b.split(".").map(Number);
+  return pa !== pb ? pa - pb : ba - bb;
+}
 
 export function cmpRef(a: [number, number], b: [number, number]) {
   return a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1];
@@ -58,6 +65,19 @@ export class Narrator extends EventTarget {
   /** Teacher Mode: called at the end of each section; narration continues when it resolves. */
   teacherMode = false;
   teacherHandler?: (unit: Unit) => Promise<void>;
+
+  /** Comprehension checkpoints: the stretch being listened to is planned by the server; when its last unit has been
+   * heard, narration waits while `checkpointHandler` (the questions) runs. */
+  quizOn = false;
+  quizPrefetch?: (unitIds: string[]) => void;
+  checkpointHandler?: (heard: string[], plan: QuizPlan, resumeAt: string | null) => Promise<void>;
+  private qPlan: QuizPlan | null = null;
+  private qPlanning: string | null = null;
+  private qHeard = new Set<string>();
+  private qHeardChars = 0;
+  private qPrefetched = false;
+  private qDoneUpTo: string | null = null;
+  private qTok = 0;
 
   private audio: HTMLAudioElement;
   private cur: Current | null = null;
@@ -91,6 +111,7 @@ export class Narrator extends EventTarget {
 
   destroy() {
     this.token++;
+    this.resetQuiz();
     this.audio.pause();
     this.audio.removeAttribute("src");
     cancelAnimationFrame(this.raf);
@@ -301,7 +322,9 @@ export class Narrator extends EventTarget {
       return;
     }
     if (tok !== this.token) return;
+    const prevUnit = this.cur?.unit.id;
     this.cur = { unit, chunk, speech: sp, starts: sp.words.map((w) => w[1]) };
+    if (prevUnit !== unit.id) this.noteUnitStart(unit);
     const a = this.audio;
     if (!a.src.endsWith(sp.audio)) {
       a.src = sp.audio;
@@ -399,6 +422,7 @@ export class Narrator extends EventTarget {
     const tok = this.token;
     const next = await this.nextChunkPos(cur.unit, cur.chunk);
     if (tok !== this.token) return;
+    if ((!next || next.unit.id !== cur.unit.id) && !(await this.afterUnit(cur.unit, next ? next.unit.id : null, tok))) return;
     if (!next || this.beyondStop(next.unit.words[next.unit.chunks[next.chunk].words[0]] ?? [1e9, 0])) {
       this.save("finished");
       this.setStatus("idle");
@@ -420,6 +444,77 @@ export class Narrator extends EventTarget {
       this.pendingNext = null;
       this.loadChunk(next.unit, next.chunk, { time: 0 }, tok);
     }, gap);
+  }
+
+  // ------------------------------------------------------- comprehension checkpoints
+  resetQuiz() {
+    this.qTok++;
+    this.qPlan = null;
+    this.qPlanning = null;
+    this.qHeard = new Set();
+    this.qHeardChars = 0;
+    this.qPrefetched = false;
+    this.qDoneUpTo = null;
+  }
+
+  /** A unit starts playing: if it is outside the planned stretch, plan a new one that starts here. */
+  private noteUnitStart(unit: Unit) {
+    if (!this.quizOn || this.stopAt) return;
+    if (this.qPlan && this.qPlan.units.some((u) => u.id === unit.id)) return; // still inside the stretch
+    if (this.qDoneUpTo) {
+      if (cmpUnit(unit.id, this.qDoneUpTo) <= 0) return; // hearing something again that was already asked about
+      this.qDoneUpTo = null;
+    }
+    if (this.qPlanning === unit.id) return;
+    this.qPlan = null;
+    this.qHeard = new Set();
+    this.qHeardChars = 0;
+    this.qPrefetched = false;
+    this.qPlanning = unit.id;
+    const tok = ++this.qTok;
+    api
+      .quizPlan(this.docId, unit.id)
+      .then((r) => {
+        if (tok === this.qTok && r.plan && r.plan.ask) this.qPlan = r.plan;
+      })
+      .catch(() => {
+        /* no plan: no checkpoint for this stretch */
+      })
+      .finally(() => {
+        if (this.qPlanning === unit.id) this.qPlanning = null;
+      });
+  }
+
+  /** A unit has been heard to its end.  Returns false when narration should not carry on by itself. */
+  private async afterUnit(unit: Unit, nextId: string | null, tok: number): Promise<boolean> {
+    const plan = this.qPlan;
+    if (!this.quizOn || !plan || this.stopAt) return true;
+    const entry = plan.units.find((u) => u.id === unit.id);
+    if (!entry) return true;
+    if (!this.qHeard.has(unit.id)) {
+      this.qHeard.add(unit.id);
+      this.qHeardChars += entry.chars;
+    }
+    if (!this.qPrefetched && this.qHeardChars >= 0.5 * plan.chars && this.quizPrefetch) {
+      this.qPrefetched = true; // by now the listener is half way through: start writing the questions
+      this.quizPrefetch(plan.units.map((u) => u.id));
+    }
+    if (unit.id !== plan.end) return true;
+    const heard = plan.units.filter((u) => this.qHeard.has(u.id)).map((u) => u.id);
+    this.qDoneUpTo = plan.end;
+    this.qPlan = null;
+    this.qHeard = new Set();
+    this.qHeardChars = 0;
+    this.qPrefetched = false;
+    if (this.checkpointHandler && heard.length) {
+      this.setStatus("paused");
+      try {
+        await this.checkpointHandler(heard, plan, nextId);
+      } catch {
+        /* the questions must never stop the reading */
+      }
+    }
+    return tok === this.token;
   }
 
   pause() {
@@ -466,6 +561,7 @@ export class Narrator extends EventTarget {
 
   stop() {
     this.token++;
+    this.resetQuiz();
     clearTimeout(this.gapTimer);
     this.pendingNext = null;
     this.audio.pause();

@@ -28,6 +28,9 @@ from .text.normalize import LexEntry, Lexicon, load_builtin, strip_niqqud, unify
 from .tts.azure import AzureProvider
 from .tts.base import ProviderInfo, TTSError, TTSProvider, Voice
 from .llm.pronounce import HEB_WORD as HEB_WORD_RE, PronounceError, Vocalizer, apply as apply_vowels
+from .llm.quiz import STYLES as QUIZ_STYLES, Passage, QuizError, QuizMaker, assemble as assemble_questions, reshuffle as reshuffle_question
+from .llm.testquiz import TestQuizModel
+from .narration import checkpoints
 from .tts.edge import EdgeProvider
 from .tts.gemini import CHUNK_CHARS as GEMINI_CHUNK_CHARS, GeminiProvider
 from .tts.testtone import TestToneProvider
@@ -45,6 +48,15 @@ PRONUNCIATION_INFO = ProviderInfo(
              " pronunciation of ambiguous words from the sentence. Only text is sent, never the PDF. On Google's free tier"
              " Google may use submitted content to improve its products."),
     verified="Request handling and validation are tested against a simulated service; live results are unverified.")
+
+
+QUIZ_CONSENT = "gemini-quiz"
+QUIZ_INFO = ProviderInfo(
+    id=QUIZ_CONSENT, name="Gemini comprehension questions", free=True, cloud=True, requires_key=True, word_timing=False,
+    privacy=("The text of the stretch you just listened to (a few paragraphs) is sent to Google's Gemini API, with your key, so"
+             " it can write questions about it. Only text is sent, never the PDF. Your answers and scores stay on this"
+             " computer. On Google's free tier Google may use submitted content to improve its products."),
+    verified="Question writing and the checks on it are tested against a simulated service and measured on a sample document; see docs/STATUS.md.")
 
 
 class ConsentRequired(Exception):
@@ -125,6 +137,7 @@ class NarratorService:
         self._secrets_path = os.path.join(self.data_dir, "secrets.json")
         self.explanations = ExplanationCache(os.path.join(self.data_dir, "explanations"))
         self.vocalizer = Vocalizer(os.path.join(self.data_dir, "pronunciation"))
+        self.quiz = QuizMaker(TestQuizModel() if self.test_mode else self.vocalizer, os.path.join(self.data_dir, "quiz"))
         self._pron_notice_at = 0.0
         self._apply_provider_settings()
 
@@ -976,6 +989,103 @@ class NarratorService:
         title = (self.db.document(doc_id) or {}).get("title", "")
         text = await llm_explain(client, self.explanations, u.lang, title, heading, previous, passage)
         return {"text": text, "lang": u.lang, "model": client.model, "heading": heading, "unit_id": u.id, "scope": scope}
+
+    # ============================================================ comprehension checkpoints
+    async def quiz_plan(self, doc_id: str, unit_id: str) -> dict:
+        """The stretch of narration that starts at `unit_id` and where its checkpoint goes ({"plan": None} when off)."""
+        s = self.settings()
+        mode = s.get("quiz_mode", "off")
+        if mode not in checkpoints.MODES or mode == "off":
+            return {"plan": None}
+        st = self.open(doc_id)
+        loop = asyncio.get_running_loop()
+        first = await loop.run_in_executor(None, st.units.find_unit, unit_id)
+        if first is None:
+            raise KeyError(unit_id)
+        read = s.get("read_kinds", {})
+        minutes = float(s.get("quiz_minutes", 6) or 6)
+        plan = await loop.run_in_executor(None, lambda: checkpoints.plan(first, st.units.next_unit, read, mode, minutes))
+        return {"plan": plan}
+
+    def _check_quiz_consent(self) -> None:
+        if QUIZ_CONSENT not in self.settings().get("cloud_consent", {}):
+            raise ConsentRequired(QUIZ_CONSENT, QUIZ_INFO)
+
+    async def _quiz_passage(self, st: DocState, unit_ids: List[str]):
+        loop = asyncio.get_running_loop()
+        units: List[Unit] = []
+        for uid in unit_ids[:120]:
+            u = await loop.run_in_executor(None, st.units.find_unit, uid)
+            if u is not None:
+                units.append(u)
+        passage = Passage(units)
+        heading = next((u.text() for u in units if u.kind == "heading"), "")
+        if not heading and units:
+            cur: Optional[Unit] = units[0]
+            for _ in range(60):
+                cur = await loop.run_in_executor(None, st.units.prev_unit, cur.id)
+                if cur is None:
+                    break
+                if cur.kind == "heading":
+                    heading = cur.text()
+                    break
+        langs: Dict[str, int] = {}
+        for u in units:
+            if u.kind in checkpoints.BODY:
+                langs[u.lang] = langs.get(u.lang, 0) + len(u.texts)
+        lang = max(langs.items(), key=lambda kv: kv[1])[0] if langs else (units[0].lang if units else "en")
+        return units, passage, heading, lang
+
+    async def quiz_make(self, doc_id: str, unit_ids: List[str], prefetch: bool = False) -> dict:
+        """Questions about the units the listener heard.  With `prefetch` the questions are only started in the background
+        (so they are ready when the stretch ends)."""
+        if not (self.vocalizer.key or self.test_mode):
+            return {"status": "no-key", "questions": []}
+        self._check_quiz_consent()
+        st = self.open(doc_id)
+        _units, passage, heading, lang = await self._quiz_passage(st, unit_ids)
+        if len(passage.text) < int(0.7 * checkpoints.MIN_CHARS):
+            return {"status": "too-short", "questions": []}
+        title = (self.db.document(doc_id) or {}).get("title", "")
+        rows = self.db.quiz_rows(doc_id)
+        asked = [r["question"].get("q", "") for r in rows[-8:]]
+        if prefetch:
+            if self.quiz.ready(passage, lang):
+                return {"status": "ready-cached"}
+            self.quiz.start(passage, lang, title, heading, asked)
+            return {"status": "started"}
+        try:
+            res = await self.quiz.make(passage, lang, title, heading, asked)
+        except QuizError as exc:
+            log.info("quiz unavailable: %s", exc)
+            return {"status": "paused" if exc.quota else "error", "message": str(exc), "questions": []}
+        style = self.settings().get("quiz_style", "mixed")
+        questions = assemble_questions(res, style if style in QUIZ_STYLES else "mixed")
+        # a question that was missed earlier comes back first, with its answers in a different order
+        have = {q["qid"] for q in questions}
+        pending = [r for r in self.db.quiz_pending(doc_id) if r["qid"] not in have]
+        revisit = None
+        if pending:
+            q0 = pending[0]["question"]
+            revisit = dict(reshuffle_question(q0, "r%d" % len(rows)) if q0.get("options") else q0, revisit=True)
+        out = ([revisit] if revisit else []) + questions
+        return {"status": "ready" if out else "empty", "questions": out, "heading": heading, "reason": res.get("reason", ""),
+                "model": res.get("model"), "verified": res.get("verified")}
+
+    def quiz_answer(self, doc_id: str, question: dict, score: float, picked: Optional[int] = None, revisit: bool = False) -> dict:
+        self.db.add_quiz_answer(doc_id, question, max(0.0, min(1.0, float(score))), picked, revisit)
+        return self.quiz_summary(doc_id)
+
+    def quiz_summary(self, doc_id: str) -> dict:
+        rows = self.db.quiz_rows(doc_id)
+        n = len(rows)
+        points = sum(r["score"] for r in rows)
+        kinds: Dict[str, List[float]] = {}
+        for r in rows:
+            kinds.setdefault(r["question"].get("kind", "?"), []).append(r["score"])
+        return {"asked": n, "points": round(points, 1), "percent": round(100.0 * points / n) if n else None,
+                "by_kind": {k: {"asked": len(v), "points": round(sum(v), 1)} for k, v in kinds.items()},
+                "pending": [r["question"] for r in self.db.quiz_pending(doc_id)][:60]}
 
     # ============================================================ lexicon
     def lexicon_changed(self) -> None:

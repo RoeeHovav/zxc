@@ -67,6 +67,9 @@ audio_cache/, explanations/, narrator.sqlite3, secrets.json, tessdata/
     1. footnote marks and exponents;
     2. leaders;
     3. detached punctuation;
+    3b. speech-only tidy-ups (`_tidy_for_speech`: list bullets and asterisks dropped, reversed year ranges put
+        in order on Hebrew pages, call-out labels get a colon, stuck brackets separated); the same tokens keep
+        their source word range, so highlighting is unaffected;
     4. Hebrew prefix-hyphen joins;
     5. vocabulary-based split-word repair;
     6. English de-hyphenation;
@@ -74,7 +77,8 @@ audio_cache/, explanations/, narrator.sqlite3, secrets.json, tessdata/
     8. per-occurrence fixes;
     9. lexicon (user phrase rules, then the built-in TSV, with Hebrew prefixes
        and `after_number` / `not_after_number` / `before_number` context);
-    10. math verbalisation.
+    10. math verbalisation;
+    11. headings, list items and side notes without final punctuation get a full stop (`_close_the_sentence`).
   - Sentences are grouped into chunks of ≤ 900 characters per language, so a
     whole English sentence inside Hebrew gets the English voice.
   - Pauses and pacing per block kind (`DELIVERY`) are applied by the player.
@@ -89,6 +93,25 @@ audio_cache/, explanations/, narrator.sqlite3, secrets.json, tessdata/
     (niqqud/punctuation-insensitive), then mapped back to page words.
   - Words without timing are interpolated.
   - The quality is reported honestly as `word` or `estimated`.
+
+## Comprehension checkpoints
+
+- `narration/checkpoints.py` plans a *stretch* from the unit where listening starts (end of section / page /
+  after N minutes; never right after a heading or a line ending in a colon). The player asks for the plan
+  (`POST /quiz/plan`), notes which units were heard to their end, and when the last unit of the stretch ends it
+  pauses and runs the checkpoint handler (`Quiz.tsx`). Half way through a stretch the questions are started in
+  the background (`prefetch`), so they are normally ready.
+- `llm/quiz.py` builds the questions from exactly the heard text: one request writes 6 multiple-choice and 3 open
+  candidates (prompt requires passage-sourced wrong answers, a verbatim quotation per question, no absolute words),
+  the app verifies each quotation against the text (`Passage.locate`), rejects self-answering options, places the
+  right answer itself, then asks the same model *without the text* which questions it could answer and keeps the
+  ones it could not (`guess_without_passage`, `select`). The result (both lists) is cached on disk per passage;
+  `assemble` picks the mix by the `quiz_style` setting. It shares the Gemini key, model list, pacing and
+  free-allowance state with the pronunciation assistant (`Vocalizer.ask_json`).
+- Answers are stored in SQLite (`quiz_answers`); a missed question comes back first at the next checkpoint with
+  its options in another order (`reshuffle`). "Hear that part again" plays the sentence holding the quotation
+  (`stopAt`) and then resumes where the reading had got to.
+- Test mode uses `llm/testquiz.py`, a pretend writer, so the whole flow runs without a network.
 
 ## Player (`web/src/player/Narrator.ts`)
 

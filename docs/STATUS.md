@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04 · version 0.9.9. This is the hand-over record for
+Last updated: 2026-11-07 · version 0.10.0. This is the hand-over record for
 continuing development across sessions.
 
 ## Verified (automated)
@@ -124,6 +124,30 @@ Chromium. It uses the test-tone engine for audio and passes:
   but the free allowance (a few requests) as far too small; mitigations (quota-kind detection, pacing, model
   rotation, 2000-character requests, automatic fall-back to the free voice, slow "patient" background narration)
   are tested against a simulated service only and cannot lift Google's limit.
+- **Comprehension checkpoints** (`narrator/llm/quiz.py`, `narrator/narration/checkpoints.py`, `Quiz.tsx`, 0.10.0).
+  Tested with a pretend question writer (unit tests of planning, grounding checks, caching, styles, consent, answers,
+  missed questions returning; a browser run `tests/e2e/quiz.cjs` of the whole flow in English and Hebrew UI).
+  Measured on the user's 314-page booklet with `scripts/eval_quiz.py` (6 passages from pages 14-200, writer
+  gemini-3.5-flash-lite, an INDEPENDENT stronger model, gemini-3.5-flash, answering): every question that reached the
+  listener had a quotation found in the text (the app rejected 12 of 42 written for an absolute word or a quotation
+  that was not in the text); answered WITH the passage 30/30 candidates and 12/12 chosen were right (the keyed answer
+  is the unambiguous one). Answered WITHOUT the passage (title only) the same model got 27/30 candidates right, almost
+  all with top confidence, and 10/12 of the questions the app chose after its own guessability check (earlier prompt,
+  with generic wrong answers: 94%). In other words **multiple-choice questions about familiar material are largely
+  guessable by a knowledgeable reader; the prompt and the check reduce that but cannot remove it.** A person who does
+  not know the subject will do much worse than this model, so the figure is a pessimistic bound, not a human score.
+  The open questions cannot be guessed; their quality is only checked for grounding (quotation present), the key points
+  are model-written and the listener grades themselves. NOT verified: whether native Hebrew readers find the questions
+  fair and well phrased (no one has read them but the developer), the native Gemini endpoint (the sandbox can only
+  use the OpenAI-compatible one), real latency with the prefetch, and how the free allowance holds up (each checkpoint
+  = 2 requests; models were intermittently "high demand" 503 during the measurement).
+- **Spoken-text punctuation (0.10.0).** Scanning every 4th page of the booklet (75 pages, 780 passages as the voice
+  receives them) found: 46 list items starting with a bullet/asterisk, 15 year ranges back to front (the PDF stores
+  the digits in visual order on a right-to-left page; checked against word coordinates), 7 call-out labels glued to
+  their sentence ("למחשבה כפי שציינו"), 117 headings/list items with no final punctuation, 41 brackets with a stray
+  space. After the clean-ups the same scan finds 0 / 0 / 0 / 0 / 1. NOT verified: that the voices sound better for it
+  (nobody has listened), and remaining artefacts the scan does not look for (misplaced quote marks such as
+  `"יהדות "שלוש "פנים"` come from bidi extraction and are not repaired).
 - **Teacher Mode** with a real model. The protocol was tested with a mock;
   explanation quality, especially in Hebrew with small local models, is
   unknown.

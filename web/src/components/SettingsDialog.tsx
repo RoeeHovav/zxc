@@ -237,6 +237,40 @@ export default function SettingsDialog({ onClose, onChanged }: { onClose: () => 
                 : "Needs your free Gemini key (see “Speech engines” below)."}
           </div>
 
+          <div className="section-title">{he ? "בדיקות הבנה" : "Comprehension checkpoints"}</div>
+          <div className="field">
+            <label>{he ? "מתי לשאול" : "When to ask"}</label>
+            <select value={settings.quiz_mode || "off"} onChange={(e) => set({ quiz_mode: e.target.value as any })} data-testid="quiz-mode-setting">
+              <option value="off">{he ? "אף פעם" : "Never"}</option>
+              <option value="section">{he ? "בסוף כל פרק (כשיש מספיק חומר)" : "At the end of each section (when there is enough to ask about)"}</option>
+              <option value="page">{he ? "בסוף כל עמוד" : "At the end of each page"}</option>
+              <option value="minutes">{he ? "כל כמה דקות הקשבה" : "Every few minutes of listening"}</option>
+            </select>
+          </div>
+          {settings.quiz_mode === "minutes" && (
+            <div className="field">
+              <label>{he ? `כל ${settings.quiz_minutes || 6} דקות` : `Every ${settings.quiz_minutes || 6} minutes`}</label>
+              <input type="range" min={3} max={15} step={1} value={settings.quiz_minutes || 6} onChange={(e) => set({ quiz_minutes: Number(e.target.value) })} />
+            </div>
+          )}
+          <div className="field">
+            <label>{he ? "סוג השאלות" : "Kind of questions"}</label>
+            <select value={settings.quiz_style || "mixed"} onChange={(e) => set({ quiz_style: e.target.value as any })} data-testid="quiz-style">
+              <option value="mixed">{he ? "שתי שאלות רב־ברירה ושאלה פתוחה אחת" : "Two multiple-choice and one open question"}</option>
+              <option value="recall">{he ? "שאלות פתוחות בלבד — המחמיר ביותר, אי אפשר לנחש" : "Open questions only — the strictest, cannot be guessed"}</option>
+              <option value="choice">{he ? "רב־ברירה בלבד — מהיר" : "Multiple choice only — quick"}</option>
+            </select>
+          </div>
+          <label className="check">
+            <input type="checkbox" checked={!!settings.quiz_read_aloud} onChange={(e) => set({ quiz_read_aloud: e.target.checked })} />
+            {he ? "להקריא כל שאלה בקול" : "Read each question aloud"}
+          </label>
+          <div className="muted small" style={{ marginBottom: 8 }}>
+            {he
+              ? "אחרי קטע האזנה מתעכבת הקריאה ושואלים שתי שאלות רב־ברירה ושאלה אחת פתוחה על מה ששמעתם (או רק שאלות פתוחות, לפי הבחירה). שאלות רב־ברירה קל לנחש גם בלי להקשיב, בעיקר בחומר מוכר; שאלה פתוחה אי אפשר לנחש. טעיתם? אפשר לשמוע שוב את המשפט שבו נאמרה התשובה, והשאלה חוזרת בבדיקה הבאה. נשלח ל-Gemini רק הטקסט של הקטע ששמעתם (באישורכם); התשובות והציונים נשארים במחשב. כל בדיקה משתמשת בשתי בקשות מהמכסה החינמית של Gemini."
+              : "After a stretch of listening the reading waits and you get two multiple-choice questions and one open question about what you heard (or open questions only, if you choose). Multiple choice can be guessed even without listening, especially on familiar material; an open question cannot. Missed one? Hear the sentence where the answer was said; the question comes back at the next checkpoint. Only the text of the stretch you listened to is sent to Gemini (with your permission); answers and scores stay on this computer. Each checkpoint uses two requests of your free Gemini allowance."}
+          </div>
+
           <div className="section-title">{he ? "מנועי דיבור" : "Speech engines"}</div>
           {app.providers.map((p) => (
             <div className="provider-card" key={p.id}>

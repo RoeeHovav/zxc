@@ -9,6 +9,7 @@ import SidePanel, { Tab } from "./SidePanel";
 import Viewer, { orderSel, PageHighlight, Ref2, Selection, ViewerHandle } from "./Viewer";
 import { ConsentDialog, PageRangeDialog, PronounceDialog, ShortcutsDialog, VoiceLab } from "./Dialogs";
 import { TeacherPanel, useTeacher } from "./Teacher";
+import { QuizCard, useQuiz } from "./Quiz";
 
 interface Menu {
   x: number;
@@ -49,6 +50,7 @@ export default function Reader({ docId }: { docId: string }) {
   const [lexVersion, setLexVersion] = useState(0);
   const [sleepUntil, setSleepUntil] = useState<number | null>(null);
   const teacher = useTeacher(docId);
+  const quiz = useQuiz(docId, narrator);
   const followRef = useRef(followPaused);
   followRef.current = followPaused;
 
@@ -140,7 +142,10 @@ export default function Reader({ docId }: { docId: string }) {
     narrator.bufferPercent = settings.buffer_percent ?? 0;
     narrator.bufferMinutes = settings.buffer_minutes ?? 0;
     narrator.teacherMode = !!settings.teacher_mode && !!settings.llm_model;
-  }, [settings?.buffer_percent, settings?.buffer_minutes, settings?.pause_scale, settings?.read_kinds, settings?.teacher_mode, settings?.llm_model]);
+    const on = (settings.quiz_mode || "off") !== "off";
+    if (narrator.quizOn !== on) narrator.resetQuiz();
+    narrator.quizOn = on;
+  }, [settings?.quiz_mode, settings?.quiz_minutes, settings?.buffer_percent, settings?.buffer_minutes, settings?.pause_scale, settings?.read_kinds, settings?.teacher_mode, settings?.llm_model]);
 
   useEffect(() => {
     narrator.teacherHandler = (unit) => teacher.explain(unit.id, "section", true);
@@ -242,6 +247,7 @@ export default function Reader({ docId }: { docId: string }) {
   };
 
   const onPlay = () => {
+    if (quiz.ui) return quiz.skip(); // the play button while a checkpoint is open: skip it and carry on
     if (status === "playing" || status === "loading") {
       teacher.stopAudio();
       return narrator.pause();
@@ -253,6 +259,27 @@ export default function Reader({ docId }: { docId: string }) {
       return narrator.playFrom(p.unit_id!, p.word);
     }
     playFromCurrentPage();
+  };
+
+  const setQuizMode = async (mode: "off" | "section" | "page" | "minutes") => {
+    if (mode !== "off") {
+      if (!useStore.getState().app?.secrets.gemini_api_key && !useStore.getState().app?.test_mode) {
+        toast(lang === "he" ? "בדיקות הבנה צריכות מפתח Gemini חינמי: הגדרות ← מנועי דיבור." : "Checkpoints need your free Gemini key: Settings → Speech engines.", "error");
+        setDialog("settings");
+        return;
+      }
+      try {
+        await api.quiz(docId, []); // answers 409 with the consent text when permission has not been given yet
+      } catch (e: any) {
+        if (e?.status === 409 && e.body?.provider) {
+          const ok = await new Promise<boolean>((resolve) => setConsent({ info: e.body, resolve }));
+          if (!ok) return;
+          await api.consent(e.body.provider);
+        }
+      }
+    }
+    await update({ quiz_mode: mode });
+    narrator.resetQuiz();
   };
 
   const selectedText = async (): Promise<string> => {
@@ -322,7 +349,7 @@ export default function Reader({ docId }: { docId: string }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || dialog || pron || consent) return;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || dialog || pron || consent || quiz.ui) return;
       const skip = settings?.skip_seconds || 10;
       const ctrl = e.ctrlKey || e.metaKey;
       if (e.key === " " && !ctrl) {
@@ -605,6 +632,7 @@ export default function Reader({ docId }: { docId: string }) {
         prep={prep}
         onPrepareAll={prepareAll}
         onCancelPrep={() => narrator.cancelPrep()}
+        onQuizMode={setQuizMode}
       />
 
       {selBar && selection && (
@@ -682,6 +710,7 @@ export default function Reader({ docId }: { docId: string }) {
       )}
 
       {teacher.state && <TeacherPanel state={teacher.state} onPlay={teacher.play} onClose={teacher.close} />}
+      <QuizCard quiz={quiz} />
       {dialog === "settings" && (
         <SettingsDialog
           onClose={() => setDialog(null)}

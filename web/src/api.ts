@@ -133,10 +133,53 @@ export interface Settings {
   ai_pronunciation: boolean;
   pronunciation_model: string;
   free_fallback: boolean;
+  quiz_mode: "off" | "section" | "page" | "minutes";
+  quiz_minutes: number;
+  quiz_style: "mixed" | "recall" | "choice";
+  quiz_read_aloud: boolean;
   sleep_minutes: number;
   teacher_mode: boolean;
   llm_base_url: string;
   llm_model: string;
+}
+
+export interface QuizQuestion {
+  qid: string;
+  kind: "detail" | "link" | "apply" | "recall";
+  q: string;
+  options?: string[];
+  answer?: number;
+  key_points?: string[];
+  evidence: string;
+  why?: string;
+  unit: string;
+  word: number;
+  revisit?: boolean;
+}
+
+export interface QuizPlan {
+  units: { id: string; kind: string; chars: number }[];
+  end: string;
+  chars: number;
+  minutes: number;
+  ask: boolean;
+  why: string;
+}
+
+export interface QuizReply {
+  status: "ready" | "empty" | "too-short" | "no-key" | "paused" | "error" | "started" | "ready-cached";
+  questions: QuizQuestion[];
+  heading?: string;
+  reason?: string;
+  message?: string;
+}
+
+export interface QuizSummary {
+  asked: number;
+  points: number;
+  percent: number | null;
+  by_kind: Record<string, { asked: number; points: number }>;
+  pending: QuizQuestion[];
 }
 
 export interface AppState {
@@ -279,6 +322,12 @@ export const api = {
   neighbour: (id: string, unitId: string, direction: 1 | -1) => req<{ unit: Unit | null }>("GET", `/api/documents/${id}/units/${enc(unitId)}/next?direction=${direction}`),
   unitAt: (id: string, page: number, word: number) => req<{ unit: Unit; word: number }>("GET", `/api/documents/${id}/unit_at?page=${page}&word=${word}`),
   suggest: (id: string, page: number, word: number) => req<{ word: string; passage: string; readings: Reading[] }>("POST", `/api/documents/${id}/suggest`, { page, word }),
+  quizPlan: (id: string, unitId: string) => req<{ plan: QuizPlan | null }>("POST", `/api/documents/${id}/quiz/plan`, { unit_id: unitId }),
+  quiz: (id: string, units: string[], prefetch = false) => req<QuizReply>("POST", `/api/documents/${id}/quiz`, { units, prefetch }),
+  quizAnswer: (id: string, question: QuizQuestion, score: number, picked: number | null, revisit: boolean) =>
+    req<QuizSummary>("POST", `/api/documents/${id}/quiz/answer`, { question, score, picked, revisit }),
+  quizSummary: (id: string) => req<QuizSummary>("GET", `/api/documents/${id}/quiz/summary`),
+  quizClear: (id: string) => req<QuizSummary>("DELETE", `/api/documents/${id}/quiz/summary`),
   prepare: (id: string, unitId: string, patient = false) => req<PrepStatus>("POST", `/api/documents/${id}/prepare`, { unit_id: unitId, patient }),
   prepareStatus: (id: string) => req<PrepStatus>("GET", `/api/documents/${id}/prepare`),
   prepareCancel: (id: string) => req<PrepStatus>("DELETE", `/api/documents/${id}/prepare`),

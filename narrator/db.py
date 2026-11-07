@@ -80,6 +80,17 @@ CREATE TABLE IF NOT EXISTS doc_settings (
     value TEXT NOT NULL,
     PRIMARY KEY (doc_id, key)
 );
+CREATE TABLE IF NOT EXISTS quiz_answers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id TEXT NOT NULL,
+    qid TEXT NOT NULL,
+    question TEXT NOT NULL,
+    score REAL NOT NULL,
+    picked INTEGER,
+    revisit INTEGER DEFAULT 0,
+    at REAL
+);
+CREATE INDEX IF NOT EXISTS quiz_answers_doc ON quiz_answers (doc_id, id);
 CREATE TABLE IF NOT EXISTS ratings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sample TEXT NOT NULL,
@@ -144,7 +155,7 @@ class Database:
         self.x("UPDATE documents SET opened_at=? WHERE id=?", (time.time(), doc_id))
 
     def delete_document(self, doc_id: str) -> None:
-        for t in ("positions", "bookmarks", "history", "occurrences", "doc_settings"):
+        for t in ("positions", "bookmarks", "history", "occurrences", "doc_settings", "quiz_answers"):
             self.x(f"DELETE FROM {t} WHERE doc_id=?", (doc_id,))
         self.x("DELETE FROM lexicon WHERE doc_id=?", (doc_id,))
         self.x("DELETE FROM documents WHERE id=?", (doc_id,))
@@ -247,3 +258,28 @@ class Database:
 
     def ratings(self) -> List[dict]:
         return self.q("SELECT * FROM ratings ORDER BY at DESC")
+
+    # ----------------------------------------------------------------- quiz
+    def add_quiz_answer(self, doc_id: str, question: dict, score: float, picked: Optional[int], revisit: bool) -> int:
+        return self.x("INSERT INTO quiz_answers (doc_id,qid,question,score,picked,revisit,at) VALUES (?,?,?,?,?,?,?)",
+                      (doc_id, str(question.get("qid", "")), json.dumps(question, ensure_ascii=False), float(score),
+                       picked, 1 if revisit else 0, time.time()))
+
+    def quiz_rows(self, doc_id: str) -> List[Dict[str, Any]]:
+        rows = self.q("SELECT * FROM quiz_answers WHERE doc_id=? ORDER BY id", (doc_id,))
+        for r in rows:
+            try:
+                r["question"] = json.loads(r["question"])
+            except ValueError:
+                r["question"] = {}
+        return rows
+
+    def quiz_pending(self, doc_id: str) -> List[Dict[str, Any]]:
+        """Questions whose most recent answer was not fully right, oldest first (these come back at a later checkpoint)."""
+        latest: Dict[str, Dict[str, Any]] = {}
+        for r in self.quiz_rows(doc_id):
+            latest[r["qid"]] = r
+        return [r for r in latest.values() if r["score"] < 1.0 and r["question"]]
+
+    def clear_quiz(self, doc_id: str) -> None:
+        self.x("DELETE FROM quiz_answers WHERE doc_id=?", (doc_id,))

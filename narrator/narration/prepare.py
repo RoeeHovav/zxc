@@ -67,7 +67,7 @@ def prepare_unit(unit: Unit, lexicon: Lexicon, opts: PrepOptions, vocab=None,
             if ref in occurrences:
                 occ_local[i] = occurrences[ref]
     nopts = NormOptions(lang=unit.lang, vocab=vocab, skip_citations=opts.skip_citations,
-                        skip_footnote_marks=opts.skip_footnote_marks, verbalize_math=opts.verbalize_math)
+                        skip_footnote_marks=opts.skip_footnote_marks, verbalize_math=opts.verbalize_math, kind=unit.kind)
     toks = normalize_words(unit.texts, unit.flags, nopts, lexicon, occ_local)
     # assign tokens to sentences by their first source word
     sent_of_word = {}

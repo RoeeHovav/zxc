@@ -6,7 +6,7 @@ import os
 import sys
 
 APP_NAME = "PDF Narrator"
-VERSION = "0.9.9"
+VERSION = "0.10.0"
 
 
 def data_dir() -> str:
@@ -66,6 +66,12 @@ DEFAULT_SETTINGS = {
     # the words that can be read several ways (שמן, ספר, ...).  Needs the Gemini key; text only.
     "ai_pronunciation": True,
     "pronunciation_model": "",
+    # Comprehension checkpoints: after a stretch of listening, three questions about what was just read.
+    # Needs the Gemini key (text only is sent).  quiz_mode: off | section | page | minutes.
+    "quiz_mode": "off",
+    "quiz_minutes": 6,
+    "quiz_style": "mixed",  # mixed (2 choice + 1 open) | recall (open questions only: cannot be guessed) | choice
+    "quiz_read_aloud": False,
     # Teacher Mode (optional, off by default): any OpenAI-compatible endpoint.
     # The default points at a free local Ollama installation.
     "teacher_mode": False,

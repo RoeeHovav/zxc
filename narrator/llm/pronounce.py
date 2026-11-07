@@ -422,11 +422,19 @@ class Vocalizer:
     async def _ask(self, items, budget: float = BUDGET) -> object:
         return await self._ask_raw(SYSTEM, build_user_message(items), budget)
 
-    async def _ask_raw(self, system: str, user: str, budget: float = BUDGET) -> object:
+    async def ask_json(self, system: str, user: str, budget: float = BUDGET, temperature: float = 0.0) -> object:
+        """One JSON answer from the first Gemini text model that will give one (shared with the quiz)."""
+        if not self.key:
+            raise PronounceError("no Gemini key")
+        if time.time() < self.cooldown_until:
+            raise PronounceError(self.cool_message or "cooling down", quota=self.cool_quota)
+        return await self._ask_raw(system, user, budget, temperature)
+
+    async def _ask_raw(self, system: str, user: str, budget: float = BUDGET, temperature: float = 0.0) -> object:
         body = {
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [{"role": "user", "parts": [{"text": user}]}],
-            "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
+            "generationConfig": {"temperature": temperature, "responseMimeType": "application/json"},
         }
         deadline = time.time() + budget
         notes: List[str] = []

@@ -157,6 +157,7 @@ class NormOptions:
     expand_abbreviations: bool = True
     verbalize_math: bool = True
     vocab: Optional[Counter] = None
+    kind: str = ""  # the kind of block being read (heading, paragraph, list_item, note, ...)
 
 
 def _split_affixes(token: str) -> Tuple[str, str, str]:
@@ -175,7 +176,9 @@ def normalize_words(words: Sequence[str], flags: Sequence[int], opts: NormOption
     toks = _initial(words, flags, opts)
     toks = _cleanup(toks)
     toks = _attach_punctuation(toks)
+    toks = _tidy_for_speech(toks, opts)
     toks = _hebrew_joins(toks, opts)
+    toks = _hebrew_dates(toks, opts)
     toks = _english_hyphenation(toks, opts)
     if opts.skip_citations:
         toks = [t for t in toks if not _CITATION_RE.match(t.text)]
@@ -184,7 +187,8 @@ def normalize_words(words: Sequence[str], flags: Sequence[int], opts: NormOption
     toks = _apply_lexicon(toks, lexicon, opts)
     if opts.verbalize_math:
         toks = _math(toks, opts)
-    return [t for t in toks if t.text.strip()]
+    toks = [t for t in toks if t.text.strip()]
+    return _close_the_sentence(toks, opts)
 
 
 def _initial(words: Sequence[str], flags: Sequence[int], opts: NormOptions) -> List[Tok]:
@@ -224,6 +228,119 @@ def _cleanup(toks: List[Tok]) -> List[Tok]:
     return out
 
 
+_BULLETS = set("*•·▪●◦○■□‣⁃-–—")
+_YEAR_RANGE_RE = re.compile(r"^(\W*(?:[א-ת]{1,2}-)?)(\d{4})([-–])(\d{4})(\W*)$")
+# a callout label at the start of a side note: "למחשבה כפי שציינו..." is spoken as "למחשבה: כפי שציינו..."
+_NOTE_LABELS = {("למחשבה",), ("הערה",), ("דוגמה",), ("דוגמא",), ("משימה",), ("תזכורת",), ("לדיון",), ("לעיון",),
+                ("שימו", "לב"), ("שים", "לב"), ("לתשומת", "לבכם"), ("לתשומת", "לבך")}
+_TERMINAL_RE = re.compile(r"[.!?…:;]['\"”’)\]»״׳]*$")
+
+
+_GEMATRIA = {c: v for c, v in zip("אבגדהוזחטיכלמנסעפצקרשת", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400])}
+_MONTHS = {"תשרי", "חשוון", "חשון", "מרחשוון", "מרחשון", "כסלו", "טבת", "שבט", "אדר", "ניסן", "אייר", "סיוון", "סיון", "תמוז",
+           "אב", "אלול"}
+_DAY_WORDS = ["", "אחד", "שניים", "שלושה", "ארבעה", "חמישה", "שישה", "שבעה", "שמונה", "תשעה", "עשרה", "אחד עשר", "שנים עשר",
+              "שלושה עשר", "ארבעה עשר", "חמישה עשר", "שישה עשר", "שבעה עשר", "שמונה עשר", "תשעה עשר", "עשרים"]
+_DAY_RE = re.compile("^([בלמהוש]{1,2}-)?([א-ל][\"'׳״]?[א-ט]?[\"'׳״]?)([,.;:!?)]*)$")
+
+
+def _day_number(letters: str) -> int:
+    marks = "\"'׳״"
+    core = "".join(c for c in letters if c not in marks)
+    n = sum(_GEMATRIA.get(c, 0) for c in core)
+    return n if 1 <= n <= 30 and len(core) <= 2 else 0
+
+
+def _day_words(n: int) -> str:
+    if n <= 20:
+        return _DAY_WORDS[n]
+    return "שלושים" if n == 30 else "עשרים" + (" ו" + _DAY_WORDS[n - 20] if n > 20 else "")
+
+
+def _hebrew_dates(toks: List[Tok], opts: NormOptions) -> List[Tok]:
+    """A day of a Hebrew date is written as a letter: "ד' באייר", "י"ב בחשוון", "ב-כ"ט בתמוז". A voice reads the letter
+    ("ד" like the letter), so it is spoken as the number: ארבעה באייר, שנים עשר בחשוון, בעשרים ותשעה בתמוז."""
+    if opts.lang != "he":
+        return toks
+    out = list(toks)
+    for i in range(len(out) - 1):
+        m = _DAY_RE.match(out[i].text)
+        if not m or out[i].replaced:
+            continue
+        nxt = re.sub(r"[,.;:!?)\"']+$", "", out[i + 1].text)
+        if not (nxt[:1] == "ב" or nxt[:1] == "ל" or nxt[:1] == "מ" or nxt[:1] == "ו") and nxt not in _MONTHS:
+            continue
+        month = nxt[1:] if nxt not in _MONTHS else nxt
+        if month not in _MONTHS and month[1:] not in _MONTHS:  # "וב-" / "מ-" + month
+            continue
+        n = _day_number(m.group(2))
+        if not n or (len(m.group(2).replace('"', "").replace("'", "").replace("׳", "").replace("״", "")) == 1 and n > 10 and n not in (20, 30)):
+            continue
+        prefix = (m.group(1) or "").rstrip("-")
+        words = _day_words(n)
+        out[i] = Tok(prefix + words + m.group(3), out[i].a, out[i].b, True)
+    return out
+
+
+def _tidy_for_speech(toks: List[Tok], opts: NormOptions) -> List[Tok]:
+    """Clean-ups that only change how a passage SOUNDS (the displayed text is never touched): list bullets and footnote
+    asterisks are not read, a year range that came out of a right-to-left page back to front is put in order, a call-out
+    label gets its pause, and brackets stuck to the previous word are separated."""
+    he = opts.lang == "he"
+    out: List[Tok] = []
+    carry: Optional[Tok] = None  # a dropped marker whose source range joins the next token
+    for i, t in enumerate(toks):
+        text = t.text
+        if not out and carry is None and text in _BULLETS:
+            carry = t
+            continue
+        if he:
+            if "*" in text:
+                text = text.replace("*", "")
+                if not text:
+                    if out:
+                        out[-1] = Tok(out[-1].text, out[-1].a, t.b, out[-1].replaced)
+                    else:
+                        carry = carry or t
+                    continue
+            m = _YEAR_RANGE_RE.match(text)
+            if m and int(m.group(2)) > int(m.group(4)) and 1000 <= int(m.group(4)) <= 2100 and int(m.group(2)) <= 2100:
+                text = f"{m.group(1)}{m.group(4)}{m.group(3)}{m.group(2)}{m.group(5)}"
+        if text == "(" and i + 1 < len(toks):  # "( 1868-1924)" -> "(1868-1924)"
+            nxt = toks[i + 1]
+            toks[i + 1] = Tok("(" + nxt.text, t.a, nxt.b, nxt.replaced)
+            continue
+        if text.endswith("(") and len(text) > 1 and i + 1 < len(toks):
+            # "הצבאי( 1955)" -> "הצבאי (1955)"
+            out.append(Tok(text[:-1], t.a, t.b, t.replaced))
+            nxt = toks[i + 1]
+            toks[i + 1] = Tok("(" + nxt.text, nxt.a, nxt.b, nxt.replaced)
+            continue
+        if carry is not None:
+            t = Tok(text, carry.a, t.b, t.replaced)
+            carry = None
+        else:
+            t = Tok(text, t.a, t.b, t.replaced) if text != t.text else t
+        out.append(t)
+    if opts.kind == "note" and out:
+        for label in _NOTE_LABELS:
+            n = len(label)
+            if len(out) > n and tuple(x.text for x in out[:n]) == label:
+                out[n - 1] = Tok(out[n - 1].text + ":", out[n - 1].a, out[n - 1].b, out[n - 1].replaced)
+                break
+    return out
+
+
+def _close_the_sentence(toks: List[Tok], opts: NormOptions) -> List[Tok]:
+    """A heading, list item or side note that ends without any punctuation gets a full stop, so the voice ends it with
+    the falling tone of a finished sentence instead of hanging in the air."""
+    if toks and opts.kind in ("heading", "list_item", "note"):
+        last = toks[-1]
+        if not _TERMINAL_RE.search(last.text) and not last.text.endswith(","):
+            toks[-1] = Tok(last.text + ".", last.a, last.b, last.replaced)
+    return toks
+
+
 _PUNCT_ONLY_RE = re.compile(r"^[.,;:!?)\]}»”’…\"'״׳]+$")
 _LEADING_PUNCT_RE = re.compile(r"^([.,;:!?]+)(\w.*)$", re.UNICODE)
 
@@ -239,7 +356,8 @@ def _attach_punctuation(toks: List[Tok]) -> List[Tok]:
                 out[-1] = Tok(out[-1].text + t.text, out[-1].a, t.b)
             continue
         m = _LEADING_PUNCT_RE.match(t.text)
-        if m and out and is_hebrew_word(t.text):
+        if m and out and (is_hebrew_word(t.text) or (m.group(2)[:1].isdigit() and "." not in m.group(1))):
+            # ",1936-1939)" after "הגדול" (a comma that a right-to-left page left in front of a number)
             # ".אך" -> previous token gets the period (Word RTL artefact)
             out[-1] = Tok(out[-1].text + m.group(1), out[-1].a, out[-1].b)
             out.append(Tok(m.group(2), t.a, t.b))

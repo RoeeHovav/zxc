@@ -266,6 +266,27 @@ def create_app(service: Optional[NarratorService] = None) -> FastAPI:
     async def explain(doc_id: str, body: dict = Body(...)):
         return await svc.explain(doc_id, body["unit_id"], body.get("scope", "paragraph"))
 
+    @app.post("/api/documents/{doc_id}/quiz/plan")
+    async def quiz_plan(doc_id: str, body: dict = Body(...)):
+        return await svc.quiz_plan(doc_id, body["unit_id"])
+
+    @app.post("/api/documents/{doc_id}/quiz")
+    async def quiz_make(doc_id: str, body: dict = Body(...)):
+        return await svc.quiz_make(doc_id, [str(x) for x in body.get("units", [])], bool(body.get("prefetch")))
+
+    @app.post("/api/documents/{doc_id}/quiz/answer")
+    async def quiz_answer(doc_id: str, body: dict = Body(...)):
+        return svc.quiz_answer(doc_id, body["question"], float(body["score"]), body.get("picked"), bool(body.get("revisit")))
+
+    @app.get("/api/documents/{doc_id}/quiz/summary")
+    async def quiz_summary(doc_id: str):
+        return svc.quiz_summary(doc_id)
+
+    @app.delete("/api/documents/{doc_id}/quiz/summary")
+    async def quiz_clear(doc_id: str):
+        svc.db.clear_quiz(doc_id)
+        return svc.quiz_summary(doc_id)
+
     @app.get("/api/llm/status")
     async def llm_status():
         return await svc.llm_status()

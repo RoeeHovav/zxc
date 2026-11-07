@@ -23,6 +23,46 @@ def test_prefix_hyphen_and_punctuation_repairs():
     assert norm("היסוד .אך הדיון") == ["היסוד.", "אך", "הדיון"]
 
 
+def kinded(text, kind, lang="he"):
+    ws = text.split()
+    return [t.text for t in normalize_words(ws, [0] * len(ws), NormOptions(lang=lang, kind=kind), LEX)]
+
+
+def test_spoken_punctuation_cleanups_found_in_a_real_study_booklet():
+    # list bullets and footnote asterisks are not read aloud
+    assert kinded("* אברהם בנימין היה בן לענף", "list_item")[0] == "אברהם"
+    assert kinded("• צום גדליה חל בתשרי", "list_item")[:2] == ["צום", "גדליה"]
+    assert "*" not in "".join(kinded("בשנת 1956;* כמו גם", "paragraph"))
+    # a year range that a right-to-left page put back to front is read in order; ordinary ranges are left alone
+    assert kinded("רב ופוסק (1575-1488) נולד", "paragraph")[2] == "(1488-1575)"
+    assert kinded("בין השנים ו-1970-1956 הוא", "paragraph")[2] == "ו-1956-1970"
+    assert kinded("בין השנים 1945-1948 הוא", "paragraph")[2] == "1945-1948"
+    assert kinded("year range (1575-1488)", "paragraph", lang="en")[2] == "(1575-1488)"  # only Hebrew pages are reversed
+    # a bracket stuck to the previous word, a comma stuck to the next number
+    assert kinded("הצבאי( 1955) ובו", "paragraph")[:2] == ["הצבאי", "(1955)"]
+    assert kinded("סירקין ( 1868-1924) שפרסם", "paragraph")[1] == "(1868-1924)"
+    assert kinded("הגדול ,1936-1939) וכן", "paragraph")[:2] == ["הגדול,", "1936-1939)"]
+
+
+def test_call_out_labels_get_their_pause_and_unpunctuated_blocks_end_like_sentences():
+    assert kinded("למחשבה מדוע דגש רב כל כך מושם?", "note")[0] == "למחשבה:"
+    assert kinded("שימו לב כי החוק השתנה", "note")[:2] == ["שימו", "לב:"]
+    assert kinded("למחשבה מדוע דגש", "paragraph")[0] == "למחשבה"  # only side notes
+    assert kinded("1.1 פתיחה", "heading")[-1] == "פתיחה."
+    assert kinded("ערבים מוסלמים", "list_item")[-1] == "מוסלמים."
+    assert kinded("חוק השיפוט הצבאי.", "list_item")[-1] == "הצבאי."      # already ends the sentence
+    assert kinded("הכותרת: ", "heading")[-1] == "הכותרת:"
+    assert kinded("הפסקה נמשכת", "paragraph")[-1] == "נמשכת"           # a paragraph may continue on the next page
+
+
+def test_hebrew_date_days_are_spoken_as_numbers_not_as_letters():
+    assert norm("ד' באייר הוא יום") == ["ארבעה", "באייר", "הוא", "יום"]
+    assert norm("חל ב-י' באייר")[1:] == ["בעשרה", "באייר"]
+    assert norm('חל ב-כ"ט בחשוון, חמישים')[1:3] == ["בעשרים ותשעה", "בחשוון,"]
+    assert norm('י"ב בחשוון')[0] == "שנים עשר" and norm('ט"ו בשבט')[0] == "חמישה עשר" and norm("ל' בניסן")[0] == "שלושים"
+    assert norm("פרק ד' באמצע")[1] == "ד'" and norm("סעיף ב' לחוק")[1] == "ב'"  # a letter that is not a date day is left alone
+
+
 def test_acronym_context_rules():
     out = norm('5 מ"מ וגם מ"מ ומ"פ')
     assert out[1] == "מִילִימֶטֶר"          # after a number: millimetre
